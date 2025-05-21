@@ -13,7 +13,7 @@
 
 ## 1. Overview
 
-This project provides a complete, self-hosted OpenStreetMap system. It ingests OpenStreetMap (OSM) data for base maps
+This project provides a complete self-hosted OpenStreetMap system. It ingests OpenStreetMap (OSM) data for base maps
 and routing networks. The system serves map tiles (both vector and raster), provides turn-by-turn routing (including for
 routes via OSRM). It adds GTFS data as an example of additional data that can be ingested and makes this data queryable
 through a PostgreSQL/PostGIS database.
@@ -22,10 +22,9 @@ The entire stack is designed to run on a dedicated Debian 12 "Bookworm" system.
 
 **Core Features:**
 
-* **Map Tile Serving:**
-    * Vector Tiles via `pg_tileserv` (dynamic, from PostGIS).
-    * Raster Tiles via a classic OpenStreetMap stack (Mapnik, `renderd`, `mod_tile` with Apache2, OpenStreetMap-Carto
-      style sheet).
+* **Development Environment:** Python package (`gtfs_processor`) managed with `uv` and defined by `pyproject.toml`,
+  suitable for development in IDEs like PyCharm.
+* **Database:** PostgreSQL with PostGIS extension for storing OSM and GTFS data.
 * **Routing Engine:**
     * OSRM (Open Source Routing Machine) running in a Docker container for general point-to-point routing (car profile
       by default, adaptable).
@@ -34,10 +33,13 @@ The entire stack is designed to run on a dedicated Debian 12 "Bookworm" system.
     * Python-based ETL pipeline for processing, validating, cleaning GTFS data, and handling problematic records via
       Dead-Letter Queues (DLQ).
     * (Future) GTFS-Realtime processing.
-* **Database:** PostgreSQL with PostGIS extension for storing OSM and GTFS data.
+* **Other Data Sources**
+    * Investigate using other file formats for known routing paths.
+* **Map Tile Serving:**
+    * Vector Tiles via `pg_tileserv` (dynamic, from PostGIS).
+    * Raster Tiles via a classic OpenStreetMap stack (Mapnik, `renderd`, `mod_tile` with Apache2, OpenStreetMap-Carto
+      style sheet).
 * **Web Access:** Nginx as a reverse proxy for all services.
-* **Development Environment:** Python package (`gtfs_processor`) managed with `uv` and defined by `pyproject.toml`,
-  suitable for development in IDEs like PyCharm.
 
 ## 2. System Architecture
 
