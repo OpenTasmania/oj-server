@@ -96,7 +96,7 @@ This command:
 
 1. Checks for required Python packages
 2. Prompts to install any missing packages using sudo apt install
-3. Runs the main installation script (install_map_server.py)
+3. Runs the [main installation script](install_map_server.py)
 
 ### Detailed Setup
 
