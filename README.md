@@ -1,4 +1,4 @@
-# Comprehensive Local Open Street Map routing system
+# Local Open Street Map routing system
 
 **Version:** 0.0.1 (Project Inception)
 
@@ -152,5 +152,4 @@ works at all at initial release, but that's why it is not marked beyond Alpha qu
 
 ## 6. Contributions
 
-Contributions welcome. This project is hosted on [Gitlab](https://gitlab.com/opentasmania/osm-osrm-server), so there's
-all the good stuff there like an [Issues board](https://gitlab.com/opentasmania/osm-osrm-server/issues).
+Contributions welcome. Please see the [Contributions](CONTRIBUTIONS.md) file for more details.
