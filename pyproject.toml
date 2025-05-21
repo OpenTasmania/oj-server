@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 backend-path = "."
 
 [project]
-name = "osm_setup"
+name = "osm_osrm_server"
 version = "0.0.1"
 description = "An Open Street Map installer using PostgreSQL/PostGIS, all the way through to setting up a map server. Included is setting up GTFS data "
 readme = "README.md"
 authors = [
-    { name = "Peter Lawler", email = "osmsetup@opentasmania.net" },
+    { name = "Peter Lawler", email = "osmosrmserver@opentasmania.net" },
 ]
 license = { text = "LGPLv3+" }
 requires-python = ">=3.11" # Debian 12 comes with Python 3.11, so this is safe
@@ -43,8 +43,8 @@ Homepage = "https://opentasmania.net"
 Repository = "https://gitlab.com/opentasmania/osm-setup.git"
 
 [project.scripts]
-run-gtfs-update = "osm_setup.update_gtfs:main"
-install-map-server = "osm_setup.install_map_server:main"
+run-gtfs-update = "osm_osrm_server.update_gtfs:main"
+install-map-server = "osm_osrm_server.install_map_server:main"
 
 [project.optional-dependencies]
 dev = [
@@ -55,7 +55,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["osm_setup*"]
+include = ["osm_osrm_server*"]
 exclude = ["tests*"]
 
 [tool.ruff]

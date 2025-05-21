@@ -870,7 +870,7 @@ WantedBy=multi-user.target
     run_sudo_command(["systemctl", "status", "renderd", "--no-pager", "-l"])
 
 
-def osm_setup() -> None:
+def osm_osrm_server_setup() -> None:
     """Set up OSM data and OSRM."""
     log("Setting up OSM data and OSRM")
 
@@ -1725,7 +1725,7 @@ def main() -> None:
         success = success and execute_step("PGTILESERV_SETUP", "Setup pg_tileserv", pg_tileserv_setup)
         success = success and execute_step("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style", carto_setup)
         success = success and execute_step("RENDERD_SETUP", "Setup Renderd for Raster Tiles", renderd_setup)
-        success = success and execute_step("OSM_SETUP", "Setup OSM Data (osm2pgsql, OSRM)", osm_setup)
+        success = success and execute_step("OSM_SERVER_SETUP", "Setup OSM Data (osm2pgsql, OSRM)", osm_osrm_server_setup)
         success = success and execute_step("APACHE_SETUP", "Setup Apache for mod_tile", apache_modtile_setup)
         success = success and execute_step("NGINX_SETUP", "Setup Nginx Reverse Proxy", nginx_setup)
         success = success and execute_step("CERTBOT_SETUP", "Setup Certbot for SSL (optional)", certbot_setup)
@@ -1994,7 +1994,7 @@ def run_custom_selection() -> None:
         ("PGTILESERV_SETUP", "Setup pg_tileserv"),
         ("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style"),
         ("RENDERD_SETUP", "Setup Renderd for Raster Tiles"),
-        ("OSM_SETUP", "Setup OSM Data (osm2pgsql, OSRM)"),
+        ("OSM_SERVER_SETUP", "Setup OSM Data (osm2pgsql, OSRM)"),
         ("APACHE_SETUP", "Setup Apache for mod_tile"),
         ("NGINX_SETUP", "Setup Nginx Reverse Proxy"),
         ("CERTBOT_SETUP", "Setup Certbot for SSL (requires FQDN & Nginx)"),
@@ -2047,7 +2047,7 @@ def run_custom_selection() -> None:
                     "PGTILESERV_SETUP": pg_tileserv_setup,
                     "CARTO_SETUP": carto_setup,
                     "RENDERD_SETUP": renderd_setup,
-                    "OSM_SETUP": osm_setup,
+                    "OSM_SERVER_SETUP": osm_server_setup,
                     "APACHE_SETUP": apache_modtile_setup,
                     "NGINX_SETUP": nginx_setup,
                     "CERTBOT_SETUP": certbot_setup,
