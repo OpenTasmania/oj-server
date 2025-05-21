@@ -144,7 +144,7 @@ increasingly clear a lot of data verification should be handled by python librar
 was removed, and the code base cleaned and documentation for such was removed - although some may linger in the
 dark recesses somewhere.
 
-While it's intended at some stage to bring back microk8s, due to the thoughts of having this run on Home Assistant, for
+While it's intended at some stage to bring back microk8s, due to the thoughts of having this run on Home Assistant for
 now the project examine the possibility of dockerizing everything.
 
 In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release is
