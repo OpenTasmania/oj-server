@@ -152,4 +152,4 @@ works at all at initial release, but that's why it is not marked beyond Alpha qu
 
 ## 6. Contributions
 
-Contributions welcome. Please see the [Contributions](CONTRIBUTIONS.md) file for more details.
+Contributions welcome. Please see the [Contributions](CONTRIBUTING.md) file for more details.
