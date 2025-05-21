@@ -1,4 +1,5 @@
 # Local Open Street Map routing system
+<img src="assets/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
 
 **Version:** 0.0.1 (Project Inception)
 
