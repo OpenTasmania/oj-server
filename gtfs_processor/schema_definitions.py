@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-from typing import Optional, Literal
+from typing import Optional, Literal, Annotated
 
-from pydantic import BaseModel, validator, Field, conint, confloat, constr
+from pydantic import BaseModel, validator, Field, conint, confloat
+from pydantic.types import StringConstraints
 
 
 # --- Pydantic Model Configuration ---
@@ -15,25 +16,25 @@ class GTFSBaseModel(BaseModel):
 # --- GTFS File Specific Models ---
 
 class Agency(GTFSBaseModel):
-    agency_id: Optional[constr(min_length=1)] = None  # Conditionally Required: required if multiple agencies
-    agency_name: constr(min_length=1)
-    agency_url: constr(pattern=r'^https?://.+')  # Basic URL validation
-    agency_timezone: constr(min_length=1)  # Should be a valid TZ database name
-    agency_lang: Optional[constr(min_length=2, max_length=2)] = None  # ISO 639-1 code
+    agency_id: Optional[Annotated[str, StringConstraints(min_length=1)]] = None  # Conditionally Required: required if multiple agencies
+    agency_name: Annotated[str, StringConstraints(min_length=1)]
+    agency_url: Annotated[str, StringConstraints(pattern=r'^https?://.+')]  # Basic URL validation
+    agency_timezone: Annotated[str, StringConstraints(min_length=1)]  # Should be a valid TZ database name
+    agency_lang: Optional[Annotated[str, StringConstraints(min_length=2, max_length=2)]] = None  # ISO 639-1 code
     agency_phone: Optional[str] = None
-    agency_fare_url: Optional[constr(pattern=r'^https?://.+')] = None
-    agency_email: Optional[constr(pattern=r'[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+')] = None  # Basic email validation
+    agency_fare_url: Optional[Annotated[str, StringConstraints(pattern=r'^https?://.+')]] = None
+    agency_email: Optional[Annotated[str, StringConstraints(pattern=r'[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+')]] = None  # Basic email validation
 
 
 class Stop(GTFSBaseModel):
-    stop_id: constr(min_length=1)
+    stop_id: Annotated[str, StringConstraints(min_length=1)]
     stop_code: Optional[str] = None
-    stop_name: Optional[constr(min_length=1)] = None  # Conditionally Required if not a station with name
+    stop_name: Optional[Annotated[str, StringConstraints(min_length=1)]] = None  # Conditionally Required if not a station with name
     stop_desc: Optional[str] = None
     stop_lat: confloat(ge=-90, le=90)  # Required
     stop_lon: confloat(ge=-180, le=180)  # Required
     zone_id: Optional[str] = None
-    stop_url: Optional[constr(pattern=r'^https?://.+')] = None
+    stop_url: Optional[Annotated[str, StringConstraints(pattern=r'^https?://.+')]] = None
     location_type: Optional[conint(ge=0, le=4)] = Field(
         0)  # 0 for stop/platform, 1 for station, etc. Default to 0 (stop/platform)
     parent_station: Optional[str] = None  # Should be a stop_id of a station (location_type=1)
@@ -45,7 +46,7 @@ class Stop(GTFSBaseModel):
 
 
 class Route(GTFSBaseModel):
-    route_id: constr(min_length=1)
+    route_id: Annotated[str, StringConstraints(min_length=1)]
     agency_id: Optional[str] = None  # Conditionally Required if multiple agencies
     route_short_name: Optional[str] = Field("", max_length=50)  # GTFS says default empty string is okay
     route_long_name: Optional[str] = Field("", max_length=255)
@@ -53,18 +54,18 @@ class Route(GTFSBaseModel):
     route_type: conint(ge=0, le=7)  # Or more specific if only certain types supported, e.g. 3 for Bus
     # Extended route types exist (e.g., up to 1700s for specific rail)
     # For a general validator, a wider range or specific list could be used.
-    route_url: Optional[constr(pattern=r'^https?://.+')] = None
-    route_color: Optional[constr(pattern=r'^[0-9a-fA-F]{6}$')] = None  # Hex color
-    route_text_color: Optional[constr(pattern=r'^[0-9a-fA-F]{6}$')] = None
+    route_url: Optional[Annotated[str, StringConstraints(pattern=r'^https?://.+')]] = None
+    route_color: Optional[Annotated[str, StringConstraints(pattern=r'^[0-9a-fA-F]{6}$')]] = None  # Hex color
+    route_text_color: Optional[Annotated[str, StringConstraints(pattern=r'^[0-9a-fA-F]{6}$')]] = None
     route_sort_order: Optional[conint(ge=0)] = None
     continuous_pickup: Optional[conint(ge=0, le=3)] = Field(None)  # 0-regular, 1-none, 2-phone, 3-driver
     continuous_drop_off: Optional[conint(ge=0, le=3)] = Field(None)
 
 
 class Trip(GTFSBaseModel):
-    route_id: constr(min_length=1)
-    service_id: constr(min_length=1)
-    trip_id: constr(min_length=1)
+    route_id: Annotated[str, StringConstraints(min_length=1)]
+    service_id: Annotated[str, StringConstraints(min_length=1)]
+    trip_id: Annotated[str, StringConstraints(min_length=1)]
     trip_headsign: Optional[str] = None
     trip_short_name: Optional[str] = None
     direction_id: Optional[Literal[0, 1]] = None  # 0 or 1
@@ -75,11 +76,11 @@ class Trip(GTFSBaseModel):
 
 
 class StopTime(GTFSBaseModel):
-    trip_id: constr(min_length=1)
+    trip_id: Annotated[str, StringConstraints(min_length=1)]
     # GTFS times can be > 23:59:59, so simple time type won't work. Use regex for HH:MM:SS format.
-    arrival_time: Optional[constr(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')] = None
-    departure_time: Optional[constr(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')] = None
-    stop_id: constr(min_length=1)
+    arrival_time: Optional[Annotated[str, StringConstraints(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')]] = None
+    departure_time: Optional[Annotated[str, StringConstraints(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')]] = None
+    stop_id: Annotated[str, StringConstraints(min_length=1)]
     stop_sequence: conint(ge=0)  # Must be non-negative, usually positive and increasing
     stop_headsign: Optional[str] = None
     pickup_type: Optional[conint(ge=0, le=3)] = Field(None)  # Default is 0 if not provided
@@ -105,7 +106,7 @@ class StopTime(GTFSBaseModel):
 
 
 class Calendar(GTFSBaseModel):
-    service_id: constr(min_length=1)
+    service_id: Annotated[str, StringConstraints(min_length=1)]
     monday: Literal[0, 1]
     tuesday: Literal[0, 1]
     wednesday: Literal[0, 1]
@@ -113,8 +114,8 @@ class Calendar(GTFSBaseModel):
     friday: Literal[0, 1]
     saturday: Literal[0, 1]
     sunday: Literal[0, 1]
-    start_date: constr(pattern=r'^[0-9]{8}$')  # YYYYMMDD
-    end_date: constr(pattern=r'^[0-9]{8}$')  # YYYYMMDD
+    start_date: Annotated[str, StringConstraints(pattern=r'^[0-9]{8}$')]  # YYYYMMDD
+    end_date: Annotated[str, StringConstraints(pattern=r'^[0-9]{8}$')]  # YYYYMMDD
 
     @validator('start_date', 'end_date')
     def check_date_format(cls, v):
@@ -127,8 +128,8 @@ class Calendar(GTFSBaseModel):
 
 
 class CalendarDate(GTFSBaseModel):
-    service_id: constr(min_length=1)
-    date: constr(pattern=r'^[0-9]{8}$')  # YYYYMMDD
+    service_id: Annotated[str, StringConstraints(min_length=1)]
+    date: Annotated[str, StringConstraints(pattern=r'^[0-9]{8}$')]  # YYYYMMDD
     exception_type: Literal[1, 2]  # 1-added, 2-removed
 
     @validator('date')
@@ -141,7 +142,7 @@ class CalendarDate(GTFSBaseModel):
 
 
 class ShapePoint(GTFSBaseModel):  # For shapes.txt
-    shape_id: constr(min_length=1)
+    shape_id: Annotated[str, StringConstraints(min_length=1)]
     shape_pt_lat: confloat(ge=-90, le=90)
     shape_pt_lon: confloat(ge=-180, le=180)
     shape_pt_sequence: conint(ge=0)
@@ -149,16 +150,16 @@ class ShapePoint(GTFSBaseModel):  # For shapes.txt
 
 
 class Frequency(GTFSBaseModel):
-    trip_id: constr(min_length=1)
-    start_time: constr(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')
-    end_time: constr(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')
+    trip_id: Annotated[str, StringConstraints(min_length=1)]
+    start_time: Annotated[str, StringConstraints(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')]
+    end_time: Annotated[str, StringConstraints(pattern=r'^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$')]
     headway_secs: conint(gt=0)  # Must be positive
     exact_times: Optional[Literal[0, 1]] = Field(None)  # 0-frequency based, 1-schedule based
 
 
 class Transfer(GTFSBaseModel):
-    from_stop_id: constr(min_length=1)
-    to_stop_id: constr(min_length=1)
+    from_stop_id: Annotated[str, StringConstraints(min_length=1)]
+    to_stop_id: Annotated[str, StringConstraints(min_length=1)]
     transfer_type: conint(ge=0, le=3)  # 0-recommended, 1-timed, 2-min_time, 3-not possible
     min_transfer_time: Optional[conint(ge=0)] = None
 
@@ -170,15 +171,15 @@ class Transfer(GTFSBaseModel):
 
 
 class FeedInfo(GTFSBaseModel):
-    feed_publisher_name: constr(min_length=1)
-    feed_publisher_url: constr(pattern=r'^https?://.+')
-    feed_lang: constr(min_length=2)  # ISO 639-1 code
-    default_lang: Optional[constr(min_length=2)] = None
-    feed_start_date: Optional[constr(pattern=r'^[0-9]{8}$')] = None
-    feed_end_date: Optional[constr(pattern=r'^[0-9]{8}$')] = None
+    feed_publisher_name: Annotated[str, StringConstraints(min_length=1)]
+    feed_publisher_url: Annotated[str, StringConstraints(pattern=r'^https?://.+')]
+    feed_lang: Annotated[str, StringConstraints(min_length=2)]  # ISO 639-1 code
+    default_lang: Optional[Annotated[str, StringConstraints(min_length=2)]] = None
+    feed_start_date: Optional[Annotated[str, StringConstraints(pattern=r'^[0-9]{8}$')]] = None
+    feed_end_date: Optional[Annotated[str, StringConstraints(pattern=r'^[0-9]{8}$')]] = None
     feed_version: Optional[str] = None
-    feed_contact_email: Optional[constr(pattern=r'[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+')] = None
-    feed_contact_url: Optional[constr(pattern=r'^https?://.+')] = None
+    feed_contact_email: Optional[Annotated[str, StringConstraints(pattern=r'[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+')]] = None
+    feed_contact_url: Optional[Annotated[str, StringConstraints(pattern=r'^https?://.+')]] = None
 
     @validator('feed_start_date', 'feed_end_date', pre=True)
     def check_date_format_optional(cls, v):
