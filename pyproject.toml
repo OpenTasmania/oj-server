@@ -5,7 +5,7 @@ backend-path = "."
 
 [project]
 name = "osm_osrm_server"
-version = "0.0.1"
+version = "0.0.2"
 description = "An Open Street Map installer using PostgreSQL/PostGIS, all the way through to setting up a map server. Included is setting up GTFS data "
 readme = "README.md"
 authors = [
