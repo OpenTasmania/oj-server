@@ -15,8 +15,7 @@ from .ui import execute_step  # To call individual steps if this module had sub-
 
 # Attempt to import gtfs_processor modules, but handle failure gracefully
 try:
-    from gtfs_processor import main_pipeline as gtfs_main_pipeline
-    from gtfs_processor import utils as gtfs_utils
+    from processors.gtfs import utils as gtfs_utils, main_pipeline as gtfs_main_pipeline
 except ImportError as e:
     gtfs_main_pipeline = None
     gtfs_utils = None

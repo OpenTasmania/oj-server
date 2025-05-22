@@ -21,7 +21,6 @@ import pandas as pd
 import psycopg2
 import requests
 from psycopg2 import sql
-from psycopg2.extras import execute_values, DictCursor
 
 # Import from the gtfs_processor package if available
 try:

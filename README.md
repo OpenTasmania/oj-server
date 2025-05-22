@@ -120,7 +120,7 @@ The detailed setup process is designed to be followed sequentially.
     * Install the map server.
     * Import data from processors.
 3. Submodules
-    * [GTFS processor](gtfs_processor) Python package to import GTFS data into the postgis database on which
+    * [GTFS processor](processors/gtfs) Python package to import GTFS data into the postgis database on which
       the mapping data exists.
 
 ## 5. History
