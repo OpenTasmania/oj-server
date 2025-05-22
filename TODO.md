@@ -1,9 +1,1 @@
-* Move this to issue boards
-* Refactor the installer, so it's more manageable
-* Use python to install docker images
-* Reduce as much reliance on shell calls as possible
-* Write tests
-* Actually test
-* Use other data formats
-* Split the server into different machines
-* Dockerize all the things.
+See the Issues board for [Task list](http://gitlab.com/opentasmania/osm-osrm-server/-/issues/?sort=created_date&state=opened&type%5B%5D=task&first_page_size=20)
