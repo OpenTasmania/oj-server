@@ -1,4 +1,5 @@
 # Open Street Map and Routing Machine Server
+
 <img src="assets/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
 
 **Version:** 0.0.1 (Project Inception)
@@ -13,60 +14,47 @@
 
 ## 1. Overview
 
-This project provides a complete self-hosted OpenStreetMap system. It ingests OpenStreetMap (OSM) data for base maps
-and routing networks. The system serves map tiles (both vector and raster), provides turn-by-turn routing (including for
-routes via OSRM). It adds GTFS data as an example of additional data that can be ingested and makes this data queryable
-through a PostgreSQL/PostGIS database.
+This project provides a complete self-hosted OpenStreetMap system. It
+ingests [OpenStreetMap](https://www.openstreetmap.org/) (OSM) data for base maps and routing networks. The system serves
+map tiles (both vector and raster), provides turn-by-turn routing (including for routes
+via [OSRM](https://project-osrm.org/)). It adds [GTFS](https://gtfs.org/) data as an example of additional data that can
+be ingested and makes this data queryable through
+a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/) database.
 
-The entire stack is designed to run on a dedicated Debian 12 "Bookworm" system.
-
-**Core Features:**
-
-* **Development Environment:** Python package (`gtfs_processor`) managed with `uv` and defined by `pyproject.toml`,
-  suitable for development in IDEs like PyCharm.
-* **Database:** PostgreSQL with PostGIS extension for storing OSM and GTFS data.
-* **Routing Engine:**
-    * OSRM (Open Source Routing Machine) running in a Docker container for general point-to-point routing (car profile
-      by default, adaptable).
-* **GTFS Data Management:**
-    * Automated download and import of GTFS static feeds into PostGIS.
-    * Python-based ETL pipeline for processing, validating, cleaning GTFS data, and handling problematic records via
-      Dead-Letter Queues (DLQ).
-    * (Future) GTFS-Realtime processing.
-* **Other Data Sources**
-    * Investigate using other file formats for known routing paths.
-* **Map Tile Serving:**
-    * Vector Tiles via `pg_tileserv` (dynamic, from PostGIS).
-    * Raster Tiles via a classic OpenStreetMap stack (Mapnik, `renderd`, `mod_tile` with Apache2, OpenStreetMap-Carto
-      style sheet).
-* **Web Access:** Nginx as a reverse proxy for all services.
+The entire stack is designed to run on a dedicated [Debian 12 "Bookworm"](http://debian.org/) system.
 
 ## 2. System Architecture
 
-The system is deployed on a single Debian 12 VM with the following key components:
+The system is deployed on a GNU/Linux system with the following key components:
 
-1. **Debian 12 "Bookworm":** The primary server environment.
-2. **PostgreSQL Server (v15):** With PostGIS and HStore extensions. Stores processed OSM data and GTFS feeds.
-3. **`pg_tileserv`:** Serves vector tiles directly from PostGIS. Runs as a `systemd` service.
-4. **Raster Tile Stack:**
-    * **Mapnik:** Rendering library.
-    * **OpenStreetMap-Carto:** Stylesheet for rendering.
-    * **`renderd`:** Tile rendering daemon. Runs as a `systemd` service.
-    * **Apache2 with `mod_tile`:** Serves raster tiles and manages the cache. Runs as a `systemd` service (typically
-      on port 8080 if Nginx is primary).
-5. **OSRM Server (Docker):**
-    * The `osrm/osrm-backend` Docker image is used.
-    * OSM PBF data is preprocessed using tools within the Docker image.
+* **Development Environment:** [Python](https://www.python.org/) package (`gtfs_processor`) managed with `uv` and
+  defined by `pyproject.toml`, suitable for development in IDEs like [PyCharm](https://www.jetbrains.com/pycharm/).
+* **Database:** PostgreSQL with ith PostGIS and HStore extensions for storing OSM and GTFS data.
+* **Routing Engine:**
+    * The `osrm/osrm-backend` [Docker](https://www.docker.com/) image is used, primarily due to dependency issues in
+      development.
+    * [OSM PBF](https://wiki.openstreetmap.org/wiki/PBF_Format) data is preprocessed using tools within the Docker
+      image.
     * `osrm-routed` runs inside a Docker container managed by a `systemd` service, exposing port 5000 locally.
-6. **GTFS Processor (Python Package):**
-    * A custom Python package (`gtfs_processor`) handles GTFS download, validation, cleaning, transformation, and
-      loading into PostgreSQL.
-    * Includes DLQ mechanisms for bad data.
-    * Managed by `uv` within a virtual environment.
+* **Map Tile Serving:**
+    * Vector Tiles via [pg_tileserv](https://github.com/CrunchyData/pg_tileserv) serving vector tiles directly from
+      PostGIS. Runs as a `systemd` service.
+    * Raster Tiles via a classic OpenStreetMap stack ([Mapnik](https://mapnik.org/), `renderd` tile rendering daemon,
+      `mod_tile` serving raster tiles with [Apache2](https://httpd.apache.org/), OpenStreetMap-Carto stylesheet for
+      rendering. Runs as a `systemd` service (typically on port 8080 if Nginx is primary).
+* **Web Access:** [nginx](https://nginx.org/) as a reverse proxy for all services.
+* **SSL Certificate:** [Certbot](https://certbot.eff.org/) (typically on ports 80/443), routing requests to the
+  appropriate backend services (`pg_tileserv`, Apache/`mod_tile`, OSRM). Handles SSL termination.
+* **GTFS Data Management:**
+    * Automated download and import of GTFS static feeds into PostGIS.
+    * Python-based [ETL pipeline](https://en.wikipedia.org/wiki/Extract,_transform,_load) for processing, validating,
+      cleaning GTFS data, and handling problematic records via
+      [Dead-Letter Queues](https://en.wikipedia.org/wiki/Dead_letter_queue) (DLQ).
     * A cron job triggers updates.
-7. **Nginx:** Acts as the main reverse proxy (typically on ports 80/443), routing requests to the appropriate backend
-   services (`pg_tileserv`, Apache/`mod_tile`, OSRM). Handles SSL termination.
-8. **UFW (Uncomplicated Firewall):** Configured for basic security.
+    * (Future) GTFS-Realtime processing.
+* **UFW (Uncomplicated Firewall):** Configured for basic security.
+* **Other Data Sources**
+    * Investigate using other file formats for known routing paths.
 
 ## 3. Setup Instructions
 
@@ -126,7 +114,7 @@ The detailed setup process is designed to be followed sequentially.
     * Configuring the cron job for automated GTFS updates.
     * (Optional) Pre-rendering raster tiles.
 
-## 4. Project Structure (Python GTFS Processor)
+## 4. Project Structure
 
 1. [Installer](install.py)
     * Ensure prequisites are available.
@@ -139,19 +127,17 @@ The detailed setup process is designed to be followed sequentially.
 
 ## 5. History
 
-This project started out in late 2023 as a tool to help optimise travel patterns to purchase household goods,
-while comparing its results to commercial tools. While the publicly available OSM/OSRM could be usable, there was a
-though about how it could be useful in [Home Assistant](https://home-assistant.io) and thinking. As such, it became
-increasingly clear a lot of data verification should be handled by python libraries. In 2024, reliance on microk8s
-was removed, and the code base cleaned and documentation for such was removed - although some may linger in the
-dark recesses somewhere.
+This project started out in late 2023 as a tool to help optimise travel patterns to purchase household goods
+after becoming dissatisfied with commercial offerings. While the publicly available OSM/OSRM could be usable, there
+was consideration given to how it might be useful in [Home Assistant](https://home-assistant.io). It became increasingly
+clear a lot of data verification could be handled by python libraries and the system moved to docker.
 
-While it's intended at some stage to bring back microk8s, due to the thoughts of having this run on Home Assistant for
-now the project examine the possibility of dockerizing everything.
+In 2024, reliance on microk8s was removed, and the code base cleaned and documentation for such was removed -
+although some may linger in the dark recesses somewhere. While it's intended at some stage to bring back microk8s, due
+to the thoughts of having this run on Home Assistant for now the project intends to be dockerizing everything.
 
 In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release is
-barely tested as a working project, it's conceptual as a Python project. In fact, it would be surprising if it
-works at all at initial release, but that's why it is not marked beyond Alpha quality at that time.
+intended to make use of Issues boards on a hosted git server, as well as continuous integration build testing.
 
 ## 6. Contributions
 
