@@ -31,6 +31,8 @@ import tempfile
 import time
 from typing import List, Callable
 
+logging.basicConfig(level=logging.ERROR)
+logger_fallback = logging.getLogger(__name__)
 # Ensure the package root is in PYTHONPATH if running script directly for development
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PACKAGE_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
@@ -41,8 +43,6 @@ try:
     from gtfs_processor import utils
 except ImportError as e:
     # Fallback for cases where the script might be run before the package is properly installed
-    logging.basicConfig(level=logging.ERROR)
-    logger_fallback = logging.getLogger(__name__)
     logger_fallback.error(
         f"Failed to import gtfs_processor modules. Ensure the package is installed or PYTHONPATH is set.")
     logger_fallback.error(f"Package Root (attempted): {PACKAGE_ROOT}")
@@ -1590,6 +1590,82 @@ def website_prep() -> None:
     log(f"You should be able to access the test page at http://{VM_IP_OR_DOMAIN}/")
 
 
+# Define step execution function
+def execute_step(step_tag: str, step_description: str, step_function: Callable) -> bool:
+    """Execute a single step with state tracking."""
+    run_this_step = True
+
+    if is_step_completed(step_tag):
+        log(f"Step '{step_description}' ({step_tag}) is already marked as completed.")
+        user_input = input("Do you want to re-run it anyway? (y/N): ").strip().lower()
+        if user_input != 'y':
+            log(f"Skipping already completed step: {step_tag} - {step_description}")
+            run_this_step = False
+
+    if run_this_step:
+        log(f"--- Executing step: {step_description} ({step_tag}) ---")
+        try:
+            step_function()
+            mark_step_completed(step_tag)
+            log(f"--- Successfully completed step: {step_description} ({step_tag}) ---")
+            return True
+        except Exception as e:
+            log(f"ERROR: Step failed: {step_description} ({step_tag})")
+            log(f"Error details: {str(e)}")
+            return False
+
+    return True  # Step was skipped, not a failure
+
+
+# Define grouped actions
+def core_conflict_removal_group() -> bool:
+    return execute_step("CORE_CONFLICTS", "Remove Core Conflicts (e.g. system node)", core_conflict_removal)
+
+
+def prereqs_install_group() -> bool:
+    log("--- Starting Prerequisites Installation Group ---")
+    success = True
+    success = success and execute_step("BOOT_VERBOSITY", "Improve Boot Verbosity & Core Utils", boot_verbosity)
+    success = success and execute_step("CORE_INSTALL", "Install Core Packages (Python, PG, GIS, Fonts)",
+                                       core_install)
+    success = success and execute_step("DOCKER_INSTALL", "Install Docker Engine", docker_install)
+    success = success and execute_step("NODEJS_INSTALL", "Install Node.js (LTS from NodeSource)",
+                                       node_js_lts_install)
+    log("--- Prerequisites Installation Group Finished ---")
+    return success
+
+
+def services_setup_group() -> bool:
+    log("--- Starting Services Setup Group ---")
+    success = True
+    success = success and execute_step("UFW_SETUP", "Setup UFW Firewall", ufw_setup)
+    success = success and execute_step("POSTGRES_SETUP", "Setup PostgreSQL Database & User", postgres_setup)
+    success = success and execute_step("PGTILESERV_SETUP", "Setup pg_tileserv", pg_tileserv_setup)
+    success = success and execute_step("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style", carto_setup)
+    success = success and execute_step("RENDERD_SETUP", "Setup Renderd for Raster Tiles", renderd_setup)
+    success = success and execute_step("OSM_SERVER_SETUP", "Setup OSM Data (osm2pgsql, OSRM)", osm_osrm_server_setup)
+    success = success and execute_step("APACHE_SETUP", "Setup Apache for mod_tile", apache_modtile_setup)
+    success = success and execute_step("NGINX_SETUP", "Setup Nginx Reverse Proxy", nginx_setup)
+    success = success and execute_step("CERTBOT_SETUP", "Setup Certbot for SSL (optional)", certbot_setup)
+    log("--- Services Setup Group Finished ---")
+    return success
+
+
+def data_prep_group() -> bool:
+    log("--- Starting Data Preparation Group ---")
+    success = True
+    success = success and execute_step("GTFS_PREP", "Prepare GTFS Data (Download & Import)", gtfs_data_prep)
+    success = success and execute_step("RASTER_PREP", "Pre-render Raster Tiles (Optional & Long Task!)",
+                                       raster_tile_prep)
+    success = success and execute_step("WEBSITE_PREP", "Prepare Test Website (index.html)", website_prep)
+    log("--- Data Preparation Group Finished ---")
+    return success
+
+
+def systemd_reload_group() -> bool:
+    return execute_step("SYSTEMD_RELOAD", "Reload Systemd Daemon", systemd_reload)
+
+
 # --- Main Function ---
 def main() -> None:
     """
@@ -1674,76 +1750,6 @@ def main() -> None:
     if args.clear_state:
         clear_state_file()
         return
-
-    # Define step execution function
-    def execute_step(step_tag: str, step_description: str, step_function: Callable) -> bool:
-        """Execute a single step with state tracking."""
-        run_this_step = True
-
-        if is_step_completed(step_tag):
-            log(f"Step '{step_description}' ({step_tag}) is already marked as completed.")
-            user_input = input("Do you want to re-run it anyway? (y/N): ").strip().lower()
-            if user_input != 'y':
-                log(f"Skipping already completed step: {step_tag} - {step_description}")
-                run_this_step = False
-
-        if run_this_step:
-            log(f"--- Executing step: {step_description} ({step_tag}) ---")
-            try:
-                step_function()
-                mark_step_completed(step_tag)
-                log(f"--- Successfully completed step: {step_description} ({step_tag}) ---")
-                return True
-            except Exception as e:
-                log(f"ERROR: Step failed: {step_description} ({step_tag})")
-                log(f"Error details: {str(e)}")
-                return False
-
-        return True  # Step was skipped, not a failure
-
-    # Define grouped actions
-    def core_conflict_removal_group() -> bool:
-        return execute_step("CORE_CONFLICTS", "Remove Core Conflicts (e.g. system node)", core_conflict_removal)
-
-    def prereqs_install_group() -> bool:
-        log("--- Starting Prerequisites Installation Group ---")
-        success = True
-        success = success and execute_step("BOOT_VERBOSITY", "Improve Boot Verbosity & Core Utils", boot_verbosity)
-        success = success and execute_step("CORE_INSTALL", "Install Core Packages (Python, PG, GIS, Fonts)",
-                                           core_install)
-        success = success and execute_step("DOCKER_INSTALL", "Install Docker Engine", docker_install)
-        success = success and execute_step("NODEJS_INSTALL", "Install Node.js (LTS from NodeSource)",
-                                           node_js_lts_install)
-        log("--- Prerequisites Installation Group Finished ---")
-        return success
-
-    def services_setup_group() -> bool:
-        log("--- Starting Services Setup Group ---")
-        success = True
-        success = success and execute_step("UFW_SETUP", "Setup UFW Firewall", ufw_setup)
-        success = success and execute_step("POSTGRES_SETUP", "Setup PostgreSQL Database & User", postgres_setup)
-        success = success and execute_step("PGTILESERV_SETUP", "Setup pg_tileserv", pg_tileserv_setup)
-        success = success and execute_step("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style", carto_setup)
-        success = success and execute_step("RENDERD_SETUP", "Setup Renderd for Raster Tiles", renderd_setup)
-        success = success and execute_step("OSM_SERVER_SETUP", "Setup OSM Data (osm2pgsql, OSRM)", osm_osrm_server_setup)
-        success = success and execute_step("APACHE_SETUP", "Setup Apache for mod_tile", apache_modtile_setup)
-        success = success and execute_step("NGINX_SETUP", "Setup Nginx Reverse Proxy", nginx_setup)
-        success = success and execute_step("CERTBOT_SETUP", "Setup Certbot for SSL (optional)", certbot_setup)
-        log("--- Services Setup Group Finished ---")
-        return success
-
-    def data_prep_group() -> bool:
-        log("--- Starting Data Preparation Group ---")
-        success = True
-        success = success and execute_step("GTFS_PREP", "Prepare GTFS Data (Download & Import)", gtfs_data_prep)
-        success = success and execute_step("RASTER_PREP", "Pre-render Raster Tiles (Optional & Long Task!)",
-                                           raster_tile_prep)
-        success = success and execute_step("WEBSITE_PREP", "Prepare Test Website (index.html)", website_prep)
-        log("--- Data Preparation Group Finished ---")
-        return success
-
-    def systemd_reload_group() -> bool:
-        return execute_step("SYSTEMD_RELOAD", "Reload Systemd Daemon", systemd_reload)
 
     # Process command-line arguments for specific installation groups
     if args.full:
@@ -2047,7 +2053,7 @@ def run_custom_selection() -> None:
                     "PGTILESERV_SETUP": pg_tileserv_setup,
                     "CARTO_SETUP": carto_setup,
                     "RENDERD_SETUP": renderd_setup,
-                    "OSM_SERVER_SETUP": osm_server_setup,
+                    "OSM_SERVER_SETUP": osm_osrm_server_setup,
                     "APACHE_SETUP": apache_modtile_setup,
                     "NGINX_SETUP": nginx_setup,
                     "CERTBOT_SETUP": certbot_setup,
