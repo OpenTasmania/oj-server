@@ -3,7 +3,7 @@
 
 **Version:** 0.0.1 (Project Inception)
 
-**Date:** May 22, 2025
+**Date:** 2025-05-22
 
 **Primary Maintainer:** [Peter Lawler (relwalretep@gmail.com)](mailto:relwalretep@gmail.com)]
 
