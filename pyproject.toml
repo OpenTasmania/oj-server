@@ -40,7 +40,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://opentasmania.net"
-Repository = "https://gitlab.com/opentasmania/osm-setup.git"
+Repository = "https://gitlab.com/opentasmania/osm-osrm-server"
 
 [project.scripts]
 run-gtfs-update = "osm_osrm_server.update_gtfs:main"
