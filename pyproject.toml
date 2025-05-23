@@ -58,14 +58,45 @@ where = ["."]
 include = ["osm_osrm_server*"]
 exclude = ["tests*"]
 
+[tool.black]
+line-length = 78
+
+[tool.pytest.ini_options]
+addopts = """
+       --cov=pyutils
+       --cov-report html:cover/coverage_html
+       --cov-report json:cover/coverage.json
+       --cov-report xml:cover/coverage.xml
+       """
+testpaths = ["tests"]
+
+[tool.coverage.report]
+show_missing = true
+
 [tool.ruff]
-line-length = 120
-select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "ARG", "RUF"]
-ignore = ["E501"]
+line-length = 78
+preview = true
+
+[tool.ruff.lint]
+select = [
+    "E1",  # Indentation
+    "E2",  # Whitespace
+    "E3",  # Blank lines
+    "E4",  # Import formatting
+    "E5",  # Line length
+    "E7",  # Statement, imports, expression formatting
+    "E9",  # Syntax errors
+    "F",   # PyFlakes
+    "B"    # Bugbear
+]
+
+ignore = [
+    "E501"  # Line length will be handled by black
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]  # Ignore import not at top of file
+"**/{tests,docs,tools}/*" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"
-
-# Optional, uv often uses pyproject.toml directly
-# [tool.uv.sources]
-# gtfs_processor = { path = "." }
