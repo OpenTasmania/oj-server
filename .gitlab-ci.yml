@@ -1,0 +1,56 @@
+image: debian:bookworm
+
+stages:
+  - lint
+  - type
+# - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+
+cache:
+  key: "${CI_JOB_NAME}"
+  paths:
+    - .cache/pip
+    - .cache/uv
+    - .venv
+
+.uv_setup: &uv_setup
+  before_script:
+    - python -V
+    - python -m pip install --upgrade pip
+    - pip install uv
+    # - pipx ensurepath
+    - uv --version
+    - uv venv --python $(which python)
+    - uv pip install .[dev]
+
+Linting:
+  <<: *uv_setup
+  stage: lint
+  script:
+    - uv run -- ruff check .
+    - uv run -- black --line-length 78 .
+
+Type checking:
+  <<: *uv_setup
+  stage: type
+  script:
+    - uv run -- mypy .
+
+# Testing:
+#   <<: *uv_setup
+#   stage: test
+#   script:
+#     - uv run -- pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
+#   coverage: '/TOTAL.*\s+(\d+%)$/'
+#   artifacts:
+#     # https://docs.gitlab.com/ee/ci/yaml/index.html#artifactsexpire_in
+#     expire_in: 1 week
+#     # https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html
+#     reports:
+#       coverage_report:
+#         coverage_format: cobertura
+#         path: cover/
+#   interruptible: true
