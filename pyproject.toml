@@ -23,7 +23,8 @@ dependencies = [
     # TODO: Switch to 'gtfs-kit' for more advanced validation if gtfparse is limiting.
     "pydantic>=2.0.0", # For data validation and schema definitions
     "python-dotenv>=0.19.0", # For managing environment variables (e.g., .env file for DB creds)
-    "PyYAML>=5.4.0"              # For any YAML configurations, or if a dependency needs it
+    "PyYAML>=5.4.0", # For any YAML configurations, or if a dependency needs it
+    "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git"
 ]
 
 classifiers = [
@@ -70,12 +71,10 @@ line-length = 78
 
 [tool.pytest.ini_options]
 addopts = """
-       --cov=pyutils
        --cov-report html:cover/coverage_html
        --cov-report json:cover/coverage.json
        --cov-report xml:cover/coverage.xml
        """
-testpaths = ["tests"]
 
 [tool.coverage.report]
 show_missing = true
