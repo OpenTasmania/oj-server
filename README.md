@@ -1,6 +1,6 @@
 # Open Street Map and Routing Machine Server
 
-<img src="assets/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
+<img src="assets/artwork/logos/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
 
 **Date:** 2025-05-22
 
