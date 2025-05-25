@@ -9,7 +9,8 @@ from typing import Optional
 
 from setup import config
 from setup.command_utils import run_command, run_elevated_command, log_map_server
-from setup.helpers import backup_file, validate_cidr  # Import necessary helpers
+from setup.helpers import backup_file, validate_cidr
+from setup.state_manager import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         "info",
         logger_to_use,
     )
-
+    script_hash_for_comments = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
     pg_version = "15"  # TODO: Make this detectable or configurable
     pg_conf_dir = f"/etc/postgresql/{pg_version}/main"
     pg_conf_file = os.path.join(pg_conf_dir, "postgresql.conf")
@@ -191,7 +192,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     if backup_file(pg_conf_file, current_logger=logger_to_use):
         postgresql_custom_conf_content = f"""
-# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{config.SCRIPT_HASH} ---
+# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash_for_comments} ---
 listen_addresses = '*'
 shared_buffers = 2GB
 work_mem = 256MB
@@ -251,7 +252,7 @@ log_min_duration_statement = 250ms
                 logger_to_use,
             )
         else:
-            pg_hba_content = f"""# pg_hba.conf configured by script V{config.SCRIPT_HASH}
+            pg_hba_content = f"""# pg_hba.conf configured by script V{script_hash_for_comments}
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 local   all             postgres                                peer
 local   all             all                                     peer
