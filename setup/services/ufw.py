@@ -5,9 +5,9 @@ Handles the setup and configuration of UFW (Uncomplicated Firewall).
 import logging
 from typing import Optional
 
-from .. import config  # Access config.ADMIN_GROUP_IP, config.SYMBOLS
-from ..command_utils import run_elevated_command, log_map_server
-from ..helpers import validate_cidr  # Import necessary helpers
+from setup import config  # Access config.ADMIN_GROUP_IP, config.SYMBOLS
+from setup.command_utils import run_elevated_command, log_map_server
+from setup.helpers import validate_cidr  # Import necessary helpers
 
 module_logger = logging.getLogger(__name__)
 

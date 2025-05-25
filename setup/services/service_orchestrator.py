@@ -6,24 +6,24 @@ Imports individual service setup functions and runs them as a group.
 import logging
 from typing import Optional
 
-from .. import config  # For SYMBOLS, if used directly in log messages here
-from ..command_utils import log_map_server  # For logging
-from ..ui import execute_step  # To run each step
+from setup import config  # For SYMBOLS, if used directly in log messages here
+from setup.command_utils import log_map_server  # For logging
+from setup.ui import execute_step  # To run each step
 
 # Import all individual service setup functions from this 'services' sub-package
-from .ufw import ufw_setup
-from .postgres import postgres_setup
+from ufw import ufw_setup
+from postgres import postgres_setup
 
 # Import other service setup functions as you create their modules:
-from .pg_tileserv import (
+from pg_tileserv import (
     pg_tileserv_setup,
 )  # Assuming you create pg_tileserv.py
-from .carto import carto_setup  # Assuming you create carto.py
-from .renderd import renderd_setup  # Assuming you create renderd.py
-from .osrm import osm_osrm_server_setup  # Assuming you create osrm.py
-from .apache import apache_modtile_setup  # Assuming you create apache.py
-from .nginx import nginx_setup  # Assuming you create nginx.py
-from .certbot import certbot_setup  # Assuming you create certbot.py
+from carto import carto_setup  # Assuming you create carto.py
+from renderd import renderd_setup  # Assuming you create renderd.py
+from osrm import osm_osrm_server_setup  # Assuming you create osrm.py
+from apache import apache_modtile_setup  # Assuming you create apache.py
+from nginx import nginx_setup  # Assuming you create nginx.py
+from certbot import certbot_setup  # Assuming you create certbot.py
 
 module_logger = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ import logging
 import re  # For IP address check
 from typing import Optional
 import subprocess
-from .. import config
-from ..command_utils import (
+from setup import config
+from setup.command_utils import (
     run_elevated_command,
     log_map_server,
 )  # Removed command_exists as not used here
