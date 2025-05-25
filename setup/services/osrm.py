@@ -2,25 +2,26 @@
 """
 Handles setup of OSM data import via osm2pgsql and OSRM routing engine via Docker.
 """
+import datetime
+import getpass
+import grp
 import logging
 import os
-import getpass
-import datetime
 from typing import Optional
 
-from .. import config
-from ..command_utils import (
+from setup import config
+from setup.command_utils import (
     run_command,
     run_elevated_command,
     log_map_server,
 )  # Removed command_exists as not used here
-from ..helpers import systemd_reload
+from setup.helpers import systemd_reload
 
 module_logger = logging.getLogger(__name__)
 
 
 def osm_osrm_server_setup(
-    current_logger: Optional[logging.Logger] = None,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -43,18 +44,19 @@ def osm_osrm_server_setup(
 
     current_user = getpass.getuser()
     try:
-        current_group = getpass.getgrgid(os.getgid()).gr_name
+        current_group_info = grp.getgrgid(os.getgid())
+        current_group_name = current_group_info.gr_name
     except KeyError:
-        current_group = str(os.getgid())
+        current_group_name = str(os.getgid())  # Fallback to GID if name not found
 
     # osm_data_base_dir needs to be writable by current user for wget/osmium
     run_elevated_command(
-        ["chown", f"{current_user}:{current_group}", osm_data_base_dir],
+        ["chown", f"{current_user}:{current_group_name}", osm_data_base_dir],
         current_logger=logger_to_use,
     )
     # osrm_data_host_dir needs to be writable by user UID/GID used in docker -u flag
     run_elevated_command(
-        ["chown", f"{current_user}:{current_group}", osrm_data_host_dir],
+        ["chown", f"{current_user}:{current_group_name}", osrm_data_host_dir],
         current_logger=logger_to_use,
     )
 
@@ -148,13 +150,13 @@ def osm_osrm_server_setup(
             osm_data_base_dir, "HobartRegionMap.osm.pbf"
         )
         if not os.path.isfile(osm_pbf_to_import_for_tiles) and os.path.isfile(
-            os.path.join(osm_data_base_dir, "TasmaniaRegionMap.osm.pbf")
+                os.path.join(osm_data_base_dir, "TasmaniaRegionMap.osm.pbf")
         ):
             osm_pbf_to_import_for_tiles = os.path.join(
                 osm_data_base_dir, "TasmaniaRegionMap.osm.pbf"
             )
         elif not os.path.isfile(
-            osm_pbf_to_import_for_tiles
+                osm_pbf_to_import_for_tiles
         ):  # If neither extract exists, use full Australia
             osm_pbf_to_import_for_tiles = os.path.join(
                 osm_data_base_dir, australia_pbf
@@ -199,7 +201,7 @@ def osm_osrm_server_setup(
         run_command(
             [
                 "chown",
-                f"{current_user}:{current_group}",
+                f"{current_user}:{current_group_name}",
                 flat_nodes_storage_dir,
             ],
             current_logger=logger_to_use,
@@ -315,7 +317,7 @@ def osm_osrm_server_setup(
             0
         ]  # remove .pbf
         if (
-            ".osm" in pbf_basename_for_osrm_files
+                ".osm" in pbf_basename_for_osrm_files
         ):  # remove .osm if it was .osm.pbf
             pbf_basename_for_osrm_files = os.path.splitext(
                 pbf_basename_for_osrm_files
@@ -328,14 +330,14 @@ def osm_osrm_server_setup(
         )
         # Check if files exist before renaming, and handle if osrm_map_label is same as pbf_basename_for_osrm_files
         if os.path.exists(
-            os.path.join(
-                osrm_data_host_dir, f"{pbf_basename_for_osrm_files}.osrm"
-            )
+                os.path.join(
+                    osrm_data_host_dir, f"{pbf_basename_for_osrm_files}.osrm"
+                )
         ):  # Check for main file
             if pbf_basename_for_osrm_files != osrm_map_label:
                 for item_name in os.listdir(osrm_data_host_dir):
                     if item_name.startswith(
-                        pbf_basename_for_osrm_files + ".osrm"
+                            pbf_basename_for_osrm_files + ".osrm"
                     ):
                         new_item_name = item_name.replace(
                             pbf_basename_for_osrm_files + ".osrm",

@@ -3,13 +3,13 @@
 Functions for data preparation: GTFS processing, tile rendering, website setup.
 """
 import getpass
+import grp
 import logging
 import os
 import shutil  # For shutil.which
 import tempfile
 
 from . import config  # For config.GTFS_FEED_URL, config.SYMBOLS etc.
-
 # Corrected import: SYMBOLS removed from here
 from .command_utils import run_command, run_elevated_command, log_map_server
 from .ui import (
@@ -49,9 +49,13 @@ def gtfs_data_prep(current_logger=None) -> None:
             ["touch", gtfs_log_file], current_logger=logger_to_use
         )
         current_user = getpass.getuser()
-        current_group = getpass.getgrgid(os.getgid()).gr_name
+        try:
+            current_group_info = grp.getgrgid(os.getgid())
+            current_group_name = current_group_info.gr_name
+        except KeyError:
+            current_group_name = str(os.getgid())
         run_elevated_command(
-            ["chown", f"{current_user}:{current_group}", gtfs_log_file],
+            ["chown", f"{current_user}:{current_group_name}", gtfs_log_file],
             current_logger=logger_to_use,
         )
         log_map_server(
@@ -235,7 +239,7 @@ def gtfs_data_prep(current_logger=None) -> None:
         new_crontab_content += cron_job_line + "\n"
 
         with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, prefix="gtfscron_"
+                mode="w", delete=False, prefix="gtfscron_"
         ) as temp_f:
             temp_f.write(new_crontab_content)
             temp_cron_path = temp_f.name
@@ -301,7 +305,7 @@ def data_prep_group(current_logger) -> bool:
     ]
     for tag, desc, func in step_definitions_in_group:
         if not execute_step(
-            tag, desc, func, logger_to_use
+                tag, desc, func, logger_to_use
         ):  # execute_step from ui.py
             overall_success = False
             log_map_server(
