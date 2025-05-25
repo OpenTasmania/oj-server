@@ -3,7 +3,6 @@
 Centralized configuration, constants, and default values for the map server setup.
 """
 from os import environ
-from os.path import join
 from pathlib import Path
 
 # --- Default Global Variable Values ---
@@ -26,7 +25,7 @@ PGPASSWORD_DEFAULT = "yourStrongPasswordHere"  # IMPORTANT: User should change t
 
 # --- State File Configuration ---
 STATE_FILE_DIR = "/var/lib/map-server-setup-script"
-STATE_FILE_PATH = join(STATE_FILE_DIR, "progress_state.txt")
+STATE_FILE_PATH = Path(STATE_FILE_DIR) / "progress_state.txt"
 SCRIPT_VERSION = "1.3.1"  # Represents the version of the setup script logic
 
 # Define the root directory of the 'osm' project for hashing
