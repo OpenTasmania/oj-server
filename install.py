@@ -28,10 +28,12 @@ MAP_SERVER_LAUNCHER_SCRIPT_NAME = "install_map_server.py"
 # --- Logger for this prerequisite installer script ---
 outer_logger = logging.getLogger("PrereqInstaller")
 outer_logger.setLevel(logging.INFO)
-_handler = logging.StreamHandler(sys.stdout)  # Renamed to avoid conflict if script is re-run in same session
+_handler = logging.StreamHandler(
+    sys.stdout
+)  # Renamed to avoid conflict if script is re-run in same session
 _formatter = logging.Formatter(
-    f"[PREREQ-INSTALL] %(asctime)s - [%(levelname)s] - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    "[PREREQ-INSTALL] %(asctime)s - [%(levelname)s] - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 _handler.setFormatter(_formatter)
 if not outer_logger.handlers:
@@ -61,16 +63,36 @@ def _run_cmd_prereq(command: List[str], check: bool = True, capture_output: bool
     log_prereq(f"{SYMBOLS_OUTER.get('gear', '>>')} Executing: {' '.join(command)}", "info")
     try:
         result = subprocess.run(
-            command, check=check, capture_output=capture_output, text=text, input=cmd_input
+            command,
+            check=check,
+            capture_output=capture_output,
+            text=text,
+            input=cmd_input,
         )
         # Log stdout/stderr for successful commands if captured, useful for debugging
-        if capture_output and result.stdout and result.stdout.strip() and result.returncode == 0:
+        if (
+                capture_output
+                and result.stdout
+                and result.stdout.strip()
+                and result.returncode == 0
+        ):
             log_prereq(f"   stdout: {result.stdout.strip()}", "info")
-        if capture_output and result.stderr and result.stderr.strip() and result.returncode == 0:
-            log_prereq(f"   stderr: {result.stderr.strip()}", "info")  # Some tools use stderr for info
+        if (
+                capture_output
+                and result.stderr
+                and result.stderr.strip()
+                and result.returncode == 0
+        ):
+            log_prereq(
+                f"   stderr: {result.stderr.strip()}", "info"
+            )  # Some tools use stderr for info
         return result
     except subprocess.CalledProcessError as e:
-        err_msg = e.stderr.strip() if e.stderr else (e.stdout.strip() if e.stdout else str(e))
+        err_msg = (
+            e.stderr.strip()
+            if e.stderr
+            else (e.stdout.strip() if e.stdout else str(e))
+        )
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} Command `{' '.join(e.cmd)}` failed (rc {e.returncode}). Error: {err_msg}",
             "error")
@@ -96,7 +118,9 @@ def get_debian_codename_prereq() -> Optional[str]:
             "warning")
         return None
     try:
-        result = _run_cmd_prereq(["lsb_release", "-cs"], capture_output=True, check=True)
+        result = _run_cmd_prereq(
+            ["lsb_release", "-cs"], capture_output=True, check=True
+        )
         return result.stdout.strip()
     except Exception as e:
         log_prereq(f"{SYMBOLS_OUTER.get('warning', '!!')} Could not determine Debian codename: {e}", "warning")
@@ -129,7 +153,9 @@ def _install_uv_with_pipx_prereq() -> bool:
             "info")
         try:
             # pipx ensurepath should run as the current user
-            _run_cmd_prereq(["pipx", "ensurepath"], check=False, capture_output=True)
+            _run_cmd_prereq(
+                ["pipx", "ensurepath"], check=False, capture_output=True
+            )
             log_prereq(
                 f"{SYMBOLS_OUTER.get('success', 'OK')} 'pipx ensurepath' executed. You may need to open a new terminal or source your shell profile.",
                 "info")
@@ -147,7 +173,7 @@ def _install_uv_with_pipx_prereq() -> bool:
         log_prereq(f"{SYMBOLS_OUTER.get('success', 'OK')} 'uv' installed/upgraded successfully using pipx.", "info")
 
         pipx_bin_dir = os.path.expanduser("~/.local/bin")
-        current_path = os.environ.get('PATH', '')
+        current_path = os.environ.get("PATH", "")
         if pipx_bin_dir not in current_path.split(os.pathsep):
             log_prereq(
                 f"{SYMBOLS_OUTER.get('gear', '>>')} Adding '{pipx_bin_dir}' to PATH for current script session...",
@@ -166,8 +192,12 @@ def install_uv_prereq() -> bool:
     if command_exists_prereq("uv"):
         log_prereq(f"{SYMBOLS_OUTER.get('success', 'OK')} 'uv' is already installed.", "info")
         try:
-            uv_version_result = _run_cmd_prereq(["uv", "--version"], capture_output=True)
-            log_prereq(f"   uv version: {uv_version_result.stdout.strip()}", "info")
+            uv_version_result = _run_cmd_prereq(
+                ["uv", "--version"], capture_output=True
+            )
+            log_prereq(
+                f"   uv version: {uv_version_result.stdout.strip()}", "info"
+            )
         except Exception:
             pass
         return True
@@ -209,7 +239,9 @@ def run_main_map_server_setup(args_to_pass: List[str]) -> bool:
     """
     # MAP_SERVER_LAUNCHER_SCRIPT_NAME should be in the same directory as this script
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
-    script_path = os.path.join(current_script_dir, MAP_SERVER_LAUNCHER_SCRIPT_NAME)
+    script_path = os.path.join(
+        current_script_dir, MAP_SERVER_LAUNCHER_SCRIPT_NAME
+    )
 
     if not os.path.isfile(script_path):
         log_prereq(
@@ -222,7 +254,9 @@ def run_main_map_server_setup(args_to_pass: List[str]) -> bool:
     log_prereq(f"{SYMBOLS_OUTER.get('rocket', '>>')} Running: {' '.join(cmd_to_run)}", "info")  # This log is key
 
     try:
-        process = subprocess.run(cmd_to_run, check=False)  # check=False allows us to inspect returncode
+        process = subprocess.run(
+            cmd_to_run, check=False
+        )  # check=False allows us to inspect returncode
 
         if process.returncode == 0:
             log_prereq(
@@ -247,8 +281,64 @@ def main():
     Main function for the prerequisite installer.
     Installs 'uv' and then calls the main map server setup script.
     """
-    log_prereq(f"{SYMBOLS_OUTER.get('sparkles', '**')} Starting Prerequisite Installation Process (e.g., for uv)...",
-               "info")
+    script_name = os.path.basename(sys.argv[0])
+    if "--help" in sys.argv:
+        help_text = f"""
+    Usage: {script_name} [--help] <action_flag> [arguments_for_{MAP_SERVER_LAUNCHER_SCRIPT_NAME}]
+
+    Prerequisite installer for the Map Server Setup.
+
+    This script performs the following actions:
+    1. Ensures 'uv' (Python packager and virtual environment manager) is installed.
+       - On Debian Trixie/Sid (and derivatives like Forky), it attempts 'apt install uv'.
+       - Otherwise, or if 'apt' fails, it uses 'pipx' (installing 'pipx' via 'apt' if needed).
+    2. Based on the <action_flag> provided:
+       - If '--continue-install' is used, it calls the main map server setup script: '{MAP_SERVER_LAUNCHER_SCRIPT_NAME}'.
+       - If '--exit-on-complete' is used, it exits after prerequisite installation.
+
+    One of the action flags (--continue-install or --exit-on-complete) MUST be provided.
+    They are mutually exclusive.
+
+    All arguments other than '--help', '--continue-install', and '--exit-on-complete'
+    will be passed directly to '{MAP_SERVER_LAUNCHER_SCRIPT_NAME}' if '--continue-install' is used.
+
+    Options:
+      --help                 Show this help message and exit.
+      --continue-install     After prerequisite installation, proceed to run the
+                             main map server setup script ('{MAP_SERVER_LAUNCHER_SCRIPT_NAME}').
+      --exit-on-complete     Exit successfully after prerequisite installation is complete.
+                             Does not run '{MAP_SERVER_LAUNCHER_SCRIPT_NAME}'.
+
+    Example:
+      To install prerequisites and then run the main setup with specific arguments:
+      {script_name} --continue-install --data-dir /path/to/data
+
+      To only install/verify prerequisites and then stop:
+      {script_name} --exit-on-complete
+    """
+        # Parse and validate action flags
+    continue_install_flag = "--continue-install" in sys.argv
+    exit_on_complete_flag = "--exit-on-complete" in sys.argv
+
+    if not continue_install_flag and not exit_on_complete_flag:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '')} Error: You must specify either --continue-install or --exit-on-complete.",
+            "critical",
+        )
+        print(
+            f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [arguments_for_{MAP_SERVER_LAUNCHER_SCRIPT_NAME}]")
+        print(f"Run '{script_name} --help' for more details.")
+        return 1
+
+    if continue_install_flag and exit_on_complete_flag:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '')} Error: --continue-install and --exit-on-complete are mutually exclusive.",
+            "critical",
+        )
+        print(
+            f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [arguments_for_{MAP_SERVER_LAUNCHER_SCRIPT_NAME}]")
+        print(f"Run '{script_name} --help' for more details.")
+        return 1
 
     log_prereq(f"{SYMBOLS_OUTER.get('step', '->')} Ensuring 'uv' (Python environment manager) is installed...", "info")
     if not install_uv_prereq():
@@ -265,22 +355,32 @@ def main():
             f"{SYMBOLS_OUTER.get('warning', '!!')} 'uv' command still not found in PATH after installation attempt. You may need to open a new terminal or source your shell profile for 'uv' to be available for manual use. The main setup script might still function if it uses absolute paths or manages environments internally.",
             "warning")
 
-    log_prereq(
-        f"{SYMBOLS_OUTER.get('step', '->')} Proceeding to main map server setup (via {MAP_SERVER_LAUNCHER_SCRIPT_NAME})...",
-        "info")
-
-    # Forward all command line arguments from this script to the next one
-    args_for_map_server_setup = sys.argv[1:]
-
-    if run_main_map_server_setup(args_for_map_server_setup):
+    if continue_install_flag:
         log_prereq(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Overall process: Main map server setup reported success! {SYMBOLS_OUTER.get('sparkles', '**')}",
-            "info")
-        return 0  # Overall success
+            f"{SYMBOLS_OUTER.get('step', '->')} Proceeding to main map server setup (via {MAP_SERVER_LAUNCHER_SCRIPT_NAME})...",
+            "info",
+        )
+        # Forward all command line arguments from this script to the next one,
+        # excluding the flags handled by this script.
+        args_for_map_server_setup = [
+            arg for arg in sys.argv[1:] if arg not in ["--continue-install", "--exit-on-complete"]
+        ]
+
+        if run_main_map_server_setup(args_for_map_server_setup):
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Overall process: Main map server setup reported success! {SYMBOLS_OUTER.get('sparkles', '**')}",
+                "info",
+            )
+            return 0  # Overall success
+        else:
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('critical', '!!')} {SYMBOLS_OUTER.get('error', '!!')} Overall process: Main map server setup script reported failure or took no definitive action.",
+            )
+            return 1  # Overall failure
     else:
         log_prereq(
-            f"{SYMBOLS_OUTER.get('critical', '!!')} {SYMBOLS_OUTER.get('error', '!!')} Overall process: Main map server setup script reported failure or took no definitive action.",
-            "critical")
+            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Overall process: Main map server setup script success, going no further.",
+        )
         return 1  # Overall failure
 
 
@@ -291,8 +391,10 @@ if __name__ == "__main__":
         # Ensure log_prereq can be called even if logger setup was minimal
         if not outer_logger.handlers:  # Basic safety for the logger
             _handler_kb = logging.StreamHandler(sys.stdout)
-            _formatter_kb = logging.Formatter(f"[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
-                                              datefmt="%Y-%m-%d %H:%M:%S")
+            _formatter_kb = logging.Formatter(
+                "[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
             _handler_kb.setFormatter(_formatter_kb)
             outer_logger.addHandler(_handler_kb)
             outer_logger.setLevel(logging.INFO)
