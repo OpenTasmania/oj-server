@@ -4,7 +4,10 @@ Handles setup of Nginx as a reverse proxy.
 """
 import logging
 import os
+import subprocess
 from typing import Optional
+
+from setup.helpers import systemd_reload
 
 from setup import config
 from setup.command_utils import (
@@ -12,8 +15,7 @@ from setup.command_utils import (
     log_map_server,
     command_exists,
 )
-from ..helpers import systemd_reload  # Import systemd_reload
-import subprocess
+from setup.state_manager import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ def nginx_setup(current_logger: Optional[logging.Logger] = None) -> None:
         "info",
         logger_to_use,
     )
-
+    script_hash_for_comments = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
     if not command_exists("nginx"):
         log_map_server(
             f"{config.SYMBOLS['warning']} Nginx not found. Skipping Nginx setup.",
@@ -74,7 +76,7 @@ def nginx_setup(current_logger: Optional[logging.Logger] = None) -> None:
     # IMPORTANT: In f-strings, Nginx's own $variables need to be escaped as $$.
     # Python variables like {config.VM_IP_OR_DOMAIN} are interpolated correctly by the f-string.
     nginx_transit_proxy_conf_content = f"""# /etc/nginx/sites-available/transit_proxy
-# Configured by script V{config.SCRIPT_HASH}
+# Configured by script V{script_hash_for_comments}
 server {{
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -151,7 +153,7 @@ server {{
     nginx_conf_enabled_path = f"/etc/nginx/sites-enabled/{os.path.basename(nginx_conf_available_path)}"
     # Ensure target for symlink exists before creating it
     if os.path.isfile(
-        nginx_conf_available_path
+            nginx_conf_available_path
     ):  # This check is as current user, might not see root-owned file
         # Better to rely on ln -sf to overwrite if it exists, or fail if source is missing
         run_elevated_command(
