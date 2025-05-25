@@ -9,7 +9,6 @@ import logging
 import os
 import sys
 
-# Use relative imports for modules within the 'setup' package
 from setup import config
 from setup.command_utils import log_map_server, check_package_installed
 from setup.core_setup import prereqs_install_group, core_conflict_removal_group

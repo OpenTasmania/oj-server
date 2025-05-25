@@ -7,12 +7,11 @@ import logging
 import os
 import tempfile
 
-from . import config  # For package lists, default values, and config.SYMBOLS
+from setup import config
 
-# Corrected import: SYMBOLS removed from here
-from .command_utils import run_command, run_elevated_command, log_map_server
-from .helpers import backup_file  # For backing up grub config
-from .ui import execute_step
+from setup.command_utils import run_command, run_elevated_command, log_map_server
+from setup.helpers import backup_file
+from setup.ui import execute_step
 
 module_logger = logging.getLogger(__name__)
 
