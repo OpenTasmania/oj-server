@@ -3,20 +3,15 @@
 General helper utility functions for the map server setup script.
 """
 import datetime
-import getpass  # For current username
+import getpass
 import logging
 import os
 import re
-import subprocess  # For CalledProcessError
-from typing import Optional, List  # Added List
+import subprocess
+from typing import Optional, List
 
-# Relative imports from within the 'setup' package
-from . import (
-    config,
-)  # To access config.SYMBOLS, config.PGPASSWORD_DEFAULT, etc.
-from .command_utils import run_command, run_elevated_command, log_map_server
-
-# SYMBOLS will be accessed via config.SYMBOLS
+from setup import config
+from setup.command_utils import run_command, run_elevated_command, log_map_server
 
 module_logger = logging.getLogger(__name__)
 
@@ -44,11 +39,10 @@ def systemd_reload(current_logger: Optional[logging.Logger] = None) -> None:
             "error",
             logger_to_use,
         )
-        # Depending on severity, you might want to raise e
 
 
 def backup_file(
-    file_path: str, current_logger: Optional[logging.Logger] = None
+        file_path: str, current_logger: Optional[logging.Logger] = None
 ) -> bool:
     """Create a backup of a file with timestamp using elevated privileges."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -63,7 +57,7 @@ def backup_file(
             current_logger=logger_to_use,
         )
     except (
-        subprocess.CalledProcessError
+            subprocess.CalledProcessError
     ):  # test -f returns 1 if file does not exist
         log_map_server(
             f"{config.SYMBOLS['warning']} File {file_path} does not exist or is not accessible (even with elevation). Cannot backup.",
@@ -72,7 +66,7 @@ def backup_file(
         )
         return False
     except (
-        Exception
+            Exception
     ) as e:  # Other errors like sudo itself failing, or test command missing
         log_map_server(
             f"{config.SYMBOLS['error']} Error pre-checking file existence for backup of {file_path}: {e}",
@@ -103,7 +97,7 @@ def backup_file(
 
 
 def validate_cidr(
-    cidr: str, current_logger: Optional[logging.Logger] = None
+        cidr: str, current_logger: Optional[logging.Logger] = None
 ) -> bool:
     """Validate a CIDR notation IP address range."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -165,14 +159,14 @@ def validate_cidr(
 
 
 def setup_pgpass(
-    pg_host: str,
-    pg_port: str,
-    pg_database: str,
-    pg_user: str,
-    pg_password: str,
-    pg_password_default: str,
-    allow_default_for_dev: bool = False,
-    current_logger: Optional[logging.Logger] = None,
+        pg_host: str,
+        pg_port: str,
+        pg_database: str,
+        pg_user: str,
+        pg_password: str,
+        pg_password_default: str,
+        allow_default_for_dev: bool = False,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """Set up .pgpass file for PostgreSQL authentication for the current user."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -181,9 +175,9 @@ def setup_pgpass(
     if pg_password and pg_password != pg_password_default:
         can_create_pgpass = True
     elif (
-        pg_password
-        and pg_password == pg_password_default
-        and allow_default_for_dev
+            pg_password
+            and pg_password == pg_password_default
+            and allow_default_for_dev
     ):
         log_map_server(
             f"{config.SYMBOLS['warning']} DEV OVERRIDE: Proceeding with .pgpass creation using the default (unsafe) password.",
@@ -228,9 +222,9 @@ def setup_pgpass(
 
         pgpass_file = os.path.join(home_dir, ".pgpass")
         pgpass_entry_content = f"{str(pg_host)}:{str(pg_port)}:{str(pg_database)}:{str(pg_user)}:{str(pg_password)}"
-#        pgpass_entry_line = f"{pgpass_entry_content}\n"
+        #        pgpass_entry_line = f"{pgpass_entry_content}\n"
 
-#        entry_exists = False
+        #        entry_exists = False
         current_pgpass_lines: List[str] = []
         if os.path.isfile(pgpass_file):
             try:
@@ -238,8 +232,8 @@ def setup_pgpass(
                     current_pgpass_lines = [
                         line.strip() for line in f_read if line.strip()
                     ]  # Read and strip empty lines
-#                if pgpass_entry_content in current_pgpass_lines:
-#                    entry_exists = True
+            #                if pgpass_entry_content in current_pgpass_lines:
+            #                    entry_exists = True
             except Exception as e_read:
                 log_map_server(
                     f"{config.SYMBOLS['warning']} Could not read existing .pgpass file at {pgpass_file}: {e_read}",
@@ -261,7 +255,7 @@ def setup_pgpass(
 
         try:
             with open(
-                pgpass_file, "w"
+                    pgpass_file, "w"
             ) as f_write:  # Overwrite with filtered + new content
                 for line in updated_pgpass_content_lines:
                     f_write.write(line + "\n")
@@ -292,7 +286,7 @@ def setup_pgpass(
 
 
 def get_debian_codename(
-    current_logger: Optional[logging.Logger] = None,
+        current_logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """Get the Debian codename."""
     logger_to_use = current_logger if current_logger else module_logger
