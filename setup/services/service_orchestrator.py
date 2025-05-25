@@ -6,30 +6,24 @@ Imports individual service setup functions and runs them as a group.
 import logging
 from typing import Optional
 
-from setup import config  # For SYMBOLS, if used directly in log messages here
-from setup.command_utils import log_map_server  # For logging
-from setup.ui import execute_step  # To run each step
-
-# Import all individual service setup functions from this 'services' sub-package
-from ufw import ufw_setup
-from postgres import postgres_setup
-
-# Import other service setup functions as you create their modules:
-from pg_tileserv import (
-    pg_tileserv_setup,
-)  # Assuming you create pg_tileserv.py
-from carto import carto_setup  # Assuming you create carto.py
-from renderd import renderd_setup  # Assuming you create renderd.py
-from osrm import osm_osrm_server_setup  # Assuming you create osrm.py
-from apache import apache_modtile_setup  # Assuming you create apache.py
-from nginx import nginx_setup  # Assuming you create nginx.py
-from certbot import certbot_setup  # Assuming you create certbot.py
+from setup import config
+from setup.command_utils import log_map_server
+from setup.services.apache import apache_modtile_setup  # Assuming you create apache.py
+from setup.services.carto import carto_setup  # Assuming you create carto.py
+from setup.services.certbot import certbot_setup  # Assuming you create certbot.py
+from setup.services.nginx import nginx_setup  # Assuming you create nginx.py
+from setup.services.osrm import osm_osrm_server_setup  # Assuming you create osrm.py
+from setup.services.pg_tileserv import pg_tileserv_setup  # Assuming you create pg_tileserv.py
+from setup.services.postgres import postgres_setup
+from setup.services.renderd import renderd_setup  # Assuming you create renderd.py
+from setup.services.ufw import ufw_setup
+from setup.ui import execute_step
 
 module_logger = logging.getLogger(__name__)
 
 
 def services_setup_group(
-    current_logger: Optional[logging.Logger] = None,
+        current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     """Runs all service setup steps in sequence."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -67,7 +61,7 @@ def services_setup_group(
     for tag, desc, func_ref in service_steps_to_run:
         # Pass logger_to_use to execute_step, which will then pass it to func_ref
         if not execute_step(
-            tag, desc, func_ref, current_logger_instance=logger_to_use
+                tag, desc, func_ref, current_logger_instance=logger_to_use
         ):
             overall_success = False
             log_map_server(
