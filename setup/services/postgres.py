@@ -254,7 +254,7 @@ log_min_duration_statement = 250ms
             pg_hba_content = f"""# pg_hba.conf configured by script V{config.SCRIPT_VERSION}
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 local   all             postgres                                peer
-local   all             all                                     peer map=pgr PGDATABASE={config.PGDATABASE} PGUSER={config.PGUSER}
+local   all             all                                     peer
 local   {config.PGDATABASE}    {config.PGUSER}                                scram-sha-256
 host    all             all             127.0.0.1/32            scram-sha-256
 host    {config.PGDATABASE}    {config.PGUSER}        127.0.0.1/32            scram-sha-256
