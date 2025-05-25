@@ -4,6 +4,7 @@ Centralized configuration, constants, and default values for the map server setu
 """
 from os import environ
 from os.path import join
+from pathlib import Path
 
 # --- Default Global Variable Values ---
 ADMIN_GROUP_IP_DEFAULT = "192.168.128.0/22"
@@ -27,6 +28,10 @@ PGPASSWORD_DEFAULT = "yourStrongPasswordHere"  # IMPORTANT: User should change t
 STATE_FILE_DIR = "/var/lib/map-server-setup-script"
 STATE_FILE_PATH = join(STATE_FILE_DIR, "progress_state.txt")
 SCRIPT_VERSION = "1.3.1"  # Represents the version of the setup script logic
+
+# Define the root directory of the 'osm' project for hashing
+# This assumes config.py is in osm/setup/
+OSM_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # --- Package Lists (for apt installation) ---
 CORE_PREREQ_PACKAGES = [

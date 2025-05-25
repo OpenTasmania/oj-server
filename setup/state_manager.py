@@ -9,9 +9,12 @@ import re
 import subprocess  # Needed for CalledProcessError in this module's context
 import tempfile
 
-from .command_utils import run_elevated_command, log_map_server
-from .config import STATE_FILE_PATH, SCRIPT_VERSION, SYMBOLS
+from setup.command_utils import run_elevated_command, log_map_server
+from setup.config import STATE_FILE_PATH, SCRIPT_VERSION, SYMBOLS, OSM_PROJECT_ROOT
 from typing import List
+from pathlib import Path
+from setup.helpers import calculate_project_hash
+from typing import Optional
 
 # Each module can have its own logger, which will inherit formatting if main configures root or a parent.
 # Or, we can pass the main logger instance around.
@@ -19,29 +22,53 @@ from typing import List
 # If not passed, they could use a default module-level logger.
 module_logger = logging.getLogger(__name__)
 
+CURRENT_SCRIPT_HASH = None
+
+def get_current_script_hash(logger_instance=None) -> Optional[str]:
+    """Gets the current script hash, calculating it if not already done."""
+    global CURRENT_SCRIPT_HASH
+    if CURRENT_SCRIPT_HASH is None:
+        CURRENT_SCRIPT_HASH = calculate_project_hash(OSM_PROJECT_ROOT, current_logger=logger_instance)
+    return CURRENT_SCRIPT_HASH
+
 
 def initialize_state_system(current_logger=None) -> None:
     """
     Initialize the state system. Ensures state directory and file exist.
-    Checks script version and clears state if mismatched.
+    Checks script hash and clears state if mismatched.
     """
     logger_to_use = current_logger if current_logger else module_logger
-    state_dir = os.path.dirname(STATE_FILE_PATH)
+    state_dir = STATE_FILE_PATH.parent # Use Path object's parent
 
-    if not os.path.isdir(state_dir):
+    # Get current script hash
+    current_hash = get_current_script_hash(logger_instance=logger_to_use)
+    if not current_hash:
+        log_map_server(
+            f"{SYMBOLS['critical']} Could not calculate current SCRIPT_HASH. State management cannot proceed reliably.",
+            "critical",
+            logger_to_use
+        )
+        # Decide behavior: raise error, or proceed with caution (state might be invalid)
+        # For now, let's try to proceed but state might be cleared if file exists without hash
+        # or has an old hash.
+        # A more robust approach might be to prevent the script from running if hash fails.
+
+    if not state_dir.is_dir():
         log_map_server(
             f"{SYMBOLS['info']} Creating state directory: {state_dir}",
             "info",
             logger_to_use,
         )
         run_elevated_command(
-            ["mkdir", "-p", state_dir], current_logger=logger_to_use
+            ["mkdir", "-p", str(state_dir)], current_logger=logger_to_use
         )
         run_elevated_command(
-            ["chmod", "750", state_dir], current_logger=logger_to_use
-        )  # Group access
+            ["chmod", "750", str(state_dir)], current_logger=logger_to_use
+        )
 
-    if not os.path.isfile(STATE_FILE_PATH):
+    state_file_header = f"# SCRIPT_HASH: {current_hash or 'UNKNOWN_HASH'}\n"
+
+    if not STATE_FILE_PATH.is_file():
         log_map_server(
             f"{SYMBOLS['info']} Initializing state file: {STATE_FILE_PATH}",
             "info",
@@ -50,82 +77,113 @@ def initialize_state_system(current_logger=None) -> None:
         with tempfile.NamedTemporaryFile(
             mode="w", delete=False, prefix="mapstate_init_", suffix=".txt"
         ) as temp_f:
-            temp_f.write(f"# Script Version: {SCRIPT_VERSION}\n")
+            temp_f.write(state_file_header)
+            # Optionally add the human-readable SCRIPT_VERSION for info
+            temp_f.write(f"# Human-readable Script Version: {SCRIPT_VERSION}\n")
             temp_file_path = temp_f.name
         try:
             run_elevated_command(
-                ["cp", temp_file_path, STATE_FILE_PATH],
+                ["cp", temp_file_path, str(STATE_FILE_PATH)],
                 current_logger=logger_to_use,
             )
             run_elevated_command(
-                ["chmod", "640", STATE_FILE_PATH],
-                current_logger=logger_to_use,
-            )  # Group read
-        finally:
-            os.unlink(temp_file_path)
-    else:
-        try:
-            # Grep needs capture_output=True to read its stdout
-            result = run_elevated_command(
-                ["grep", "^# Script Version:", STATE_FILE_PATH],
-                capture_output=True,
-                check=False,
+                ["chmod", "640", str(STATE_FILE_PATH)],
                 current_logger=logger_to_use,
             )
+        finally:
+            os.unlink(temp_file_path)
+    else: # State file exists, check hash
+        try:
+            result = run_elevated_command(
+                ["grep", "^# SCRIPT_HASH:", str(STATE_FILE_PATH)],
+                capture_output=True,
+                check=False, # Don't fail if grep doesn't find it
+                current_logger=logger_to_use,
+            )
+            stored_hash = None
             if result.returncode == 0 and result.stdout:
-                # Extract version more carefully
-                stored_version_match = re.search(
-                    r"^\# Script Version:\s*(\S+)",
+                stored_hash_match = re.search(
+                    r"^\# SCRIPT_HASH:\s*(\S+)",
                     result.stdout,
                     re.MULTILINE,
                 )
-                if stored_version_match:
-                    stored_version = stored_version_match.group(1)
-                    if stored_version != SCRIPT_VERSION:
-                        log_map_server(
-                            f"{SYMBOLS['warning']} Script version mismatch in state file. Stored: {stored_version}, Current: {SCRIPT_VERSION}",
-                            "warning",
-                            logger_to_use,
-                        )
-                        log_map_server(
-                            f"{SYMBOLS['info']} Clearing state file due to version mismatch.",
-                            "info",
-                            logger_to_use,
-                        )
-                        clear_state_file(
-                            write_version_only=True,
-                            current_logger=logger_to_use,
-                        )
-                else:
-                    log_map_server(
-                        f"{SYMBOLS['warning']} State file version line not found or malformed. Re-initializing.",
-                        "warning",
-                        logger_to_use,
-                    )
-                    clear_state_file(
-                        write_version_only=True, current_logger=logger_to_use
-                    )
-            elif (
-                result.returncode == 1
-            ):  # Grep found nothing (empty file or no version line)
+                if stored_hash_match:
+                    stored_hash = stored_hash_match.group(1)
+
+            if not current_hash or (stored_hash != current_hash):
+                log_message_reason = "Could not calculate current hash" if not current_hash else \
+                                     f"SCRIPT_HASH mismatch. Stored: {stored_hash}, Current: {current_hash}"
                 log_map_server(
-                    f"{SYMBOLS['warning']} State file exists but is empty or has no version line. Re-initializing.",
+                    f"{SYMBOLS['warning']} {log_message_reason}",
                     "warning",
                     logger_to_use,
                 )
-                clear_state_file(
-                    write_version_only=True, current_logger=logger_to_use
+                log_map_server(
+                    f"{SYMBOLS['info']} Clearing state file due to hash issue or mismatch.",
+                    "info",
+                    logger_to_use,
                 )
-            # If grep had other errors, run_elevated_command would raise an exception
+                # Pass current_hash (or a placeholder if None) to clear_state_file
+                clear_state_file(
+                    script_hash_to_write=current_hash, current_logger=logger_to_use
+                )
+            # If current_hash is valid and matches stored_hash, do nothing.
         except Exception as e:
             log_map_server(
-                f"{SYMBOLS['error']} Error checking script version in state file ({STATE_FILE_PATH}): {e}. Re-initializing.",
+                f"{SYMBOLS['error']} Error checking SCRIPT_HASH in state file ({STATE_FILE_PATH}): {e}. Re-initializing.",
                 "error",
                 logger_to_use,
             )
             clear_state_file(
-                write_version_only=True, current_logger=logger_to_use
+                script_hash_to_write=current_hash, current_logger=logger_to_use
             )
+
+def clear_state_file(script_hash_to_write: Optional[str] = None, current_logger=None) -> None:
+    """Clear the state file, writing only the SCRIPT_HASH and optionally SCRIPT_VERSION."""
+    logger_to_use = current_logger if current_logger else module_logger
+    log_map_server(
+        f"{SYMBOLS['info']} Clearing state file: {STATE_FILE_PATH}",
+        "info",
+        logger_to_use,
+    )
+
+    effective_hash = script_hash_to_write
+    if effective_hash is None: # If not passed, try to calculate it
+        effective_hash = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH_AT_CLEAR"
+
+    content_to_write = f"# SCRIPT_HASH: {effective_hash}\n"
+    # Optionally, keep the human-readable version for reference
+    content_to_write += f"# Human-readable Script Version: {SCRIPT_VERSION}\n"
+    content_to_write += (
+        f"# State cleared/re-initialized on {datetime.datetime.now().isoformat()}\n"
+    )
+
+    temp_file_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, prefix="mapstate_clear_", suffix=".txt"
+        ) as temp_f:
+            temp_f.write(content_to_write)
+            temp_file_path = temp_f.name
+
+        run_elevated_command(
+            ["cp", temp_file_path, str(STATE_FILE_PATH)],
+            current_logger=logger_to_use,
+        )
+        log_map_server(
+            f"{SYMBOLS['success']} State file re-initialized with SCRIPT_HASH: {effective_hash}.",
+            "success",
+            logger_to_use,
+        )
+    except Exception as e:
+        log_map_server(
+            f"{SYMBOLS['error']} Failed to clear/re-initialize state file: {e}",
+            "error",
+            logger_to_use,
+        )
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
 
 
 def mark_step_completed(step_tag: str, current_logger=None) -> None:
@@ -184,59 +242,6 @@ def is_step_completed(step_tag: str, current_logger=None) -> bool:
         )
         return False  # Assume not completed on error
 
-
-def clear_state_file(
-    write_version_only: bool = False, current_logger=None
-) -> None:
-    """Clear the state file, optionally keeping only the version line."""
-    logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(
-        f"{SYMBOLS['info']} Clearing state file: {STATE_FILE_PATH}",
-        "info",
-        logger_to_use,
-    )
-
-    content_to_write = f"# Script Version: {SCRIPT_VERSION}\n"
-    if not write_version_only:
-        content_to_write += (
-            f"# State cleared on {datetime.datetime.now().isoformat()}\n"
-        )
-
-    # Use a temporary file to prepare content, then sudo cp
-    # This avoids needing sudo for basic file writing in Python, only for the final copy.
-    temp_file_path = ""
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, prefix="mapstate_clear_", suffix=".txt"
-        ) as temp_f:
-            temp_f.write(content_to_write)
-            temp_file_path = temp_f.name
-
-        run_elevated_command(
-            ["cp", temp_file_path, STATE_FILE_PATH],
-            current_logger=logger_to_use,
-        )
-        if not write_version_only:
-            log_map_server(
-                f"{SYMBOLS['success']} Progress state file cleared.",
-                "success",
-                logger_to_use,
-            )
-        else:
-            log_map_server(
-                f"{SYMBOLS['success']} Progress state file re-initialized with version.",
-                "success",
-                logger_to_use,
-            )
-    except Exception as e:
-        log_map_server(
-            f"{SYMBOLS['error']} Failed to clear state file: {e}",
-            "error",
-            logger_to_use,
-        )
-    finally:
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.unlink(temp_file_path)
 
 
 def view_completed_steps(current_logger=None) -> List[str]:

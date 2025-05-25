@@ -74,7 +74,7 @@ def nginx_setup(current_logger: Optional[logging.Logger] = None) -> None:
     # IMPORTANT: In f-strings, Nginx's own $variables need to be escaped as $$.
     # Python variables like {config.VM_IP_OR_DOMAIN} are interpolated correctly by the f-string.
     nginx_transit_proxy_conf_content = f"""# /etc/nginx/sites-available/transit_proxy
-# Configured by script V{config.SCRIPT_VERSION}
+# Configured by script V{config.SCRIPT_HASH}
 server {{
     listen 80 default_server;
     listen [::]:80 default_server;

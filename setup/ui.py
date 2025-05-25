@@ -7,7 +7,7 @@ import datetime  # For view_configuration
 from typing import Callable, List, Tuple  # For type hinting
 
 # Relative imports from within the 'setup' package
-from . import config  # To access config.SYMBOLS, SCRIPT_VERSION, etc.
+from . import config  # To access config.SYMBOLS, SCRIPT_HASH, etc.
 from .command_utils import log_map_server  # SYMBOLS is NOT imported from here
 from .state_manager import (
     is_step_completed,
@@ -133,7 +133,7 @@ def view_configuration(current_logger=None) -> None:
     config_text += (
         f"  STATE_FILE_PATH:             {config.STATE_FILE_PATH}\n"
     )
-    config_text += f"  SCRIPT_VERSION:              {config.SCRIPT_VERSION}\n"
+    config_text += f"  SCRIPT_HASH:              {config.SCRIPT_HASH}\n"
     config_text += f"  TIMESTAMP (current view):    {datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S')}\n\n"
     config_text += (
         "You can override these using command-line options (see -h)."
@@ -170,9 +170,8 @@ def manage_state_interactive(current_logger) -> None:
                 .lower()
             )
             if confirm == "yes":
-                clear_state_file(
-                    write_version_only=True, current_logger=logger_to_use
-                )  # Keep version
+                clear_state_file( current_logger=logger_to_use
+                )
                 print("Progress state cleared (version retained).")
             else:
                 print("State file not cleared.")
@@ -210,7 +209,7 @@ def show_menu(
     while True:
         print("\n" + "=" * 80)
         print(
-            f"Map Server Setup Script (v{config.SCRIPT_VERSION}) - Main Menu"
+            f"Map Server Setup Script (v{config.SCRIPT_HASH}) - Main Menu"
         )
         print("=" * 80)
         print("1. View Current Configuration")

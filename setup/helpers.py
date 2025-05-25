@@ -4,10 +4,12 @@ General helper utility functions for the map server setup script.
 """
 import datetime
 import getpass
+import hashlib
 import logging
 import os
 import re
 import subprocess
+from pathlib import Path
 from typing import Optional, List
 
 from setup import config
@@ -315,4 +317,61 @@ def get_debian_codename(
             "warning",
             logger_to_use,
         )
+        return None
+
+
+def calculate_project_hash(project_root_dir: Path, current_logger: Optional[logging.Logger] = None) -> Optional[str]:
+    """
+    Calculates a SHA256 hash of all .py files within the project directory.
+    The hash includes both file content and relative file paths to detect
+    additions, deletions, renames, and content changes.
+    """
+    logger_to_use = current_logger if current_logger else module_logger
+    hasher = hashlib.sha256()
+    py_files_found = []
+
+    try:
+        # Ensure project_root_dir is a Path object
+        project_root = Path(project_root_dir)
+        if not project_root.is_dir():
+            log_map_server(f"{config.SYMBOLS['error']} Project root directory '{project_root}' not found for hashing.",
+                           "error", logger_to_use)
+            return None
+
+        for path_object in project_root.rglob('*.py'):  # rglob finds files recursively
+            if path_object.is_file():
+                py_files_found.append(path_object)
+
+        if not py_files_found:
+            log_map_server(f"{config.SYMBOLS['warning']} No .py files found under '{project_root}' for hashing.",
+                           "warning", logger_to_use)
+            # Return a default hash for an empty set of files, or None
+            return hasher.hexdigest()  # Hash of an empty update is still a valid hash
+
+        # Sort files by their relative path to ensure deterministic hashing
+        # Convert to relative paths from project_root for hashing filenames
+        sorted_files = sorted(py_files_found, key=lambda p: p.relative_to(project_root).as_posix())
+
+        for file_path in sorted_files:
+            try:
+                # Add relative file path to the hash (normalized to POSIX for consistency)
+                relative_path_str = file_path.relative_to(project_root).as_posix()
+                hasher.update(relative_path_str.encode('utf-8'))
+
+                # Add file content to the hash
+                file_content = file_path.read_bytes()
+                hasher.update(file_content)
+            except Exception as e:
+                log_map_server(f"{config.SYMBOLS['error']} Error reading file {file_path} for hashing: {e}", "error",
+                               logger_to_use)
+                return None  # Or handle more gracefully, e.g., skip problematic file with warning
+
+        final_hash = hasher.hexdigest()
+        log_map_server(
+            f"{config.SYMBOLS['info']} Calculated SCRIPT_HASH: {final_hash} from {len(sorted_files)} .py files.",
+            "info", logger_to_use)
+        return final_hash
+
+    except Exception as e:
+        log_map_server(f"{config.SYMBOLS['error']} Critical error during project hashing: {e}", "error", logger_to_use)
         return None

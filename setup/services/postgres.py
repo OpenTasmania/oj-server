@@ -191,7 +191,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     if backup_file(pg_conf_file, current_logger=logger_to_use):
         postgresql_custom_conf_content = f"""
-# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{config.SCRIPT_VERSION} ---
+# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{config.SCRIPT_HASH} ---
 listen_addresses = '*'
 shared_buffers = 2GB
 work_mem = 256MB
@@ -251,7 +251,7 @@ log_min_duration_statement = 250ms
                 logger_to_use,
             )
         else:
-            pg_hba_content = f"""# pg_hba.conf configured by script V{config.SCRIPT_VERSION}
+            pg_hba_content = f"""# pg_hba.conf configured by script V{config.SCRIPT_HASH}
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 local   all             postgres                                peer
 local   all             all                                     peer
