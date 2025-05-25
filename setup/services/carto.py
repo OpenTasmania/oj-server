@@ -5,11 +5,12 @@ Handles the setup of CartoCSS compiler and OpenStreetMap-Carto stylesheet.
 import logging
 import os
 import getpass
+import grp
 import shutil  # For shutil.which
 from typing import Optional
 
-from .. import config
-from ..command_utils import (
+from setup import config
+from setup.command_utils import (
     run_command,
     run_elevated_command,
     log_map_server,
@@ -113,12 +114,13 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     current_user = getpass.getuser()
     try:
-        current_group = getpass.getgrgid(os.getgid()).gr_name
+        current_group_info = grp.getgrgid(os.getgid())
+        current_group_name = current_group_info.gr_name
     except KeyError:
-        current_group = str(os.getgid())  # Fallback to GID if name not found
+        current_group_name = str(os.getgid())  # Fallback to GID if name not found
 
     log_map_server(
-        f"{config.SYMBOLS['info']} Temporarily changing ownership of {osm_carto_base_dir} to {current_user}:{current_group} for script execution.",
+        f"{config.SYMBOLS['info']} Temporarily changing ownership of {osm_carto_base_dir} to {current_user}:{current_group_name} for script execution.",
         "info",
         logger_to_use,
     )
@@ -126,7 +128,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         [
             "chown",
             "-R",
-            f"{current_user}:{current_group}",
+            f"{current_user}:{current_group_name}",
             osm_carto_base_dir,
         ],
         current_logger=logger_to_use,
