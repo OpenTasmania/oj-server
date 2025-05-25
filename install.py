@@ -14,16 +14,17 @@ import subprocess
 import sys
 from typing import List, Optional
 
+from setup.main_installer import main_map_server_entry
+
+# Define the name of the main installer module
+MAP_SERVER_LAUNCHER_SCRIPT_NAME = "setup/main_installer.py"
+
 # --- Basic Configuration & Symbols ---
 SYMBOLS_OUTER = {
     "success": "✅", "error": "❌", "warning": "⚠️", "info": "ℹ️",
     "step": "➡️", "gear": "⚙️", "package": "📦", "rocket": "🚀",
     "sparkles": "✨", "critical": "🔥"
 }
-
-# Name of the script that launches the main setup logic (in the setup/ directory)
-# This should be in the same directory as install.py
-MAP_SERVER_LAUNCHER_SCRIPT_NAME = "install_map_server.py"
 
 # --- Logger for this prerequisite installer script ---
 outer_logger = logging.getLogger("PrereqInstaller")
@@ -234,14 +235,13 @@ def install_uv_prereq() -> bool:
 # --- Main Application Logic ---
 def run_main_map_server_setup(args_to_pass: List[str]) -> bool:
     """
+    DEPRECATED: This function is no longer used. The main_map_server_entry function is called directly instead.
+
     Runs the main map server setup script (launcher for the 'setup' package)
     and returns True on success (exit code 0 from child), False otherwise.
     """
     # MAP_SERVER_LAUNCHER_SCRIPT_NAME should be in the same directory as this script
-    current_script_dir = os.path.dirname(os.path.abspath(__file__))
-    script_path = os.path.join(
-        current_script_dir, MAP_SERVER_LAUNCHER_SCRIPT_NAME
-    )
+    script_path = MAP_SERVER_LAUNCHER_SCRIPT_NAME
 
     if not os.path.isfile(script_path):
         log_prereq(
@@ -279,12 +279,12 @@ def run_main_map_server_setup(args_to_pass: List[str]) -> bool:
 def main():
     """
     Main function for the prerequisite installer.
-    Installs 'uv' and then calls the main map server setup script.
+    Installs 'uv' and then calls the main map server setup function.
     """
     script_name = os.path.basename(sys.argv[0])
     if "--help" in sys.argv:
         help_text = f"""
-    Usage: {script_name} [--help] <action_flag> [arguments_for_{MAP_SERVER_LAUNCHER_SCRIPT_NAME}]
+    Usage: {script_name} [--help] <action_flag> [arguments_for_main_map_server_entry]
 
     Prerequisite installer for the Map Server Setup.
 
@@ -293,21 +293,21 @@ def main():
        - On Debian Trixie/Sid (and derivatives like Forky), it attempts 'apt install uv'.
        - Otherwise, or if 'apt' fails, it uses 'pipx' (installing 'pipx' via 'apt' if needed).
     2. Based on the <action_flag> provided:
-       - If '--continue-install' is used, it calls the main map server setup script: '{MAP_SERVER_LAUNCHER_SCRIPT_NAME}'.
+       - If '--continue-install' is used, it calls the main map server setup function: 'main_map_server_entry'.
        - If '--exit-on-complete' is used, it exits after prerequisite installation.
 
     One of the action flags (--continue-install or --exit-on-complete) MUST be provided.
     They are mutually exclusive.
 
     All arguments other than '--help', '--continue-install', and '--exit-on-complete'
-    will be passed directly to '{MAP_SERVER_LAUNCHER_SCRIPT_NAME}' if '--continue-install' is used.
+    will be passed directly to 'main_map_server_entry' function if '--continue-install' is used.
 
     Options:
       --help                 Show this help message and exit.
       --continue-install     After prerequisite installation, proceed to run the
-                             main map server setup script ('{MAP_SERVER_LAUNCHER_SCRIPT_NAME}').
+                             main map server setup function ('main_map_server_entry').
       --exit-on-complete     Exit successfully after prerequisite installation is complete.
-                             Does not run '{MAP_SERVER_LAUNCHER_SCRIPT_NAME}'.
+                             Does not run 'main_map_server_entry' function.
 
     Example:
       To install prerequisites and then run the main setup with specific arguments:
@@ -326,7 +326,7 @@ def main():
             "critical",
         )
         print(
-            f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [arguments_for_{MAP_SERVER_LAUNCHER_SCRIPT_NAME}]")
+            f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [arguments_for_main_map_server_entry]")
         print(f"Run '{script_name} --help' for more details.")
         return 1
 
@@ -336,7 +336,7 @@ def main():
             "critical",
         )
         print(
-            f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [arguments_for_{MAP_SERVER_LAUNCHER_SCRIPT_NAME}]")
+            f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [arguments_for_main_map_server_entry]")
         print(f"Run '{script_name} --help' for more details.")
         return 1
 
@@ -357,7 +357,7 @@ def main():
 
     if continue_install_flag:
         log_prereq(
-            f"{SYMBOLS_OUTER.get('step', '->')} Proceeding to main map server setup (via {MAP_SERVER_LAUNCHER_SCRIPT_NAME})...",
+            f"{SYMBOLS_OUTER.get('step', '->')} Proceeding to main map server setup (via main_map_server_entry function)...",
             "info",
         )
         # Forward all command line arguments from this script to the next one,
@@ -366,7 +366,8 @@ def main():
             arg for arg in sys.argv[1:] if arg not in ["--continue-install", "--exit-on-complete"]
         ]
 
-        if run_main_map_server_setup(args_for_map_server_setup):
+        result = main_map_server_entry(args_for_map_server_setup)
+        if result == 0:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Overall process: Main map server setup reported success! {SYMBOLS_OUTER.get('sparkles', '**')}",
                 "info",
@@ -374,14 +375,16 @@ def main():
             return 0  # Overall success
         else:
             log_prereq(
-                f"{SYMBOLS_OUTER.get('critical', '!!')} {SYMBOLS_OUTER.get('error', '!!')} Overall process: Main map server setup script reported failure or took no definitive action.",
+                f"{SYMBOLS_OUTER.get('critical', '!!')} {SYMBOLS_OUTER.get('error', '!!')} Overall process: Main map server setup function reported failure or took no definitive action (exit code {result}).",
+                "error",
             )
             return 1  # Overall failure
     else:
         log_prereq(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Overall process: Main map server setup script success, going no further.",
+            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Overall process: Prerequisites installed successfully, not proceeding to main map server setup.",
+            "info",
         )
-        return 1  # Overall failure
+        return 0  # Overall success
 
 
 if __name__ == "__main__":

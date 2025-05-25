@@ -85,7 +85,7 @@ This command:
 
 1. Checks for required Python packages
 2. Prompts to install any missing packages using sudo apt install
-3. Runs the [main installation script](install_map_server.py)
+3. Runs the main mapping installer ([main_map_server_entry](setup/main_installer.py))
 
 ### Detailed Setup
 
@@ -116,7 +116,7 @@ The detailed setup process is designed to be followed sequentially.
 
 1. [Installer](install.py)
     * Ensure prequisites are available.
-2. [Map server installer](install_map_server.py)
+2. [Map server installer](setup/main_installer.py)
     * Install the map server.
     * Import data from processors.
 3. Submodules
