@@ -6,15 +6,14 @@ import datetime
 import logging
 import os
 import re
-import subprocess  # Needed for CalledProcessError in this module's context
+import subprocess
 import tempfile
+from typing import List
+from typing import Optional
 
 from setup.command_utils import run_elevated_command, log_map_server
 from setup.config import STATE_FILE_PATH, SCRIPT_VERSION, SYMBOLS, OSM_PROJECT_ROOT
-from typing import List
-from pathlib import Path
 from setup.helpers import calculate_project_hash
-from typing import Optional
 
 # Each module can have its own logger, which will inherit formatting if main configures root or a parent.
 # Or, we can pass the main logger instance around.
@@ -23,6 +22,7 @@ from typing import Optional
 module_logger = logging.getLogger(__name__)
 
 CURRENT_SCRIPT_HASH = None
+
 
 def get_current_script_hash(logger_instance=None) -> Optional[str]:
     """Gets the current script hash, calculating it if not already done."""
@@ -38,7 +38,7 @@ def initialize_state_system(current_logger=None) -> None:
     Checks script hash and clears state if mismatched.
     """
     logger_to_use = current_logger if current_logger else module_logger
-    state_dir = STATE_FILE_PATH.parent # Use Path object's parent
+    state_dir = STATE_FILE_PATH.parent  # Use Path object's parent
 
     # Get current script hash
     current_hash = get_current_script_hash(logger_instance=logger_to_use)
@@ -68,17 +68,44 @@ def initialize_state_system(current_logger=None) -> None:
 
     state_file_header = f"# SCRIPT_HASH: {current_hash or 'UNKNOWN_HASH'}\n"
 
-    if not STATE_FILE_PATH.is_file():
+    state_file_exists_and_is_file = False
+    try:
+        result = run_elevated_command(
+            ["test", "-f", str(STATE_FILE_PATH)],
+            check=False,
+            capture_output=True,
+            current_logger=logger_to_use
+        )
+        if result.returncode == 0:
+            state_file_exists_and_is_file = True
+        elif result.returncode == 1:
+            state_file_exists_and_is_file = False
+        else:
+            log_map_server(
+                f"{SYMBOLS['warning']} Elevated 'test -f' command for {STATE_FILE_PATH} returned unexpected code: {result.returncode}. Stderr: {result.stderr}",
+                "warning",
+                logger_to_use
+            )
+            state_file_exists_and_is_file = False
+
+    except Exception as e:
         log_map_server(
-            f"{SYMBOLS['info']} Initializing state file: {STATE_FILE_PATH}",
+            f"{SYMBOLS['error']} Exception while checking state file existence with elevated privileges: {e}",
+            "error",
+            logger_to_use
+        )
+        state_file_exists_and_is_file = False
+
+    if not state_file_exists_and_is_file:
+        log_map_server(
+            f"{SYMBOLS['info']} State file {STATE_FILE_PATH} does not exist or is not a regular file. Initializing.",
             "info",
             logger_to_use,
         )
         with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, prefix="mapstate_init_", suffix=".txt"
+                mode="w", delete=False, prefix="mapstate_init_", suffix=".txt"
         ) as temp_f:
             temp_f.write(state_file_header)
-            # Optionally add the human-readable SCRIPT_VERSION for info
             temp_f.write(f"# Human-readable Script Version: {SCRIPT_VERSION}\n")
             temp_file_path = temp_f.name
         try:
@@ -91,13 +118,14 @@ def initialize_state_system(current_logger=None) -> None:
                 current_logger=logger_to_use,
             )
         finally:
-            os.unlink(temp_file_path)
-    else: # State file exists, check hash
+            if os.path.exists(temp_file_path):  # Check existence before unlinking
+                os.unlink(temp_file_path)
+    else:  # State file exists, check hash
         try:
             result = run_elevated_command(
                 ["grep", "^# SCRIPT_HASH:", str(STATE_FILE_PATH)],
                 capture_output=True,
-                check=False, # Don't fail if grep doesn't find it
+                check=False,  # Don't fail if grep doesn't find it
                 current_logger=logger_to_use,
             )
             stored_hash = None
@@ -112,7 +140,7 @@ def initialize_state_system(current_logger=None) -> None:
 
             if not current_hash or (stored_hash != current_hash):
                 log_message_reason = "Could not calculate current hash" if not current_hash else \
-                                     f"SCRIPT_HASH mismatch. Stored: {stored_hash}, Current: {current_hash}"
+                    f"SCRIPT_HASH mismatch. Stored: {stored_hash}, Current: {current_hash}"
                 log_map_server(
                     f"{SYMBOLS['warning']} {log_message_reason}",
                     "warning",
@@ -138,6 +166,7 @@ def initialize_state_system(current_logger=None) -> None:
                 script_hash_to_write=current_hash, current_logger=logger_to_use
             )
 
+
 def clear_state_file(script_hash_to_write: Optional[str] = None, current_logger=None) -> None:
     """Clear the state file, writing only the SCRIPT_HASH and optionally SCRIPT_VERSION."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -148,7 +177,7 @@ def clear_state_file(script_hash_to_write: Optional[str] = None, current_logger=
     )
 
     effective_hash = script_hash_to_write
-    if effective_hash is None: # If not passed, try to calculate it
+    if effective_hash is None:  # If not passed, try to calculate it
         effective_hash = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH_AT_CLEAR"
 
     content_to_write = f"# SCRIPT_HASH: {effective_hash}\n"
@@ -161,7 +190,7 @@ def clear_state_file(script_hash_to_write: Optional[str] = None, current_logger=
     temp_file_path = ""
     try:
         with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, prefix="mapstate_clear_", suffix=".txt"
+                mode="w", delete=False, prefix="mapstate_clear_", suffix=".txt"
         ) as temp_f:
             temp_f.write(content_to_write)
             temp_file_path = temp_f.name
@@ -243,7 +272,6 @@ def is_step_completed(step_tag: str, current_logger=None) -> bool:
         return False  # Assume not completed on error
 
 
-
 def view_completed_steps(current_logger=None) -> List[str]:
     """View the steps marked as completed in the state file."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -281,7 +309,7 @@ def view_completed_steps(current_logger=None) -> List[str]:
                 )
             return []
     except (
-        subprocess.CalledProcessError
+            subprocess.CalledProcessError
     ) as e:  # Should be caught by run_elevated_command, but defensive
         log_map_server(
             f"{SYMBOLS['error']} CalledProcessError viewing completed steps: {e}",
