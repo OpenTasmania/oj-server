@@ -11,7 +11,9 @@ import requests
 logger = logging.getLogger(__name__)  # Use module-specific logger
 
 
-def download_gtfs_feed(feed_url: str, download_to_path: Union[str, Path]) -> bool:
+def download_gtfs_feed(
+    feed_url: str, download_to_path: Union[str, Path]
+) -> bool:
     """
     Downloads a GTFS feed from a given URL to a specified path.
 
@@ -29,32 +31,47 @@ def download_gtfs_feed(feed_url: str, download_to_path: Union[str, Path]) -> boo
         # Ensure the directory for the download path exists
         download_to_path.parent.mkdir(parents=True, exist_ok=True)
 
-        response = requests.get(feed_url, stream=True, timeout=120)  # stream=True for large files, 120s timeout
+        response = requests.get(
+            feed_url, stream=True, timeout=120
+        )  # stream=True for large files, 120s timeout
         response.raise_for_status()  # Raise an HTTPError for bad responses (4XX or 5XX)
 
-        with open(download_to_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):  # Download in chunks
+        with open(download_to_path, "wb") as f:
+            for chunk in response.iter_content(
+                chunk_size=8192
+            ):  # Download in chunks
                 f.write(chunk)
 
-        logger.info(f"GTFS feed successfully downloaded to: {download_to_path}")
+        logger.info(
+            f"GTFS feed successfully downloaded to: {download_to_path}"
+        )
         return True
     except requests.exceptions.HTTPError as http_err:
-        logger.error(f"HTTP error occurred during download: {http_err} - Status code: {response.status_code}")
+        logger.error(
+            f"HTTP error occurred during download: {http_err} - Status code: {response.status_code}"
+        )
     except requests.exceptions.ConnectionError as conn_err:
         logger.error(f"Connection error occurred during download: {conn_err}")
     except requests.exceptions.Timeout as timeout_err:
         logger.error(f"Timeout error occurred during download: {timeout_err}")
     except requests.exceptions.RequestException as req_err:
-        logger.error(f"An unexpected error occurred during download: {req_err}")
+        logger.error(
+            f"An unexpected error occurred during download: {req_err}"
+        )
     except IOError as io_err:
         logger.error(f"File I/O error when saving download: {io_err}")
     except Exception as e:
-        logger.error(f"A general error occurred in download_gtfs_feed: {e}", exc_info=True)
+        logger.error(
+            f"A general error occurred in download_gtfs_feed: {e}",
+            exc_info=True,
+        )
 
     return False
 
 
-def extract_gtfs_feed(zip_file_path: Union[str, Path], extract_to_dir: Union[str, Path]) -> bool:
+def extract_gtfs_feed(
+    zip_file_path: Union[str, Path], extract_to_dir: Union[str, Path]
+) -> bool:
     """
     Extracts a GTFS zip file to a specified directory.
     It will clear the target directory before extraction if it exists.
@@ -69,7 +86,9 @@ def extract_gtfs_feed(zip_file_path: Union[str, Path], extract_to_dir: Union[str
     zip_file_path = Path(zip_file_path)
     extract_to_dir = Path(extract_to_dir)
 
-    logger.info(f"Attempting to extract GTFS feed '{zip_file_path}' to '{extract_to_dir}'")
+    logger.info(
+        f"Attempting to extract GTFS feed '{zip_file_path}' to '{extract_to_dir}'"
+    )
 
     if not zip_file_path.exists() or not zip_file_path.is_file():
         logger.error(f"Zip file not found: {zip_file_path}")
@@ -77,37 +96,52 @@ def extract_gtfs_feed(zip_file_path: Union[str, Path], extract_to_dir: Union[str
 
     try:
         if extract_to_dir.exists():
-            logger.info(f"Clearing existing contents from extraction directory: {extract_to_dir}")
+            logger.info(
+                f"Clearing existing contents from extraction directory: {extract_to_dir}"
+            )
             for item in extract_to_dir.iterdir():
                 if item.is_dir():
                     # shutil.rmtree(item) # For recursive delete if needed, but GTFS usually flat
                     logger.warning(
-                        f"Subdirectory found in extract path: {item}. Manual cleanup might be needed if not expected.")
+                        f"Subdirectory found in extract path: {item}. Manual cleanup might be needed if not expected."
+                    )
                 else:
                     item.unlink()  # Delete file
         else:
             extract_to_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created extraction directory: {extract_to_dir}")
 
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
             # Check for common GTFS files to validate it's likely a GTFS archive
             required_files_present = any(
-                name.lower() in ['stops.txt', 'routes.txt', 'trips.txt'] for name in zip_ref.namelist())
+                name.lower() in ["stops.txt", "routes.txt", "trips.txt"]
+                for name in zip_ref.namelist()
+            )
             if not required_files_present:
                 logger.warning(
-                    f"The archive '{zip_file_path}' does not seem to contain common GTFS files. Proceeding with extraction anyway.")
+                    f"The archive '{zip_file_path}' does not seem to contain common GTFS files. Proceeding with extraction anyway."
+                )
 
             zip_ref.extractall(extract_to_dir)
 
-        extracted_files = [item.name for item in extract_to_dir.iterdir() if item.is_file()]
-        logger.info(f"GTFS feed successfully extracted to: {extract_to_dir}. Files: {extracted_files}")
+        extracted_files = [
+            item.name for item in extract_to_dir.iterdir() if item.is_file()
+        ]
+        logger.info(
+            f"GTFS feed successfully extracted to: {extract_to_dir}. Files: {extracted_files}"
+        )
         return True
     except zipfile.BadZipFile:
-        logger.error(f"Error: '{zip_file_path}' is not a valid zip file or is corrupted.")
+        logger.error(
+            f"Error: '{zip_file_path}' is not a valid zip file or is corrupted."
+        )
     except IOError as io_err:
         logger.error(f"File I/O error during extraction: {io_err}")
     except Exception as e:
-        logger.error(f"A general error occurred in extract_gtfs_feed: {e}", exc_info=True)
+        logger.error(
+            f"A general error occurred in extract_gtfs_feed: {e}",
+            exc_info=True,
+        )
 
     return False
 
@@ -131,7 +165,9 @@ def cleanup_temp_file(file_path: Union[str, Path]) -> None:
 # Example usage (for testing this module directly)
 if __name__ == "__main__":
     # Configure basic logging for direct script execution test
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
 
     # --- TEST PARAMETERS (REPLACE WITH ACTUAL TEST VALUES) ---
     # Use a small, publicly available GTFS feed for testing if possible
@@ -139,8 +175,9 @@ if __name__ == "__main__":
     # Or a test feed you have locally.
     # For this example, let's use a placeholder that will likely fail but demonstrates structure.
     # You would get the actual URL from the environment or a config file in the main pipeline.
-    TEST_GTFS_URL = os.environ.get("TEST_GTFS_URL",
-                                   "https://cdn.mbta.com/archive/archived_feeds.txt")  # This is a list of feeds, not a feed itself!
+    TEST_GTFS_URL = os.environ.get(
+        "TEST_GTFS_URL", "https://cdn.mbta.com/archive/archived_feeds.txt"
+    )  # This is a list of feeds, not a feed itself!
     # Replace with a direct link to a GTFS .zip for a real test
     TEST_DOWNLOAD_DIR = Path("/tmp/gtfs_test_download")
     TEST_ZIP_FILE = TEST_DOWNLOAD_DIR / "test_feed.zip"
@@ -149,14 +186,18 @@ if __name__ == "__main__":
     # Ensure test download directory exists
     TEST_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"--- Testing download.py ---")
-    logger.info(f"Using Test GTFS URL: {TEST_GTFS_URL}")  # This URL will likely fail as it's not a direct zip
+    logger.info("--- Testing download.py ---")
+    logger.info(
+        f"Using Test GTFS URL: {TEST_GTFS_URL}"
+    )  # This URL will likely fail as it's not a direct zip
     logger.info(f"Test Download Path: {TEST_ZIP_FILE}")
     logger.info(f"Test Extract Path: {TEST_EXTRACT_DIR}")
 
     # Create a dummy zip file for extraction test if download fails or URL is bad
     dummy_zip_created = False
-    if not Path("dummy_stops.txt").exists():  # Create dummy files only if they don't exist
+    if not Path(
+        "dummy_stops.txt"
+    ).exists():  # Create dummy files only if they don't exist
         with open("dummy_stops.txt", "w") as f:
             f.write("stop_id,stop_name,stop_lat,stop_lon\n")
             f.write("1,Main St,40.7128,-74.0060\n")
@@ -164,11 +205,13 @@ if __name__ == "__main__":
             f.write("route_id,route_short_name,route_long_name,route_type\n")
             f.write("R1,10,Main Street Express,3\n")
 
-        with zipfile.ZipFile(TEST_ZIP_FILE, 'w') as zf:
+        with zipfile.ZipFile(TEST_ZIP_FILE, "w") as zf:
             zf.write("dummy_stops.txt")
             zf.write("dummy_routes.txt")
         dummy_zip_created = True
-        logger.info(f"Created dummy test zip: {TEST_ZIP_FILE} because live URL might fail for example.")
+        logger.info(
+            f"Created dummy test zip: {TEST_ZIP_FILE} because live URL might fail for example."
+        )
         # Use this dummy zip for testing extraction
         source_zip_for_extraction = TEST_ZIP_FILE
     else:  # If dummy files exist, assume dummy zip also exists or was created previously
@@ -197,13 +240,19 @@ if __name__ == "__main__":
 
     # More focused test for extraction using the dummy zip if it was created
     if dummy_zip_created or Path(TEST_ZIP_FILE).exists():
-        logger.info(f"--- Testing extraction with: {source_zip_for_extraction} ---")
+        logger.info(
+            f"--- Testing extraction with: {source_zip_for_extraction} ---"
+        )
         if extract_gtfs_feed(source_zip_for_extraction, TEST_EXTRACT_DIR):
-            logger.info(f"Extraction test successful. Check contents in {TEST_EXTRACT_DIR}")
+            logger.info(
+                f"Extraction test successful. Check contents in {TEST_EXTRACT_DIR}"
+            )
         else:
             logger.error("Extraction test failed.")
     else:
-        logger.warning(f"Could not find or create a dummy zip at {TEST_ZIP_FILE} for extraction test.")
+        logger.warning(
+            f"Could not find or create a dummy zip at {TEST_ZIP_FILE} for extraction test."
+        )
 
     # Test cleanup
     # cleanup_temp_file(TEST_ZIP_FILE) # Only if download was real

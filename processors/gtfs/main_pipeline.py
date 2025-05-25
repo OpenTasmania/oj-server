@@ -4,11 +4,15 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
+
 # Import from other modules in the package
-from . import download
-from . import load
-from . import schema_definitions as schemas  # Assuming GTFS_SCHEMA and other defs are here
-from . import utils  # For setup_logging and get_db_connection
+from processors.gtfs import download
+from processors.gtfs import load
+from processors.gtfs import (
+    schema_definitions as schemas,
+)  # Assuming GTFS_SCHEMA and other defs are here
+from processors.gtfs import utils  # For setup_logging and get_db_connection
 
 # Configure logging for this module (or rely on root logger configured by run_gtfs_update.py)
 logger = logging.getLogger(__name__)
@@ -18,16 +22,22 @@ logger = logging.getLogger(__name__)
 # For now, using placeholders or deriving from environment for flexibility.
 
 # Fetched from environment, with defaults matching previous script discussions
-GTFS_FEED_URL = os.environ.get("GTFS_FEED_URL", "https://example.com/path/to/your/gtfs-feed.zip")
+GTFS_FEED_URL = os.environ.get(
+    "GTFS_FEED_URL", "https://example.com/path/to/your/gtfs-feed.zip"
+)
 DB_PARAMS = {  # These should ideally come from utils or a config manager
     "dbname": os.environ.get("PG_GIS_DB", "gis"),
     "user": os.environ.get("PG_OSM_USER", "osmuser"),
-    "password": os.environ.get("PG_OSM_PASSWORD", "yourStrongPasswordHere"),  # Placeholder!
+    "password": os.environ.get(
+        "PG_OSM_PASSWORD", "yourStrongPasswordHere"
+    ),  # Placeholder!
     "host": os.environ.get("PG_HOST", "localhost"),
-    "port": os.environ.get("PG_PORT", "5432")
+    "port": os.environ.get("PG_PORT", "5432"),
 }
 
-TEMP_DOWNLOAD_DIR = Path(os.environ.get("GTFS_TEMP_DOWNLOAD_DIR", "/tmp/gtfs_pipeline_downloads"))
+TEMP_DOWNLOAD_DIR = Path(
+    os.environ.get("GTFS_TEMP_DOWNLOAD_DIR", "/tmp/gtfs_pipeline_downloads")
+)
 TEMP_ZIP_FILENAME = "gtfs_feed.zip"
 TEMP_EXTRACT_DIR_NAME = "gtfs_extracted_feed"
 
@@ -41,11 +51,15 @@ def run_full_gtfs_etl_pipeline():
     Orchestrates the full GTFS ETL (Extract, Transform, Load) pipeline.
     """
     start_time = datetime.now()
-    logger.info(f"===== GTFS ETL Pipeline Started at {start_time.isoformat()} =====")
+    logger.info(
+        f"===== GTFS ETL Pipeline Started at {start_time.isoformat()} ====="
+    )
 
     # Create temporary directories if they don't exist
     TEMP_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    TEMP_EXTRACT_PATH.mkdir(parents=True, exist_ok=True)  # extract_gtfs_feed also creates it
+    TEMP_EXTRACT_PATH.mkdir(
+        parents=True, exist_ok=True
+    )  # extract_gtfs_feed also creates it
 
     conn = None  # Initialize conn to None
     try:
@@ -55,15 +69,21 @@ def run_full_gtfs_etl_pipeline():
             logger.critical("Failed to download GTFS feed. Pipeline aborted.")
             return False
 
-        if not download.extract_gtfs_feed(TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH):
+        if not download.extract_gtfs_feed(
+                TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH
+        ):
             logger.critical("Failed to extract GTFS feed. Pipeline aborted.")
             return False
         logger.info("GTFS feed downloaded and extracted successfully.")
 
         # --- Get Database Connection ---
-        conn = utils.get_db_connection(DB_PARAMS)  # Assuming utils.py has this
+        conn = utils.get_db_connection(
+            DB_PARAMS
+        )  # Assuming utils.py has this
         if not conn:
-            logger.critical("Failed to connect to the database. Pipeline aborted.")
+            logger.critical(
+                "Failed to connect to the database. Pipeline aborted."
+            )
             return False
 
         # --- Setup Schema (Idempotent: CREATE TABLE IF NOT EXISTS) ---
@@ -72,13 +92,17 @@ def run_full_gtfs_etl_pipeline():
         # And utils.py might contain a function to create tables based on these.
         # For now, let's assume a setup_all_schemas function exists in utils or load.
         # Or, directly call the schema setup from load.py if that's where it's defined
-        load.setup_gtfs_schema(conn)  # From load.py example, creates main tables
+        load.setup_gtfs_schema(
+            conn
+        )  # From load.py example, creates main tables
         # You would also need a similar function to create DLQ tables
         # e.g., utils.setup_dlq_schemas(conn, schemas.GTFS_DLQ_SCHEMA_DEFINITIONS)
         logger.info("Database schema verified/created.")
 
         # --- 2. TRANSFORM & VALIDATE & 3. LOAD (File by File) ---
-        logger.info("--- Step 2 & 3: Validating, Transforming, and Loading GTFS Data ---")
+        logger.info(
+            "--- Step 2 & 3: Validating, Transforming, and Loading GTFS Data ---"
+        )
 
         total_records_processed = 0
         total_records_loaded_successfully = 0
@@ -88,14 +112,18 @@ def run_full_gtfs_etl_pipeline():
         for gtfs_filename in schemas.GTFS_LOAD_ORDER:
             file_schema_definition = schemas.GTFS_SCHEMA.get(gtfs_filename)
             if not file_schema_definition:
-                logger.warning(f"No schema definition found for '{gtfs_filename}'. Skipping.")
+                logger.warning(
+                    f"No schema definition found for '{gtfs_filename}'. Skipping."
+                )
                 continue
 
             file_path_on_disk = TEMP_EXTRACT_PATH / gtfs_filename
             if not file_path_on_disk.exists():
                 # Only log warning if the file is generally expected (not for purely optional ones if not present)
                 # GTFS_SCHEMA keys are files we expect to define
-                logger.warning(f"GTFS file '{gtfs_filename}' not found in extracted feed. Skipping.")
+                logger.warning(
+                    f"GTFS file '{gtfs_filename}' not found in extracted feed. Skipping."
+                )
                 continue
 
             logger.info(f"--- Processing file: {gtfs_filename} ---")
@@ -104,14 +132,23 @@ def run_full_gtfs_etl_pipeline():
             # validate.py and transform.py will need access to this raw data.
             # This is a simplified flow; in reality, validate/transform might stream or chunk.
             try:
-                raw_df = pd.read_csv(file_path_on_disk, dtype=str, keep_default_na=False, na_values=[''])
-                logger.info(f"Read {len(raw_df)} raw records from {gtfs_filename}.")
+                raw_df = pd.read_csv(
+                    file_path_on_disk,
+                    dtype=str,
+                    keep_default_na=False,
+                    na_values=[""],
+                )
+                logger.info(
+                    f"Read {len(raw_df)} raw records from {gtfs_filename}."
+                )
                 total_records_processed += len(raw_df)
             except pd.errors.EmptyDataError:
                 logger.info(f"File {gtfs_filename} is empty. Skipping.")
                 continue
             except Exception as e:
-                logger.error(f"Failed to read {gtfs_filename} into DataFrame: {e}. Skipping file.")
+                logger.error(
+                    f"Failed to read {gtfs_filename} into DataFrame: {e}. Skipping file."
+                )
                 # Optionally, log this file itself to a "failed files" log/table
                 continue
 
@@ -140,14 +177,24 @@ def run_full_gtfs_etl_pipeline():
 
             # Prepare DataFrame columns based on schema for loading
             # (This logic might be better inside transform.py or load.py)
-            schema_cols = list(file_schema_definition.get("columns", {}).keys())
-            df_cols_to_load = [col for col in schema_cols if col in df_for_loading.columns]
+            schema_cols = list(
+                file_schema_definition.get("columns", {}).keys()
+            )
+            df_cols_to_load = [
+                col for col in schema_cols if col in df_for_loading.columns
+            ]
             final_df_for_loading = df_for_loading[df_cols_to_load].copy()
 
             # Add geom column placeholder if needed (transform.py should actually create WKT)
             geom_config = file_schema_definition.get("geom_config")
-            if geom_config and geom_config.get("geom_col") not in final_df_for_loading.columns:
-                final_df_for_loading[geom_config.get("geom_col")] = None  # transform.py populates this
+            if (
+                    geom_config
+                    and geom_config.get("geom_col")
+                    not in final_df_for_loading.columns
+            ):
+                final_df_for_loading[geom_config.get("geom_col")] = (
+                    None  # transform.py populates this
+                )
 
             # --- This section needs real implementation of validate & transform ---
             # Example flow:
@@ -187,13 +234,15 @@ def run_full_gtfs_etl_pipeline():
             # This means the load_dataframe_to_db will do its best.
             # Granular DLQ logic needs to be built into validate.py and transform.py
 
-            logger.info(f"Preparing to load data for {file_schema_definition['table_name']}...")
+            logger.info(
+                f"Preparing to load data for {file_schema_definition['table_name']}..."
+            )
             loaded_count, dlq_count_from_load = load.load_dataframe_to_db(
                 conn,
                 final_df_for_loading,  # This DataFrame needs to be perfectly prepared by transform.py
-                file_schema_definition['table_name'],
+                file_schema_definition["table_name"],
                 file_schema_definition,
-                dlq_table_name=f"dlq_{file_schema_definition['table_name']}"  # Pass DLQ table name
+                dlq_table_name=f"dlq_{file_schema_definition['table_name']}",  # Pass DLQ table name
             )
             total_records_loaded_successfully += loaded_count
             # The dlq_count_from_load in current load.py is basic (for batch fails)
@@ -204,20 +253,32 @@ def run_full_gtfs_etl_pipeline():
         load.add_foreign_keys(conn)  # From load.py
 
         logger.info("--- GTFS Data Load Phase Complete ---")
-        logger.info(f"Total records encountered in files: {total_records_processed}")
-        logger.info(f"Total records loaded successfully: {total_records_loaded_successfully}")
         logger.info(
-            f"Total records sent to DLQ (needs full implementation): {total_records_sent_to_dlq}")  # This count needs to come from validate/transform
+            f"Total records encountered in files: {total_records_processed}"
+        )
+        logger.info(
+            f"Total records loaded successfully: {total_records_loaded_successfully}"
+        )
+        logger.info(
+            f"Total records sent to DLQ (needs full implementation): {total_records_sent_to_dlq}"
+        )  # This count needs to come from validate/transform
 
         conn.commit()  # Final commit for the entire process
         return True
 
-    except ValueError as ve:  # Catch specific config error from download_and_extract_gtfs
+    except (
+            ValueError
+    ) as ve:  # Catch specific config error from download_and_extract_gtfs
         logger.critical(f"Configuration Error in pipeline: {ve}")
-        if conn: conn.rollback()
+        if conn:
+            conn.rollback()
     except Exception as e:
-        logger.critical(f"A critical error occurred in the GTFS ETL pipeline: {e}", exc_info=True)
-        if conn: conn.rollback()
+        logger.critical(
+            f"A critical error occurred in the GTFS ETL pipeline: {e}",
+            exc_info=True,
+        )
+        if conn:
+            conn.rollback()
     finally:
         if conn:
             conn.close()
@@ -225,12 +286,18 @@ def run_full_gtfs_etl_pipeline():
         download.cleanup_temp_file(TEMP_DOWNLOAD_PATH)
         # cleanup for TEMP_EXTRACT_PATH is handled in download.py or could be here
         if TEMP_EXTRACT_PATH.exists():
-            utils.cleanup_directory(TEMP_EXTRACT_PATH)  # Assuming utils.py has this
-            logger.info(f"Cleaned up extraction directory: {TEMP_EXTRACT_PATH}")
+            utils.cleanup_directory(
+                TEMP_EXTRACT_PATH
+            )  # Assuming utils.py has this
+            logger.info(
+                f"Cleaned up extraction directory: {TEMP_EXTRACT_PATH}"
+            )
 
         end_time = datetime.now()
         duration = end_time - start_time
-        logger.info(f"===== GTFS ETL Pipeline Finished at {end_time.isoformat()}. Duration: {duration} =====")
+        logger.info(
+            f"===== GTFS ETL Pipeline Finished at {end_time.isoformat()}. Duration: {duration} ====="
+        )
 
     return False
 
@@ -238,19 +305,30 @@ def run_full_gtfs_etl_pipeline():
 if __name__ == "__main__":
     # This is the entry point that would be called by scripts/run_gtfs_update.py
     # Setup basic logging if run directly for testing
-    utils.setup_logging(log_level=logging.INFO)  # Assuming utils.py has setup_logging
+    utils.setup_logging(
+        log_level=logging.INFO
+    )  # Assuming utils.py has setup_logging
 
     # Ensure critical environment variables are set for direct execution test
-    if "GTFS_FEED_URL" not in os.environ or os.environ[
-        "GTFS_FEED_URL"] == "https://example.com/path/to/your/gtfs-feed.zip":
-        logger.warning("CRITICAL: GTFS_FEED_URL environment variable is not set or is a placeholder.")
+    if (
+            "GTFS_FEED_URL" not in os.environ
+            or os.environ["GTFS_FEED_URL"]
+            == "https://example.com/path/to/your/gtfs-feed.zip"
+    ):
+        logger.warning(
+            "CRITICAL: GTFS_FEED_URL environment variable is not set or is a placeholder."
+        )
         logger.warning("Set it like: export GTFS_FEED_URL='your_actual_url'")
         # For testing, you might provide a default or raise an error
         # For this example, we'll let it try the default and likely fail in download.
 
-    if "PG_OSM_PASSWORD" not in os.environ and DB_PARAMS["password"] == "yourStrongPasswordHere":
+    if (
+            "PG_OSM_PASSWORD" not in os.environ
+            and DB_PARAMS["password"] == "yourStrongPasswordHere"
+    ):
         logger.warning("CRITICAL: PostgreSQL password is a placeholder.")
         logger.warning(
-            "Set PGPASSWORD (for psql tool) or PG_OSM_PASSWORD (for this script's DB_PARAMS) environment variable, or update DB_PARAMS in script.")
+            "Set PGPASSWORD (for psql tool) or PG_OSM_PASSWORD (for this script's DB_PARAMS) environment variable, or update DB_PARAMS in script."
+        )
 
     run_full_gtfs_etl_pipeline()

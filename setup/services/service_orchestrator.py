@@ -13,8 +13,11 @@ from ..ui import execute_step  # To run each step
 # Import all individual service setup functions from this 'services' sub-package
 from .ufw import ufw_setup
 from .postgres import postgres_setup
+
 # Import other service setup functions as you create their modules:
-from .pg_tileserv import pg_tileserv_setup  # Assuming you create pg_tileserv.py
+from .pg_tileserv import (
+    pg_tileserv_setup,
+)  # Assuming you create pg_tileserv.py
 from .carto import carto_setup  # Assuming you create carto.py
 from .renderd import renderd_setup  # Assuming you create renderd.py
 from .osrm import osm_osrm_server_setup  # Assuming you create osrm.py
@@ -25,33 +28,58 @@ from .certbot import certbot_setup  # Assuming you create certbot.py
 module_logger = logging.getLogger(__name__)
 
 
-def services_setup_group(current_logger: Optional[logging.Logger] = None) -> bool:
+def services_setup_group(
+    current_logger: Optional[logging.Logger] = None,
+) -> bool:
     """Runs all service setup steps in sequence."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"--- {config.SYMBOLS['info']} Starting Services Setup Group ---", "info", logger_to_use)
+    log_map_server(
+        f"--- {config.SYMBOLS['info']} Starting Services Setup Group ---",
+        "info",
+        logger_to_use,
+    )
     overall_success = True
 
     service_steps_to_run = [
         ("UFW_SETUP", "Setup UFW Firewall", ufw_setup),
-        ("POSTGRES_SETUP", "Setup PostgreSQL Database & User", postgres_setup),
+        (
+            "POSTGRES_SETUP",
+            "Setup PostgreSQL Database & User",
+            postgres_setup,
+        ),
         ("PGTILESERV_SETUP", "Setup pg_tileserv", pg_tileserv_setup),
         ("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style", carto_setup),
         ("RENDERD_SETUP", "Setup Renderd for Raster Tiles", renderd_setup),
-        ("OSM_OSRM_SERVER_SETUP", "Setup OSM Data & OSRM", osm_osrm_server_setup),
+        (
+            "OSM_OSRM_SERVER_SETUP",
+            "Setup OSM Data & OSRM",
+            osm_osrm_server_setup,
+        ),
         ("APACHE_SETUP", "Setup Apache for mod_tile", apache_modtile_setup),
         ("NGINX_SETUP", "Setup Nginx Reverse Proxy", nginx_setup),
-        ("CERTBOT_SETUP", "Setup Certbot for SSL (optional, requires FQDN)", certbot_setup),
+        (
+            "CERTBOT_SETUP",
+            "Setup Certbot for SSL (optional, requires FQDN)",
+            certbot_setup,
+        ),
     ]
 
     for tag, desc, func_ref in service_steps_to_run:
         # Pass logger_to_use to execute_step, which will then pass it to func_ref
-        if not execute_step(tag, desc, func_ref, current_logger_instance=logger_to_use):
+        if not execute_step(
+            tag, desc, func_ref, current_logger_instance=logger_to_use
+        ):
             overall_success = False
-            log_map_server(f"{config.SYMBOLS['error']} Step '{desc}' ({tag}) failed. Aborting services setup group.",
-                           "error", logger_to_use)
+            log_map_server(
+                f"{config.SYMBOLS['error']} Step '{desc}' ({tag}) failed. Aborting services setup group.",
+                "error",
+                logger_to_use,
+            )
             break  # Stop on first failure in the group
 
     log_map_server(
         f"--- {config.SYMBOLS['info']} Services Setup Group Finished (Overall Success: {overall_success}) ---",
-        "info" if overall_success else "error", logger_to_use)
+        "info" if overall_success else "error",
+        logger_to_use,
+    )
     return overall_success

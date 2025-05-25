@@ -22,7 +22,7 @@ cache:
 .uv_setup: &uv_setup
   before_script:
     - apt-get update -y
-    - apt-get install -y python3 python3-pip
+    - apt-get install -y python3-full
     - python3 -V
     - python3 -m pip install --upgrade pip
     - pip install uv
