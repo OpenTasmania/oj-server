@@ -2,7 +2,8 @@
 """
 Centralized configuration, constants, and default values for the map server setup.
 """
-import os
+from os import environ
+from os.path import join
 
 # --- Default Global Variable Values ---
 ADMIN_GROUP_IP_DEFAULT = "192.168.128.0/22"
@@ -24,7 +25,7 @@ PGPASSWORD_DEFAULT = "yourStrongPasswordHere"  # IMPORTANT: User should change t
 
 # --- State File Configuration ---
 STATE_FILE_DIR = "/var/lib/map-server-setup-script"
-STATE_FILE_PATH = os.path.join(STATE_FILE_DIR, "progress_state.txt")
+STATE_FILE_PATH = join(STATE_FILE_DIR, "progress_state.txt")
 SCRIPT_VERSION = "1.3.1"  # Represents the version of the setup script logic
 
 # --- Package Lists (for apt installation) ---
@@ -142,8 +143,8 @@ PGDATABASE: str = PGDATABASE_DEFAULT
 PGUSER: str = PGUSER_DEFAULT
 PGPASSWORD: str = PGPASSWORD_DEFAULT
 
-os.environ["PGHOST"] = PGHOST
-os.environ["PGPORT"] = PGPORT
-os.environ["PGDATABASE"] = PGDATABASE
-os.environ["PGUSER"] = PGUSER
-os.environ["PGPASSWORD"] = PGPASSWORD
+environ["PGHOST"] = PGHOST
+environ["PGPORT"] = PGPORT
+environ["PGDATABASE"] = PGDATABASE
+environ["PGUSER"] = PGUSER
+environ["PGPASSWORD"] = PGPASSWORD
