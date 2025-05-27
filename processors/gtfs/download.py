@@ -1,71 +1,94 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Handles downloading and extracting GTFS (General Transit Feed Specification)
+zip files.
+
+This module provides functions to download a GTFS feed from a URL, extract
+its contents, and clean up temporary files. It includes basic error handling
+for network issues, file I/O, and zip file processing.
+"""
+
 import logging
 import os
 import zipfile
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import requests
 
-# Configure logging for this module
-logger = logging.getLogger(__name__)  # Use module-specific logger
+# Configure logging for this module.
+# It's recommended that the main application configures the root logger.
+# This module-specific logger will inherit that configuration.
+module_logger = logging.getLogger(__name__)
 
 
 def download_gtfs_feed(
     feed_url: str, download_to_path: Union[str, Path]
 ) -> bool:
     """
-    Downloads a GTFS feed from a given URL to a specified path.
+    Download a GTFS feed from a given URL to a specified path.
 
     Args:
-        feed_url (str): The URL of the GTFS zip file.
-        download_to_path (Union[str, Path]): The file path to save the downloaded zip file.
+        feed_url: The URL of the GTFS zip file.
+        download_to_path: The file path (string or Path object) where the
+                          downloaded zip file will be saved.
 
     Returns:
-        bool: True if download was successful, False otherwise.
+        True if the download was successful, False otherwise.
     """
-    download_to_path = Path(download_to_path)
-    logger.info(f"Attempting to download GTFS feed from: {feed_url}")
-    response = None
+    download_path = Path(download_to_path) # Ensure it's a Path object
+    module_logger.info(f"Attempting to download GTFS feed from: {feed_url}")
+    response: Optional[requests.Response] = None # Initialize for status code access in except
+
     try:
-        # Ensure the directory for the download path exists
-        download_to_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure the directory for the download path exists.
+        download_path.parent.mkdir(parents=True, exist_ok=True)
 
         response = requests.get(
-            feed_url, stream=True, timeout=120
-        )  # stream=True for large files, 120s timeout
-        response.raise_for_status()  # Raise an HTTPError for bad responses (4XX or 5XX)
+            feed_url,
+            stream=True,  # Recommended for large files to avoid memory issues.
+            timeout=120   # Timeout in seconds (e.g., 2 minutes).
+        )
+        # Raise an HTTPError for bad responses (4XX or 5XX client/server errors).
+        response.raise_for_status()
 
-        with open(download_to_path, "wb") as f:
-            for chunk in response.iter_content(
-                chunk_size=8192
-            ):  # Download in chunks
-                f.write(chunk)
+        with open(download_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192): # Download in chunks
+                if chunk: # filter out keep-alive new chunks
+                    f.write(chunk)
 
-        logger.info(
-            f"GTFS feed successfully downloaded to: {download_to_path}"
+        module_logger.info(
+            f"GTFS feed successfully downloaded to: {download_path}"
         )
         return True
     except requests.exceptions.HTTPError as http_err:
-        logger.error(
-            f"HTTP error occurred during download: {http_err} - Status code: {response.status_code}"
+        status_code = response.status_code if response else "Unknown"
+        module_logger.error(
+            f"HTTP error occurred during download: {http_err} - "
+            f"Status code: {status_code}"
         )
     except requests.exceptions.ConnectionError as conn_err:
-        logger.error(f"Connection error occurred during download: {conn_err}")
+        module_logger.error(
+            f"Connection error occurred during download: {conn_err}"
+        )
     except requests.exceptions.Timeout as timeout_err:
-        logger.error(f"Timeout error occurred during download: {timeout_err}")
+        module_logger.error(
+            f"Timeout error occurred during download: {timeout_err}"
+        )
     except requests.exceptions.RequestException as req_err:
-        logger.error(
+        # For other requests-related errors.
+        module_logger.error(
             f"An unexpected error occurred during download: {req_err}"
         )
     except IOError as io_err:
-        logger.error(f"File I/O error when saving download: {io_err}")
+        module_logger.error(f"File I/O error when saving download: {io_err}")
     except Exception as e:
-        logger.error(
+        # Catch-all for any other unexpected errors.
+        module_logger.error(
             f"A general error occurred in download_gtfs_feed: {e}",
-            exc_info=True,
+            exc_info=True, # Include traceback for general exceptions
         )
-
     return False
 
 
@@ -73,199 +96,221 @@ def extract_gtfs_feed(
     zip_file_path: Union[str, Path], extract_to_dir: Union[str, Path]
 ) -> bool:
     """
-    Extracts a GTFS zip file to a specified directory.
-    It will clear the target directory before extraction if it exists.
+    Extract a GTFS zip file to a specified directory.
+
+    It will clear the target directory of existing files (but not subdirectories
+    not directly part of the zip) before extraction if it exists.
 
     Args:
-        zip_file_path (Union[str, Path]): The path to the GTFS zip file.
-        extract_to_dir (Union[str, Path]): The directory to extract files into.
+        zip_file_path: The path to the GTFS zip file (string or Path object).
+        extract_to_dir: The directory (string or Path object) to extract
+                        files into.
 
     Returns:
-        bool: True if extraction was successful, False otherwise.
+        True if extraction was successful, False otherwise.
     """
-    zip_file_path = Path(zip_file_path)
-    extract_to_dir = Path(extract_to_dir)
+    zip_path = Path(zip_file_path)
+    extract_path = Path(extract_to_dir)
 
-    logger.info(
-        f"Attempting to extract GTFS feed '{zip_file_path}' to '{extract_to_dir}'"
+    module_logger.info(
+        f"Attempting to extract GTFS feed '{zip_path}' to '{extract_path}'"
     )
 
-    if not zip_file_path.exists() or not zip_file_path.is_file():
-        logger.error(f"Zip file not found: {zip_file_path}")
+    if not zip_path.is_file(): # More specific check than exists()
+        module_logger.error(f"Zip file not found or is not a file: {zip_path}")
         return False
 
     try:
-        if extract_to_dir.exists():
-            logger.info(
-                f"Clearing existing contents from extraction directory: {extract_to_dir}"
+        if extract_path.exists():
+            module_logger.info(
+                f"Clearing existing files from extraction directory: {extract_path}"
             )
-            for item in extract_to_dir.iterdir():
-                if item.is_dir():
-                    # shutil.rmtree(item) # For recursive delete if needed, but GTFS usually flat
-                    logger.warning(
-                        f"Subdirectory found in extract path: {item}. Manual cleanup might be needed if not expected."
+            # Iterate and remove files; be cautious with subdirectories.
+            for item in extract_path.iterdir():
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    # Decide on policy for subdirs: remove or warn.
+                    # For GTFS, usually flat, so warning might be enough.
+                    # If recursive delete is needed: shutil.rmtree(item)
+                    module_logger.warning(
+                        f"Subdirectory found in extract path: {item}. "
+                        "This basic cleanup only removes files, not subdirectories "
+                        "unless they are part of the new zip extraction."
                     )
-                else:
-                    item.unlink()  # Delete file
         else:
-            extract_to_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created extraction directory: {extract_to_dir}")
+            extract_path.mkdir(parents=True, exist_ok=True)
+            module_logger.info(f"Created extraction directory: {extract_path}")
 
-        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
-            # Check for common GTFS files to validate it's likely a GTFS archive
-            required_files_present = any(
-                name.lower() in ["stops.txt", "routes.txt", "trips.txt"]
-                for name in zip_ref.namelist()
-            )
-            if not required_files_present:
-                logger.warning(
-                    f"The archive '{zip_file_path}' does not seem to contain common GTFS files. Proceeding with extraction anyway."
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            # Optional: Check for common GTFS files to validate archive content.
+            # This is a heuristic and not foolproof.
+            common_gtfs_files = {"stops.txt", "routes.txt", "trips.txt"}
+            archive_files = {name.lower() for name in zip_ref.namelist()}
+            if not common_gtfs_files.intersection(archive_files):
+                module_logger.warning(
+                    f"The archive '{zip_path}' does not appear to contain "
+                    "common GTFS files (stops.txt, routes.txt, trips.txt). "
+                    "Proceeding with extraction anyway."
                 )
 
-            zip_ref.extractall(extract_to_dir)
+            zip_ref.extractall(extract_path)
 
         extracted_files = [
-            item.name for item in extract_to_dir.iterdir() if item.is_file()
+            item.name for item in extract_path.iterdir() if item.is_file()
         ]
-        logger.info(
-            f"GTFS feed successfully extracted to: {extract_to_dir}. Files: {extracted_files}"
+        module_logger.info(
+            f"GTFS feed successfully extracted to: {extract_path}. "
+            f"Files found: {len(extracted_files)}."
         )
+        module_logger.debug(f"Extracted files list: {extracted_files}")
         return True
+
     except zipfile.BadZipFile:
-        logger.error(
-            f"Error: '{zip_file_path}' is not a valid zip file or is corrupted."
+        module_logger.error(
+            f"Error: '{zip_path}' is not a valid zip file or is corrupted."
         )
     except IOError as io_err:
-        logger.error(f"File I/O error during extraction: {io_err}")
+        module_logger.error(f"File I/O error during extraction: {io_err}")
     except Exception as e:
-        logger.error(
+        module_logger.error(
             f"A general error occurred in extract_gtfs_feed: {e}",
-            exc_info=True,
+            exc_info=True, # Include traceback for general exceptions
         )
-
     return False
 
 
 def cleanup_temp_file(file_path: Union[str, Path]) -> None:
     """
-    Removes a temporary file if it exists.
+    Remove a temporary file if it exists.
 
     Args:
-        file_path (Union[str, Path]): Path to the file to remove.
+        file_path: Path (string or Path object) to the file to remove.
     """
-    file_path = Path(file_path)
+    path_to_remove = Path(file_path)
     try:
-        if file_path.exists() and file_path.is_file():
-            file_path.unlink()
-            logger.info(f"Cleaned up temporary file: {file_path}")
+        if path_to_remove.is_file(): # Check if it's a file before unlinking
+            path_to_remove.unlink()
+            module_logger.info(f"Cleaned up temporary file: {path_to_remove}")
+        elif path_to_remove.exists(): # It exists but is not a file (e.g. directory)
+            module_logger.warning(
+                f"Path '{path_to_remove}' exists but is not a file. "
+                "Not removed by this function."
+            )
     except Exception as e:
-        logger.error(f"Error cleaning up file '{file_path}': {e}")
+        module_logger.error(
+            f"Error cleaning up file '{path_to_remove}': {e}",
+            exc_info=True
+        )
 
 
 # Example usage (for testing this module directly)
 if __name__ == "__main__":
-    # Configure basic logging for direct script execution test
+    # Configure basic logging for direct script execution test.
+    # This setup is minimal and for testing purposes only.
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()] # Log to console
     )
 
-    # --- TEST PARAMETERS (REPLACE WITH ACTUAL TEST VALUES) ---
-    # Use a small, publicly available GTFS feed for testing if possible
-    # Example: MBTA (Massachusetts Bay Transportation Authority) - check for their current feed URL
-    # Or a test feed you have locally.
-    # For this example, let's use a placeholder that will likely fail but demonstrates structure.
-    # You would get the actual URL from the environment or a config file in the main pipeline.
+    # --- TEST PARAMETERS (REPLACE WITH ACTUAL TEST VALUES IF NEEDED) ---
+    # Example: A known small, publicly available GTFS feed for testing.
+    # Using a placeholder URL that might list feeds, not a direct zip.
+    # For a real test, replace with a direct link to a GTFS .zip file.
     TEST_GTFS_URL = os.environ.get(
-        "TEST_GTFS_URL", "https://cdn.mbta.com/archive/archived_feeds.txt"
-    )  # This is a list of feeds, not a feed itself!
-    # Replace with a direct link to a GTFS .zip for a real test
-    TEST_DOWNLOAD_DIR = Path("/tmp/gtfs_test_download")
+        "TEST_GTFS_URL",
+        "https://gtfscommunity.org/resources/transitfeeds-archives-direct-links"
+        # This URL lists feeds, not a direct feed itself!
+        # A better test URL would be a direct link to a small GTFS zip.
+        # e.g. (check for validity and size):
+        # TEST_GTFS_URL = "https://gitlab.com/LACMTA/gtfs_bus/-/raw/master/gtfs_bus.zip"
+    )
+    TEST_DOWNLOAD_DIR = Path("/tmp/gtfs_test_download_module")
     TEST_ZIP_FILE = TEST_DOWNLOAD_DIR / "test_feed.zip"
     TEST_EXTRACT_DIR = TEST_DOWNLOAD_DIR / "extracted_feed"
 
-    # Ensure test download directory exists
+    # Ensure test download directory exists for the dummy zip creation.
     TEST_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info("--- Testing download.py ---")
-    logger.info(
-        f"Using Test GTFS URL: {TEST_GTFS_URL}"
-    )  # This URL will likely fail as it's not a direct zip
-    logger.info(f"Test Download Path: {TEST_ZIP_FILE}")
-    logger.info(f"Test Extract Path: {TEST_EXTRACT_DIR}")
+    module_logger.info(f"--- Testing {__file__} ---")
+    module_logger.info(f"Using Test GTFS URL: {TEST_GTFS_URL}")
+    module_logger.info(f"Test Download Path: {TEST_ZIP_FILE}")
+    module_logger.info(f"Test Extract Path: {TEST_EXTRACT_DIR}")
 
-    # Create a dummy zip file for extraction test if download fails or URL is bad
-    dummy_zip_created = False
-    if not Path(
-        "dummy_stops.txt"
-    ).exists():  # Create dummy files only if they don't exist
-        with open("dummy_stops.txt", "w") as f:
-            f.write("stop_id,stop_name,stop_lat,stop_lon\n")
-            f.write("1,Main St,40.7128,-74.0060\n")
-        with open("dummy_routes.txt", "w") as f:
-            f.write("route_id,route_short_name,route_long_name,route_type\n")
-            f.write("R1,10,Main Street Express,3\n")
+    # Attempt live download (this might fail with the example URL).
+    download_success = download_gtfs_feed(TEST_GTFS_URL, TEST_ZIP_FILE)
+    source_zip_for_extraction = TEST_ZIP_FILE if download_success else None
 
-        with zipfile.ZipFile(TEST_ZIP_FILE, "w") as zf:
-            zf.write("dummy_stops.txt")
-            zf.write("dummy_routes.txt")
-        dummy_zip_created = True
-        logger.info(
-            f"Created dummy test zip: {TEST_ZIP_FILE} because live URL might fail for example."
+    if not download_success:
+        module_logger.warning(
+            f"Live download from {TEST_GTFS_URL} failed or was skipped. "
+            "Attempting to create and use a dummy zip file for extraction test."
         )
-        # Use this dummy zip for testing extraction
-        source_zip_for_extraction = TEST_ZIP_FILE
-    else:  # If dummy files exist, assume dummy zip also exists or was created previously
-        if Path(TEST_ZIP_FILE).exists():
+        # Create a dummy zip file for extraction test.
+        dummy_zip_created = False
+        dummy_stops_path = TEST_DOWNLOAD_DIR / "dummy_stops.txt"
+        dummy_routes_path = TEST_DOWNLOAD_DIR / "dummy_routes.txt"
+
+        try:
+            with open(dummy_stops_path, "w", encoding="utf-8") as f_stops:
+                f_stops.write("stop_id,stop_name,stop_lat,stop_lon\n")
+                f_stops.write("1,Main St,40.7128,-74.0060\n")
+            with open(dummy_routes_path, "w", encoding="utf-8") as f_routes:
+                f_routes.write("route_id,route_short_name,route_long_name,route_type\n")
+                f_routes.write("R1,10,Main Street Express,3\n")
+
+            with zipfile.ZipFile(TEST_ZIP_FILE, "w") as zf:
+                zf.write(dummy_stops_path, arcname="stops.txt") # Use standard names in zip
+                zf.write(dummy_routes_path, arcname="routes.txt")
+            dummy_zip_created = True
             source_zip_for_extraction = TEST_ZIP_FILE
-            logger.info(f"Using existing dummy test zip: {TEST_ZIP_FILE}")
-        else:  # Fallback if dummy zip is missing too, extraction test will likely fail
-            source_zip_for_extraction = Path("non_existent_for_fail_test.zip")
+            module_logger.info(f"Created dummy test zip: {TEST_ZIP_FILE}")
+        except Exception as e_dummy:
+            module_logger.error(f"Could not create dummy zip file: {e_dummy}")
+            source_zip_for_extraction = None # Ensure it's None if dummy creation fails
+        finally:
+            # Clean up individual dummy text files after zipping (or attempting to).
+            if dummy_stops_path.exists():
+                dummy_stops_path.unlink()
+            if dummy_routes_path.exists():
+                dummy_routes_path.unlink()
 
-    # Test download (this will likely fail with the example URL)
-    # if download_gtfs_feed(TEST_GTFS_URL, TEST_ZIP_FILE):
-    #     source_zip_for_extraction = TEST_ZIP_FILE # Use downloaded if successful
-    #     if extract_gtfs_feed(source_zip_for_extraction, TEST_EXTRACT_DIR):
-    #         logger.info("Extraction test successful.")
-    #     else:
-    #         logger.error("Extraction test failed.")
-    # else:
-    #     logger.error(f"Download test failed. Using dummy zip for extraction test if available.")
-    #     if dummy_zip_created or Path(TEST_ZIP_FILE).exists():
-    #          if extract_gtfs_feed(source_zip_for_extraction, TEST_EXTRACT_DIR):
-    #             logger.info("Extraction test with dummy zip successful.")
-    #          else:
-    #             logger.error("Extraction test with dummy zip failed.")
-    #     else:
-    #         logger.error("No zip file to test extraction.")
-
-    # More focused test for extraction using the dummy zip if it was created
-    if dummy_zip_created or Path(TEST_ZIP_FILE).exists():
-        logger.info(
+    # Test extraction if a source zip is available (either downloaded or dummy).
+    if source_zip_for_extraction and source_zip_for_extraction.exists():
+        module_logger.info(
             f"--- Testing extraction with: {source_zip_for_extraction} ---"
         )
         if extract_gtfs_feed(source_zip_for_extraction, TEST_EXTRACT_DIR):
-            logger.info(
+            module_logger.info(
                 f"Extraction test successful. Check contents in {TEST_EXTRACT_DIR}"
             )
+            # Optionally, clean up the extract directory after test
+            # shutil.rmtree(TEST_EXTRACT_DIR, ignore_errors=True)
         else:
-            logger.error("Extraction test failed.")
+            module_logger.error("Extraction test failed.")
     else:
-        logger.warning(
-            f"Could not find or create a dummy zip at {TEST_ZIP_FILE} for extraction test."
+        module_logger.error(
+            "No zip file (live or dummy) available to test extraction."
         )
 
-    # Test cleanup
-    # cleanup_temp_file(TEST_ZIP_FILE) # Only if download was real
-    # If dummy was created for test, you might want to clean it up too
-    if dummy_zip_created:
-        try:
-            Path("dummy_stops.txt").unlink()
-            Path("dummy_routes.txt").unlink()
-            # TEST_ZIP_FILE might have already been cleaned by cleanup_temp_file if called
-            if TEST_ZIP_FILE.exists():
-                TEST_ZIP_FILE.unlink()
-            logger.info("Cleaned up dummy source files.")
-        except OSError as e:
-            logger.warning(f"Could not clean up all dummy source files: {e}")
+    # Test cleanup of the downloaded/dummy zip file.
+    if TEST_ZIP_FILE.exists():
+        cleanup_temp_file(TEST_ZIP_FILE)
+    else:
+        module_logger.info(f"Test zip file {TEST_ZIP_FILE} was not present for cleanup test.")
 
-    logger.info("--- download.py test finished ---")
+    # Clean up the main test directory if it's empty or desired
+    # For safety, this is often done manually or with more checks.
+    # if TEST_DOWNLOAD_DIR.exists():
+    #     try:
+    #         if not any(TEST_DOWNLOAD_DIR.iterdir()): # Check if empty
+    #             TEST_DOWNLOAD_DIR.rmdir()
+    #             module_logger.info(f"Cleaned up empty test directory: {TEST_DOWNLOAD_DIR}")
+    #         else:
+    #             module_logger.info(f"Test directory {TEST_DOWNLOAD_DIR} not empty, not removed.")
+    #     except OSError as e_rmdir:
+    #         module_logger.warning(f"Could not remove test directory {TEST_DOWNLOAD_DIR}: {e_rmdir}")
+
+
+    module_logger.info(f"--- {__file__} test finished ---")

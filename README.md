@@ -58,8 +58,10 @@ The system is deployed on a GNU/Linux system with the following key components:
 
 ### Quick Start
 
-To set up the system, use the provided installation script:
-
+1. Check for essential preqrequisites:
+   * Update the system package lists.
+   * Upgrade the system if required to ensure the latest packages are installed.
+   * Tests to see if basic python3 capability is available, and if not install it.
 ```bash
 sudo apt --yes update
 sudo apt --yes upgrade
@@ -70,26 +72,117 @@ else
    echo "python3 and python3-dev are already installed."
 fi
 ```
+2. Run the installer
+   * Checks for required Python packages
+   * Prompts to install any missing packages using sudo apt install
+   * Runs the main mapping installer ([main_map_server_entry](setup/main_installer.py))
 
-This command:
-
-1. Updates the system package lists.
-2. Upgrades the system if required to ensure the latest packages are installed.
-3. Tests to see if basic python3 capability is available, and if not install it.
-
-```
+```bash
 python3 install.py
 ```
 
-This command:
+### Installer help
+To obtain install configuration options and associated help text, use this command (correct at 2025-05-28:
+```bash
+python3 install.py --continue-install --help
 
-1. Checks for required Python packages
-2. Prompts to install any missing packages using sudo apt install
-3. Runs the main mapping installer ([main_map_server_entry](setup/main_installer.py))
+Usage: install.py [--help] <action_flag> [arguments_for_main_map_server_entry]
+
+Prerequisite installer for the Map Server Setup.
+This script performs the following actions:
+1. Ensures 'uv' (Python packager and virtual environment manager) is installed.
+2. Creates a virtual environment in '.venv' using 'uv venv'.
+3. Installs project dependencies from 'pyproject.toml' (expected in the same directory as this script)
+   into the venv using 'uv pip install .'.
+4. Based on the <action_flag> provided, it either continues to the main setup or exits.
+
+Action Flags (mutually exclusive, one is required):
+  --continue-install     After prerequisite and venv setup, proceed to run the
+                         main map server setup ('setup.main_installer') using the
+                         virtual environment's Python.
+  --exit-on-complete     Exit successfully after prerequisite and venv setup is complete.
+                         Does not run the main map server setup.
+
+Options for this script (install.py):
+  -h, --help             Show this combined help message (including help for the main setup script if --continue-install is used)
+                         and exit.
+
+Arguments for setup.main_installer (passed if --continue-install is used):
+  (These are arguments for 'setup.main_installer' and will be dynamically fetched and listed below if possible)
+
+
+================================================================================
+Help information for the main setup module (setup.main_installer):
+================================================================================
+Could not import processors.gtfs module at load time: cannot import name 'model_validator' from 'pydantic' (/usr/lib/python3/dist-packages/pydantic/__init__.py). GTFS processing will likely fail.
+usage: main_installer.py [-h] [-a ADMIN_GROUP_IP] [-f GTFS_FEED_URL] [-v VM_IP_OR_DOMAIN] [-b PG_TILESERV_BINARY_LOCATION] [-l LOG_PREFIX] [-H PGHOST] [-P PGPORT] [-D PGDATABASE]
+                         [-U PGUSER] [-W PGPASSWORD] [--boot-verbosity] [--core-conflicts] [--core-install] [--docker-install] [--nodejs-install] [--ufw] [--postgres]
+                         [--pgtileserv] [--carto] [--renderd] [--osrm] [--apache] [--nginx] [--certbot] [--gtfs-prep] [--raster-prep] [--website-prep] [--task-systemd-reload]
+                         [--full] [--conflicts-removed] [--prereqs] [--services] [--data] [--systemd-reload] [--view-config] [--view-state] [--clear-state]
+                         [--im-a-developer-get-me-out-of-here]
+
+Map Server Installer Script. Automates installation and configuration.
+
+options:
+  -h, --help            show this help message and exit
+  -a ADMIN_GROUP_IP, --admin-group-ip ADMIN_GROUP_IP
+                        Admin group IP range (CIDR). (default: 192.168.128.0/22)
+  -f GTFS_FEED_URL, --gtfs-feed-url GTFS_FEED_URL
+                        GTFS feed URL. (default: https://www.transport.act.gov.au/googletransit/google_transit.zip)
+  -v VM_IP_OR_DOMAIN, --vm-ip-or-domain VM_IP_OR_DOMAIN
+                        VM IP or Domain Name. (default: example.com)
+  -b PG_TILESERV_BINARY_LOCATION, --pg-tileserv-binary-location PG_TILESERV_BINARY_LOCATION
+                        pg_tileserv binary URL. (default: https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip)
+  -l LOG_PREFIX, --log-prefix LOG_PREFIX
+                        Log message prefix. (default: [MAP-SETUP])
+  -H PGHOST, --pghost PGHOST
+                        PostgreSQL host. (default: 127.0.0.1)
+  -P PGPORT, --pgport PGPORT
+                        PostgreSQL port. (default: 5432)
+  -D PGDATABASE, --pgdatabase PGDATABASE
+                        PostgreSQL database name. (default: gis)
+  -U PGUSER, --pguser PGUSER
+                        PostgreSQL username. (default: osmuser)
+  -W PGPASSWORD, --pgpassword PGPASSWORD
+                        PostgreSQL password. IMPORTANT: Change this default! (default: yourStrongPasswordHere)
+  --boot-verbosity      Run boot verbosity setup only. (Prerequisites, Step 1) (default: False)
+  --core-conflicts      Run core conflict removal only. (Core Conflict Removal, Step 1) (default: False)
+  --core-install        Run core package installation only. (Prerequisites, Step 2) (default: False)
+  --docker-install      Run Docker installation only. (Prerequisites, Step 3) (default: False)
+  --nodejs-install      Run Node.js installation only. (Prerequisites, Step 4) (default: False)
+  --ufw                 Run UFW setup only. (Services, Step 1) (default: False)
+  --postgres            Run PostgreSQL setup only. (Services, Step 2) (default: False)
+  --pgtileserv          Run pg_tileserv setup only. (Services, Step 3) (default: False)
+  --carto               Run CartoCSS & OSM Style setup only. (Services, Step 4) (default: False)
+  --renderd             Run Renderd setup only. (Services, Step 5) (default: False)
+  --osrm                Run OSM Data & OSRM setup only. (Services, Step 6) (default: False)
+  --apache              Run Apache for mod_tile setup only. (Services, Step 7) (default: False)
+  --nginx               Run Nginx reverse proxy setup only. (Services, Step 8) (default: False)
+  --certbot             Run Certbot SSL setup only. (Services, Step 9) (default: False)
+  --gtfs-prep           Run GTFS data preparation only. (Data Preparation, Step 1) (default: False)
+  --raster-prep         Run raster tile pre-rendering only. (Data Preparation, Step 2) (default: False)
+  --website-prep        Run test website preparation only. (Data Preparation, Step 3) (default: False)
+  --task-systemd-reload 
+                        Run systemd reload as a single task. (Systemd Reload, Step 1) (default: False)
+  --full                Run full installation process (all groups in sequence). (default: False)
+  --conflicts-removed   Run core conflict removal group only. (default: False)
+  --prereqs             Run prerequisites installation group only. (default: False)
+  --services            Run services setup group only. (default: False)
+  --data                Run data preparation group only. (default: False)
+  --systemd-reload      Run systemd reload (original group action). (default: False)
+  --view-config         View current configuration settings and exit. (default: False)
+  --view-state          View completed installation steps from state file and exit. (default: False)
+  --clear-state         Clear all progress state from state file and exit. (default: False)
+  --im-a-developer-get-me-out-of-here, --dev-override-unsafe-password
+                        Developer flag: Allow using default PGPASSWORD for .pgpass and suppress related warnings. USE WITH CAUTION. (default: False)
+
+Example: python3 ./setup/main_installer.py --full -v mymap.example.com
+
+```
 
 ### Detailed Setup
 
-The detailed setup process is designed to be followed sequentially.
+The setup process is designed to be followed sequentially.
 
 * **System Foundation - Debian 12**
     * Initial OS configuration, updates, and essential package installations (including all anticipated dependencies for

@@ -5,7 +5,7 @@ backend-path = "."
 
 [project]
 name = "osm_osrm_server"
-version = "0.0.3"
+version = "0.1.0"
 description = "An Open Street Map installer using PostgreSQL/PostGIS, all the way through to setting up a map server. Included is setting up GTFS data "
 readme = "README.md"
 authors = [
@@ -24,7 +24,9 @@ dependencies = [
     "pydantic>=2.0.0", # For data validation and schema definitions
     "python-dotenv>=0.19.0", # For managing environment variables (e.g., .env file for DB creds)
     "PyYAML>=5.4.0", # For any YAML configurations, or if a dependency needs it
-    "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git"
+    "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git",
+    "urwid>=3.0.2",
+    "setuptools>=61.0",
 ]
 
 classifiers = [

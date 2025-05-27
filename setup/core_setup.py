@@ -1,24 +1,39 @@
 # setup/core_setup.py
 """
-Functions for core system setup: package installation, Docker, Node.js, etc.
+Functions for core system setup tasks.
+
+This module includes functions for improving boot verbosity, removing
+conflicting packages (like system Node.js), installing essential system
+packages, Docker, and Node.js LTS from NodeSource. It also defines
+group functions to orchestrate these core setup steps.
 """
+
 import getpass  # For user-related operations
 import logging
 import os
 import tempfile
+from typing import Optional
 
 from setup import config
-
-from setup.command_utils import run_command, run_elevated_command, log_map_server
+from setup.cli_handler import cli_prompt_for_rerun
+from setup.command_utils import run_command, run_elevated_command, \
+    log_map_server
 from setup.helpers import backup_file
-from setup.ui import execute_step
+from setup.step_executor import execute_step
 
 module_logger = logging.getLogger(__name__)
 
 
-def boot_verbosity(current_logger=None) -> None:
+def boot_verbosity(current_logger: Optional[logging.Logger] = None) -> None:
+    """
+    Improve boot verbosity by modifying GRUB configuration and add user to
+    systemd-journal group. Also performs a system update and installs
+    essential utilities.
+
+    Args:
+        current_logger: Optional logger instance to use.
+    """
     logger_to_use = current_logger if current_logger else module_logger
-    # Use config.SYMBOLS for direct access
     log_map_server(
         f"{config.SYMBOLS['step']} Improving boot verbosity & core utils...",
         "info",
@@ -28,17 +43,13 @@ def boot_verbosity(current_logger=None) -> None:
     grub_file = "/etc/default/grub"
     if backup_file(grub_file, current_logger=logger_to_use):
         try:
+            # SED expressions to remove 'quiet' and 'splash' from GRUB config.
             sed_expressions = [
-                r"-e",
-                r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bquiet\b//g",
-                r"-e",
-                r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bsplash\b//g",
-                r"-e",
-                r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/  +/ /g",
-                r"-e",
-                r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/" /"/g',
-                r"-e",
-                r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g',
+                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bquiet\b//g",
+                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bsplash\b//g",
+                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/  +/ /g", # Compact spaces
+                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/" /"/g', # Trim leading space in value
+                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g', # Trim trailing space in value
             ]
             run_elevated_command(
                 ["sed", "-i"] + sed_expressions + [grub_file],
@@ -57,14 +68,17 @@ def boot_verbosity(current_logger=None) -> None:
             )
         except Exception as e:
             log_map_server(
-                f"{config.SYMBOLS['error']} Failed to update grub for boot verbosity: {e}",
+                f"{config.SYMBOLS['error']} Failed to update grub for boot "
+                f"verbosity: {e}",
                 "error",
                 logger_to_use,
             )
+            # Non-critical, so we don't re-raise here.
 
-    current_user = getpass.getuser()
+    current_user_name = getpass.getuser()
     log_map_server(
-        f"{config.SYMBOLS['gear']} Adding user '{current_user}' to 'systemd-journal' group...",
+        f"{config.SYMBOLS['gear']} Adding user '{current_user_name}' to "
+        "'systemd-journal' group...",
         "info",
         logger_to_use,
     )
@@ -75,24 +89,28 @@ def boot_verbosity(current_logger=None) -> None:
                 "--append",
                 "--group",
                 "systemd-journal",
-                current_user,
+                current_user_name,
             ],
             current_logger=logger_to_use,
         )
         log_map_server(
-            f"{config.SYMBOLS['success']} User {current_user} added to systemd-journal group.",
+            f"{config.SYMBOLS['success']} User {current_user_name} added to "
+            "systemd-journal group.",
             "success",
             logger_to_use,
         )
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['warning']} Could not add user {current_user} to systemd-journal group: {e}. This may be non-critical.",
+            f"{config.SYMBOLS['warning']} Could not add user "
+            f"{current_user_name} to systemd-journal group: {e}. This may "
+            "be non-critical.",
             "warning",
             logger_to_use,
         )
 
     log_map_server(
-        f"{config.SYMBOLS['package']} System update and essential utilities install...",
+        f"{config.SYMBOLS['package']} System update and essential utilities "
+        "install...",
         "info",
         logger_to_use,
     )
@@ -102,50 +120,60 @@ def boot_verbosity(current_logger=None) -> None:
             ["apt", "--yes", "upgrade"], current_logger=logger_to_use
         )
         essential_utils = [
-            "curl",
-            "wget",
-            "bash",
-            "btop",
-            "screen",
-            "ca-certificates",
-            "lsb-release",
-            "gnupg",
+            "curl", "wget", "bash", "btop", "screen",
+            "ca-certificates", "lsb-release", "gnupg",
         ]
         run_elevated_command(
             ["apt", "--yes", "install"] + essential_utils,
             current_logger=logger_to_use,
         )
         log_map_server(
-            f"{config.SYMBOLS['success']} System updated and essential utilities ensured.",
+            f"{config.SYMBOLS['success']} System updated and essential "
+            "utilities ensured.",
             "success",
             logger_to_use,
         )
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Failed during system update/essential util install: {e}",
+            f"{config.SYMBOLS['error']} Failed during system update/essential "
+            f"util install: {e}",
             "error",
             logger_to_use,
         )
-        raise
+        raise  # This is more critical for subsequent steps.
 
 
-def core_conflict_removal(current_logger=None) -> None:
+def core_conflict_removal(
+    current_logger: Optional[logging.Logger] = None
+) -> None:
+    """
+    Remove potentially conflicting system-installed Node.js packages.
+
+    This is done to ensure that the Node.js version managed by NodeSource
+    (or another method) is used without conflicts.
+
+    Args:
+        current_logger: Optional logger instance to use.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
-        f"{config.SYMBOLS['step']} Removing conflicting system Node.js (if any)...",
+        f"{config.SYMBOLS['step']} Removing conflicting system Node.js "
+        "(if any)...",
         "info",
         logger_to_use,
     )
     try:
+        # Check if 'nodejs' package is installed.
         result = run_command(
             ["dpkg", "-s", "nodejs"],
-            check=False,
+            check=False,  # Don't raise error if package not found.
             capture_output=True,
             current_logger=logger_to_use,
         )
-        if result.returncode == 0:
+        if result.returncode == 0:  # Package is installed.
             log_map_server(
-                f"{config.SYMBOLS['info']} System 'nodejs' package found. Attempting removal...",
+                f"{config.SYMBOLS['info']} System 'nodejs' package found. "
+                "Attempting removal...",
                 "info",
                 logger_to_use,
             )
@@ -164,7 +192,8 @@ def core_conflict_removal(current_logger=None) -> None:
             )
         else:
             log_map_server(
-                f"{config.SYMBOLS['info']} System 'nodejs' not found via dpkg, skipping removal.",
+                f"{config.SYMBOLS['info']} System 'nodejs' not found via dpkg, "
+                "skipping removal.",
                 "info",
                 logger_to_use,
             )
@@ -174,9 +203,19 @@ def core_conflict_removal(current_logger=None) -> None:
             "error",
             logger_to_use,
         )
+        # Depending on severity, you might re-raise or just log.
+        # For this step, it's often okay if it fails (e.g., package was already gone).
 
 
-def core_install(current_logger=None) -> None:
+def core_install(current_logger: Optional[logging.Logger] = None) -> None:
+    """
+    Install core system packages required for the map server.
+
+    This includes prerequisites, Python, PostgreSQL, mapping tools, and fonts.
+
+    Args:
+        current_logger: Optional logger instance to use.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
         f"{config.SYMBOLS['step']} Installing core system packages...",
@@ -186,55 +225,25 @@ def core_install(current_logger=None) -> None:
     try:
         run_elevated_command(["apt", "update"], current_logger=logger_to_use)
 
-        log_map_server(
-            f"{config.SYMBOLS['package']} Installing prerequisite system utilities (git, build-essential, etc.)...",
-            "info",
-            logger_to_use,
-        )
-        run_elevated_command(
-            ["apt", "--yes", "install"] + config.CORE_PREREQ_PACKAGES,
-            current_logger=logger_to_use,
-        )
+        package_categories = {
+            "prerequisite system utilities": config.CORE_PREREQ_PACKAGES,
+            "Python system packages": config.PYTHON_SYSTEM_PACKAGES,
+            "PostgreSQL system packages": config.POSTGRES_PACKAGES,
+            "mapping system packages": config.MAPPING_PACKAGES,
+            "font system packages": config.FONT_PACKAGES,
+        }
 
-        log_map_server(
-            f"{config.SYMBOLS['package']} Installing Python system packages...",
-            "info",
-            logger_to_use,
-        )
-        run_elevated_command(
-            ["apt", "--yes", "install"] + config.PYTHON_SYSTEM_PACKAGES,
-            current_logger=logger_to_use,
-        )
-
-        log_map_server(
-            f"{config.SYMBOLS['package']} Installing PostgreSQL system packages...",
-            "info",
-            logger_to_use,
-        )
-        run_elevated_command(
-            ["apt", "--yes", "install"] + config.POSTGRES_PACKAGES,
-            current_logger=logger_to_use,
-        )
-
-        log_map_server(
-            f"{config.SYMBOLS['package']} Installing mapping system packages...",
-            "info",
-            logger_to_use,
-        )
-        run_elevated_command(
-            ["apt", "--yes", "install"] + config.MAPPING_PACKAGES,
-            current_logger=logger_to_use,
-        )
-
-        log_map_server(
-            f"{config.SYMBOLS['package']} Installing font system packages...",
-            "info",
-            logger_to_use,
-        )
-        run_elevated_command(
-            ["apt", "--yes", "install"] + config.FONT_PACKAGES,
-            current_logger=logger_to_use,
-        )
+        for category, packages in package_categories.items():
+            if packages: # Only attempt install if list is not empty
+                log_map_server(
+                    f"{config.SYMBOLS['package']} Installing {category}...",
+                    "info",
+                    logger_to_use,
+                )
+                run_elevated_command(
+                    ["apt", "--yes", "install"] + packages,
+                    current_logger=logger_to_use,
+                )
 
         log_map_server(
             f"{config.SYMBOLS['package']} Installing unattended-upgrades...",
@@ -246,20 +255,28 @@ def core_install(current_logger=None) -> None:
             current_logger=logger_to_use,
         )
         log_map_server(
-            f"{config.SYMBOLS['success']} Core system packages installation process completed.",
+            f"{config.SYMBOLS['success']} Core system packages installation "
+            "process completed.",
             "success",
             logger_to_use,
         )
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Error during core package installation: {e}",
+            f"{config.SYMBOLS['error']} Error during core package "
+            f"installation: {e}",
             "error",
             logger_to_use,
         )
-        raise
+        raise  # Package installation is critical.
 
 
-def docker_install(current_logger=None) -> None:
+def docker_install(current_logger: Optional[logging.Logger] = None) -> None:
+    """
+    Install Docker Engine from Docker's official repository.
+
+    Args:
+        current_logger: Optional logger instance to use.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
         f"{config.SYMBOLS['step']} Setting up Docker Engine...",
@@ -269,11 +286,12 @@ def docker_install(current_logger=None) -> None:
 
     key_dest_final = "/etc/apt/keyrings/docker.asc"
     key_url = "https://download.docker.com/linux/debian/gpg"
-    key_dest_tmp = ""
+    key_dest_tmp = ""  # Path for temporary GPG key download.
 
     try:
         log_map_server(
-            f"{config.SYMBOLS['gear']} Ensuring Docker GPG key directory exists...",
+            f"{config.SYMBOLS['gear']} Ensuring Docker GPG key directory "
+            "exists...",
             "info",
             logger_to_use,
         )
@@ -283,21 +301,25 @@ def docker_install(current_logger=None) -> None:
         )
 
         log_map_server(
-            f"{config.SYMBOLS['gear']} Downloading Docker's GPG key to temporary location...",
+            f"{config.SYMBOLS['gear']} Downloading Docker's GPG key to "
+            "temporary location...",
             "info",
             logger_to_use,
         )
+        # Create a temporary file for the GPG key.
         with tempfile.NamedTemporaryFile(
-            delete=False, prefix="dockerkey_", suffix=".asc"
+                delete=False, prefix="dockerkey_", suffix=".asc"
         ) as temp_f:
             key_dest_tmp = temp_f.name
+        # Download the key.
         run_command(
             ["curl", "-fsSL", key_url, "-o", key_dest_tmp],
             current_logger=logger_to_use,
         )
 
         log_map_server(
-            f"{config.SYMBOLS['gear']} Installing Docker GPG key to {key_dest_final}...",
+            f"{config.SYMBOLS['gear']} Installing Docker GPG key to "
+            f"{key_dest_final}...",
             "info",
             logger_to_use,
         )
@@ -314,13 +336,14 @@ def docker_install(current_logger=None) -> None:
         )
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Failed to download or install Docker GPG key: {e}",
+            f"{config.SYMBOLS['error']} Failed to download or install Docker "
+            f"GPG key: {e}",
             "error",
             logger_to_use,
         )
         if key_dest_tmp and os.path.exists(key_dest_tmp):
-            os.unlink(key_dest_tmp)
-        raise
+            os.unlink(key_dest_tmp)  # Clean up temporary file.
+        raise  # GPG key setup is critical for repository trust.
     finally:
         if key_dest_tmp and os.path.exists(key_dest_tmp):
             os.unlink(key_dest_tmp)
@@ -331,29 +354,31 @@ def docker_install(current_logger=None) -> None:
         logger_to_use,
     )
     try:
+        # Determine system architecture and Debian codename.
         arch_result = run_command(
             ["dpkg", "--print-architecture"],
-            capture_output=True,
-            check=True,
-            current_logger=logger_to_use,
+            capture_output=True, check=True, current_logger=logger_to_use
         )
         arch = arch_result.stdout.strip()
+
         codename_result = run_command(
             ["lsb_release", "-cs"],
-            capture_output=True,
-            check=True,
-            current_logger=logger_to_use,
+            capture_output=True, check=True, current_logger=logger_to_use
         )
         codename = codename_result.stdout.strip()
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Could not determine system architecture or codename for Docker setup: {e}",
+            f"{config.SYMBOLS['error']} Could not determine system "
+            f"architecture or codename for Docker setup: {e}",
             "error",
             logger_to_use,
         )
         raise
 
-    docker_source_list_content = f"deb [arch={arch} signed-by={key_dest_final}] https://download.docker.com/linux/debian {codename} stable\n"
+    docker_source_list_content = (
+        f"deb [arch={arch} signed-by={key_dest_final}] "
+        f"https://download.docker.com/linux/debian {codename} stable\n"
+    )
     docker_sources_file = "/etc/apt/sources.list.d/docker.list"
     try:
         run_elevated_command(
@@ -362,13 +387,15 @@ def docker_install(current_logger=None) -> None:
             current_logger=logger_to_use,
         )
         log_map_server(
-            f"{config.SYMBOLS['success']} Docker apt source configured: {docker_sources_file}",
+            f"{config.SYMBOLS['success']} Docker apt source configured: "
+            f"{docker_sources_file}",
             "success",
             logger_to_use,
         )
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Failed to write Docker apt source list: {e}",
+            f"{config.SYMBOLS['error']} Failed to write Docker apt source "
+            f"list: {e}",
             "error",
             logger_to_use,
         )
@@ -382,14 +409,12 @@ def docker_install(current_logger=None) -> None:
     run_elevated_command(["apt", "update"], current_logger=logger_to_use)
 
     docker_packages_list = [
-        "docker-ce",
-        "docker-ce-cli",
-        "containerd.io",
-        "docker-buildx-plugin",
-        "docker-compose-plugin",
+        "docker-ce", "docker-ce-cli", "containerd.io",
+        "docker-buildx-plugin", "docker-compose-plugin",
     ]
     log_map_server(
-        f"{config.SYMBOLS['package']} Installing Docker packages: {', '.join(docker_packages_list)}...",
+        f"{config.SYMBOLS['package']} Installing Docker packages: "
+        f"{', '.join(docker_packages_list)}...",
         "info",
         logger_to_use,
     )
@@ -398,30 +423,36 @@ def docker_install(current_logger=None) -> None:
         current_logger=logger_to_use,
     )
 
-    current_user = getpass.getuser()
+    current_user_name = getpass.getuser()
     log_map_server(
-        f"{config.SYMBOLS['gear']} Adding current user ({current_user}) to the 'docker' group...",
+        f"{config.SYMBOLS['gear']} Adding current user ({current_user_name}) "
+        "to the 'docker' group...",
         "info",
         logger_to_use,
     )
     try:
         run_elevated_command(
-            ["usermod", "-aG", "docker", current_user],
+            ["usermod", "-aG", "docker", current_user_name],
             current_logger=logger_to_use,
         )
         log_map_server(
-            f"{config.SYMBOLS['success']} User {current_user} added to 'docker' group.",
+            f"{config.SYMBOLS['success']} User {current_user_name} added to "
+            "'docker' group.",
             "success",
             logger_to_use,
         )
         log_map_server(
-            f"   {config.SYMBOLS['warning']} You MUST log out and log back in for this group change to take full effect for your current session.",
+            f"   {config.SYMBOLS['warning']} You MUST log out and log back "
+            "in for this group change to take full effect for your current "
+            "session.",
             "warning",
             logger_to_use,
         )
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['warning']} Could not add user {current_user} to docker group: {e}. Docker commands might require 'sudo' prefix from this user until re-login.",
+            f"{config.SYMBOLS['warning']} Could not add user "
+            f"{current_user_name} to docker group: {e}. Docker commands might "
+            "require 'sudo' prefix from this user until re-login.",
             "warning",
             logger_to_use,
         )
@@ -433,11 +464,11 @@ def docker_install(current_logger=None) -> None:
     )
     run_elevated_command(
         ["systemctl", "enable", "docker.service"],
-        current_logger=logger_to_use,
+        current_logger=logger_to_use
     )
     run_elevated_command(
         ["systemctl", "enable", "containerd.service"],
-        current_logger=logger_to_use,
+        current_logger=logger_to_use
     )
     run_elevated_command(
         ["systemctl", "start", "docker.service"], current_logger=logger_to_use
@@ -449,17 +480,27 @@ def docker_install(current_logger=None) -> None:
     )
 
 
-def node_js_lts_install(current_logger=None) -> None:
+def node_js_lts_install(
+    current_logger: Optional[logging.Logger] = None
+) -> None:
+    """
+    Install Node.js LTS (Long Term Support) version using NodeSource repository.
+
+    Args:
+        current_logger: Optional logger instance to use.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
-        f"{config.SYMBOLS['step']} Installing Node.js LTS version using NodeSource...",
+        f"{config.SYMBOLS['step']} Installing Node.js LTS version using "
+        "NodeSource...",
         "info",
         logger_to_use,
     )
     try:
         nodesource_setup_url = "https://deb.nodesource.com/setup_lts.x"
         log_map_server(
-            f"{config.SYMBOLS['gear']} Downloading NodeSource setup script from {nodesource_setup_url}...",
+            f"{config.SYMBOLS['gear']} Downloading NodeSource setup script "
+            f"from {nodesource_setup_url}...",
             "info",
             logger_to_use,
         )
@@ -472,22 +513,25 @@ def node_js_lts_install(current_logger=None) -> None:
         nodesource_script_content = curl_result.stdout
 
         log_map_server(
-            f"{config.SYMBOLS['gear']} Executing NodeSource setup script with elevated privileges...",
+            f"{config.SYMBOLS['gear']} Executing NodeSource setup script with "
+            "elevated privileges...",
             "info",
             logger_to_use,
         )
         run_elevated_command(
-            ["bash", "-"],
+            ["bash", "-"],  # Execute script content passed via stdin.
             cmd_input=nodesource_script_content,
             current_logger=logger_to_use,
         )
 
         log_map_server(
-            f"{config.SYMBOLS['gear']} Updating apt package list after adding NodeSource repo...",
+            f"{config.SYMBOLS['gear']} Updating apt package list after adding "
+            "NodeSource repo...",
             "info",
             logger_to_use,
         )
         run_elevated_command(["apt", "update"], current_logger=logger_to_use)
+
         log_map_server(
             f"{config.SYMBOLS['package']} Installing Node.js...",
             "info",
@@ -498,26 +542,22 @@ def node_js_lts_install(current_logger=None) -> None:
             current_logger=logger_to_use,
         )
 
+        # Verify installation by checking versions.
         node_version = (
             run_command(
-                ["node", "--version"],
-                capture_output=True,
-                check=False,
-                current_logger=logger_to_use,
-            ).stdout.strip()
-            or "Not detected"
+                ["node", "--version"], capture_output=True, check=False,
+                current_logger=logger_to_use
+            ).stdout.strip() or "Not detected"
         )
         npm_version = (
             run_command(
-                ["npm", "--version"],
-                capture_output=True,
-                check=False,
-                current_logger=logger_to_use,
-            ).stdout.strip()
-            or "Not detected"
+                ["npm", "--version"], capture_output=True, check=False,
+                current_logger=logger_to_use
+            ).stdout.strip() or "Not detected"
         )
         log_map_server(
-            f"{config.SYMBOLS['success']} Node.js installed. Version: {node_version}, NPM Version: {npm_version}",
+            f"{config.SYMBOLS['success']} Node.js installed. Version: "
+            f"{node_version}, NPM Version: {npm_version}",
             "success",
             logger_to_use,
         )
@@ -527,68 +567,95 @@ def node_js_lts_install(current_logger=None) -> None:
             "error",
             logger_to_use,
         )
-        raise
+        raise  # Node.js might be critical for Carto or other tools.
 
 
-def core_conflict_removal_group(current_logger) -> bool:
+def core_conflict_removal_group(
+    current_logger: logging.Logger
+) -> bool:
+    """
+    Execute the core conflict removal step as a group.
+
+    Args:
+        current_logger: The logger instance to use.
+
+    Returns:
+        True if the step succeeds, False otherwise.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
-        f"--- {config.SYMBOLS['info']} Starting Core Conflict Removal Group ---",
+        f"--- {config.SYMBOLS['info']} Starting Core Conflict Removal Group "
+        "---",
         "info",
         logger_to_use,
     )
     success = execute_step(
-        "CORE_CONFLICTS",
-        "Remove Core Conflicts (e.g. system node)",
-        core_conflict_removal,
-        logger_to_use,
+        step_tag="CORE_CONFLICTS",
+        step_description="Remove Core Conflicts (e.g. system node)",
+        step_function=core_conflict_removal,
+        current_logger_instance=logger_to_use,
+        prompt_user_for_rerun=cli_prompt_for_rerun
     )
     log_map_server(
-        f"--- {config.SYMBOLS['info']} Core Conflict Removal Group Finished (Success: {success}) ---",
+        f"--- {config.SYMBOLS['info']} Core Conflict Removal Group Finished "
+        f"(Success: {success}) ---",
         "info" if success else "error",
         logger_to_use,
     )
     return success
 
 
-def prereqs_install_group(current_logger) -> bool:
+def prereqs_install_group(current_logger: logging.Logger) -> bool:
+    """
+    Execute all prerequisite installation steps as a group.
+
+    This includes boot verbosity changes, core package installation,
+    Docker installation, and Node.js installation.
+
+    Args:
+        current_logger: The logger instance to use.
+
+    Returns:
+        True if all steps in the group succeed, False otherwise.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
-        f"--- {config.SYMBOLS['info']} Starting Prerequisites Installation Group ---",
+        f"--- {config.SYMBOLS['info']} Starting Prerequisites Installation "
+        "Group ---",
         "info",
         logger_to_use,
     )
 
     overall_success = True
     steps_in_group = [
-        (
-            "BOOT_VERBOSITY",
-            "Improve Boot Verbosity & Core Utils",
-            boot_verbosity,
-        ),
-        # core_conflict_removal is now its own group, called before this by main if --full
+        ("BOOT_VERBOSITY", "Improve Boot Verbosity & Core Utils",
+         boot_verbosity),
         ("CORE_INSTALL", "Install Core System Packages", core_install),
         ("DOCKER_INSTALL", "Install Docker Engine", docker_install),
-        (
-            "NODEJS_INSTALL",
-            "Install Node.js (LTS from NodeSource)",
-            node_js_lts_install,
-        ),
+        ("NODEJS_INSTALL", "Install Node.js (LTS from NodeSource)",
+         node_js_lts_install),
     ]
 
     for tag, desc, func in steps_in_group:
-        if not execute_step(tag, desc, func, logger_to_use):
+        if not execute_step(
+            step_tag=tag,
+            step_description=desc,
+            step_function=func,
+            current_logger_instance=logger_to_use,
+            prompt_user_for_rerun=cli_prompt_for_rerun
+        ):
             overall_success = False
             log_map_server(
-                f"{config.SYMBOLS['error']} Step '{desc}' failed in Prerequisites group.",
+                f"{config.SYMBOLS['error']} Step '{desc}' failed in "
+                "Prerequisites group.",
                 "error",
                 logger_to_use,
             )
-            # Decide if you want to break on first failure within a group
-            # break
+            break  # Stop on first failure within the group.
 
     log_map_server(
-        f"--- {config.SYMBOLS['info']} Prerequisites Installation Group Finished (Overall Success: {overall_success}) ---",
+        f"--- {config.SYMBOLS['info']} Prerequisites Installation Group "
+        f"Finished (Overall Success: {overall_success}) ---",
         "info" if overall_success else "error",
         logger_to_use,
     )
