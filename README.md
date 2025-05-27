@@ -2,7 +2,7 @@
 
 <img src="assets/artwork/logos/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
 
-**Date:** 2025-05-22
+**Date:** 2025-05-28
 
 **Primary Maintainer:** [Peter Lawler (relwalretep@gmail.com)](mailto:relwalretep@gmail.com)]
 
@@ -59,9 +59,10 @@ The system is deployed on a GNU/Linux system with the following key components:
 ### Quick Start
 
 1. Check for essential preqrequisites:
-   * Update the system package lists.
-   * Upgrade the system if required to ensure the latest packages are installed.
-   * Tests to see if basic python3 capability is available, and if not install it.
+    * Update the system package lists.
+    * Upgrade the system if required to ensure the latest packages are installed.
+    * Tests to see if basic python3 capability is available, and if not install it.
+
 ```bash
 sudo apt --yes update
 sudo apt --yes upgrade
@@ -72,17 +73,20 @@ else
    echo "python3 and python3-dev are already installed."
 fi
 ```
+
 2. Run the installer
-   * Checks for required Python packages
-   * Prompts to install any missing packages using sudo apt install
-   * Runs the main mapping installer ([main_map_server_entry](setup/main_installer.py))
+    * Checks for required Python packages
+    * Prompts to install any missing packages using sudo apt install
+    * Runs the main mapping installer ([main_map_server_entry](setup/main_installer.py))
 
 ```bash
 python3 install.py
 ```
 
 ### Installer help
+
 To obtain install configuration options and associated help text, use this command (correct at 2025-05-28:
+
 ```bash
 python3 install.py --continue-install --help
 
@@ -230,6 +234,18 @@ to the thoughts of having this run on Home Assistant for now the project intends
 In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release is
 intended to make use of Issues boards on a hosted git server, as well as continuous integration build testing.
 
-## 6. Contributions
+## 6. Future
+
+Theres a [Todo list](TODO.md), which is automatically generated from comments found in the code.
+Planned [enhancements](https://gitlab.com/opentasmania/osm-osrm-server/-/issues/?label_name%5B%5D=Enhancement)
+can also be found on the Gitlab site.
+
+## 7. Support
+
+There's an [issues](https://gitlab.com/opentasmania/osm-osrm-server/-/issues) board where you can submit bugs.
+A [Revolt server])(https://revolt.chat) is being worked on, but not yet launched. An FAQ is planned, as well
+as a Wiki.
+
+## 8. Contributions
 
 Contributions welcome. Please see the [Contributions](CONTRIBUTING.md) file for more details.
