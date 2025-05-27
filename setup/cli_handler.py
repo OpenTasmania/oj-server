@@ -1,4 +1,5 @@
 # osm/setup/cli_handler.py
+# -*- coding: utf-8 -*-
 """
 Handles Command Line Interface (CLI) interactions for the map server setup.
 

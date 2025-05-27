@@ -1,4 +1,5 @@
 # setup/config.py
+# -*- coding: utf-8 -*-
 """
 Centralized configuration, constants, and default values for the map server setup.
 

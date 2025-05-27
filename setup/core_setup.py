@@ -1,4 +1,5 @@
 # setup/core_setup.py
+# -*- coding: utf-8 -*-
 """
 Functions for core system setup tasks.
 

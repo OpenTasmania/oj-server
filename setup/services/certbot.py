@@ -1,4 +1,5 @@
 # setup/services/certbot.py
+# -*- coding: utf-8 -*-
 """
 Handles setup of SSL certificates using Certbot with the Nginx plugin.
 

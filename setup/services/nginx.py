@@ -1,4 +1,5 @@
 # setup/services/nginx.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup and configuration of Nginx as a reverse proxy.
 

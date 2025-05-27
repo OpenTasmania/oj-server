@@ -1,4 +1,5 @@
 # setup/services/apache.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup and configuration of the Apache webserver with mod_tile.
 

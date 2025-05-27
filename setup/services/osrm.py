@@ -1,4 +1,5 @@
 # setup/services/osrm.py
+# -*- coding: utf-8 -*-
 """
 Handles setup of OSM data import via osm2pgsql and OSRM routing engine.
 

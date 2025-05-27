@@ -1,4 +1,5 @@
 # setup/data_processing.py
+# -*- coding: utf-8 -*-
 """
 Functions for data preparation, including GTFS processing and placeholders
 for tile rendering and website setup.

@@ -1,4 +1,5 @@
 # osm/setup/services/pg_tileserv.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup and configuration of pg_tileserv.
 

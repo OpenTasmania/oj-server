@@ -1,4 +1,5 @@
 # setup/services/postgres.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup and configuration of PostgreSQL.
 

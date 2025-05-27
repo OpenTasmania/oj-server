@@ -1,4 +1,5 @@
 # setup/command_utils.py
+# -*- coding: utf-8 -*-
 """
 Utilities for executing shell commands and logging their output.
 

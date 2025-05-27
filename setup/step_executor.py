@@ -1,4 +1,5 @@
 # osm/setup/step_executor.py
+# -*- coding: utf-8 -*-
 """
 Provides functionality to execute individual setup steps.
 

@@ -1,4 +1,5 @@
 # setup/services_setup.py
+# -*- coding: utf-8 -*-
 """
 Functions for setting up and configuring various map-related services.
 

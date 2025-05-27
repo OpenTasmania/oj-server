@@ -1,4 +1,5 @@
 # setup/helpers.py
+# -*- coding: utf-8 -*-
 """
 General helper utility functions for the map server setup script.
 

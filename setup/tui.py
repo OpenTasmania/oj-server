@@ -1,4 +1,5 @@
 # osm/setup/tui.py
+# -*- coding: utf-8 -*-
 """
 Urwid-based Text User Interface (TUI) for the Map Server Installer.
 

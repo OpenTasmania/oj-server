@@ -1,4 +1,5 @@
 # setup/main_installer.py
+# -*- coding: utf-8 -*-
 """
 Main entry point and orchestrator for the Map Server Setup script.
 

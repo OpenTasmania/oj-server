@@ -1,4 +1,5 @@
 # setup/services/renderd.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup and configuration of Renderd for raster tile generation.
 

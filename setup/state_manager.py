@@ -1,4 +1,5 @@
 # setup/state_manager.py
+# -*- coding: utf-8 -*-
 """
 Manages the state file for tracking installation progress.
 

@@ -1,4 +1,5 @@
 # setup/services/carto.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup of the CartoCSS compiler and OpenStreetMap-Carto stylesheet.
 

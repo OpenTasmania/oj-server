@@ -1,4 +1,5 @@
 # setup/services/ufw.py
+# -*- coding: utf-8 -*-
 """
 Handles the setup and configuration of UFW (Uncomplicated Firewall).
 

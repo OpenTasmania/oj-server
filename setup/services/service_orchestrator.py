@@ -1,4 +1,5 @@
 # setup/services/service_orchestrator.py
+# -*- coding: utf-8 -*-
 """
 Orchestrates the setup of various map-related services.
 
