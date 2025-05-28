@@ -1,6 +1,9 @@
 # Open Street Map and Routing Machine Server
 
 <img src="assets/artwork/logos/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
+[![pipeline status](https://gitlab.com/opentasmania/osm-osrm-server/badges/master/pipeline.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/commits/master)
+[![coverage report](https://gitlab.com/opentasmania/osm-osrm-server/badges/master/coverage.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/commits/master)
+[![Latest Release](https://gitlab.com/opentasmania/osm-osrm-server/-/badges/release.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/releases)
 
 **Date:** 2025-05-28
 
