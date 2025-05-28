@@ -25,7 +25,7 @@ cache:
 ".uv_setup":
   before_script:
     - apt-get update -y
-    - apt-get install -y python3-full curl git
+    - apt-get install -y curl git python3-full python3-pip
     - python3 -V
     - python3 -m pip install --upgrade pip
     - pip install uv
@@ -35,7 +35,7 @@ cache:
 Linting:
   before_script:
     - apt-get update -y
-    - apt-get install -y python3-full curl git
+    - apt-get install -y curl git python3-full python3-pip
     - python3 -V
     - python3 -m pip install --upgrade pip
     - pip install uv
@@ -68,7 +68,7 @@ Testing:
     - when: manual
   before_script:
     - apt-get update -y
-    - apt-get install -y python3-full curl git
+    - apt-get install -y curl git python3-full python3-pip
     - python3 -V
     - python3 -m pip install --upgrade pip
     - pip install uv
