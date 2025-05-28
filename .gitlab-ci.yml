@@ -34,8 +34,7 @@ cache:
     - echo "--- System Python and Pip versions ---"
     - python3 -V
     - python3 -m pip --version
-    - echo "--- Upgrading pip and installing pipx ---"
-    - python3 -m pip install --user --upgrade pip
+    - echo "--- Installing pipx ---"
     - python3 -m pip install --user pipx
     - export PATH="$HOME/.local/bin:$PATH"
     - echo "--- Pipx version ---"
@@ -94,8 +93,7 @@ generate_documentation:
     - echo "--- System Python and Pip versions ---"
     - python3 -V
     - python3 -m pip --version
-    - echo "--- Upgrading pip and installing pipx ---"
-    - python3 -m pip install --user --upgrade pip
+    - echo "--- Installing pipx ---"
     - python3 -m pip install --user pipx
     - export PATH="$HOME/.local/bin:$PATH"
     - echo "--- Pipx version ---"
