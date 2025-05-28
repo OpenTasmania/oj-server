@@ -23,22 +23,24 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional # For PgConnection type hint
+from typing import Optional  # For PgConnection type hint
 
 import pandas as pd
-import psycopg2 # For PgConnection type hint, actual connection in utils
+import psycopg2  # For PgConnection type hint, actual connection in utils
 
 # Import from other modules in the GTFS processor package
-from . import download
-from . import load
+from . import (
+    download,
+    load,
+    utils,  # For setup_logging, get_db_connection, cleanup_directory
+)
 from . import schema_definitions as schemas
-from . import utils # For setup_logging, get_db_connection, cleanup_directory
 
 # Import specific items needed for this pipeline's orchestration
 from .update_gtfs import (
-    create_tables_from_schema, # Assumes this is from a shared/adapted update_gtfs
+    GTFS_LOAD_ORDER,  # Relies on GTFS_LOAD_ORDER from update_gtfs or a shared config
     add_foreign_keys_from_schema,
-    GTFS_LOAD_ORDER # Relies on GTFS_LOAD_ORDER from update_gtfs or a shared config
+    create_tables_from_schema,  # Assumes this is from a shared/adapted update_gtfs
 )
 
 # Import GTFS feed URL from a central configuration.
@@ -60,7 +62,7 @@ except ImportError:
         # For now, let it try to proceed and fail in download if URL is bad.
     GTFS_FEED_URL = os.environ.get(
         "GTFS_FEED_URL",
-        "https://example.com/default_gtfs_feed.zip" # Placeholder default
+        "https://example.com/default_gtfs_feed.zip"  # Placeholder default
     )
 
 
@@ -72,7 +74,7 @@ module_logger = logging.getLogger(__name__)
 # The `utils.get_db_connection` function will use its defaults if these are
 # not explicitly passed or if environment variables it checks are not set.
 DB_PARAMS: dict[str, str] = {
-    "dbname": os.environ.get("PG_GIS_DB", "gis"), # Consistent with update_gtfs.py
+    "dbname": os.environ.get("PG_GIS_DB", "gis"),  # Consistent with update_gtfs.py
     "user": os.environ.get("PG_OSM_USER", "osmuser"),
     "password": os.environ.get("PG_OSM_PASSWORD", "yourStrongPasswordHere"),
     "host": os.environ.get("PG_HOST", "localhost"),
@@ -83,8 +85,8 @@ DB_PARAMS: dict[str, str] = {
 TEMP_DOWNLOAD_DIR = Path(
     os.environ.get("GTFS_TEMP_DOWNLOAD_DIR", "/tmp/gtfs_pipeline_downloads")
 )
-TEMP_ZIP_FILENAME = "gtfs_feed.zip" # Name for the downloaded zip file.
-TEMP_EXTRACT_DIR_NAME = "gtfs_extracted_feed" # Subdirectory for extracted files.
+TEMP_ZIP_FILENAME = "gtfs_feed.zip"  # Name for the downloaded zip file.
+TEMP_EXTRACT_DIR_NAME = "gtfs_extracted_feed"  # Subdirectory for extracted files.
 
 # Full paths for download and extraction.
 TEMP_DOWNLOAD_PATH = TEMP_DOWNLOAD_DIR / TEMP_ZIP_FILENAME
@@ -148,7 +150,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
         if not conn:
             module_logger.critical("Failed to connect to the database. Pipeline aborted.")
             return False
-        conn.autocommit = False # Ensure transactions are managed.
+        conn.autocommit = False  # Ensure transactions are managed.
 
         # --- Setup Schema (Idempotent: CREATE TABLE IF NOT EXISTS) ---
         module_logger.info("--- Ensuring database schema exists ---")
@@ -158,7 +160,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
         # TODO: Explicitly create DLQ tables per entity if not handled by above.
         # e.g., utils.setup_dlq_tables(conn, schemas.GTFS_DLQ_SCHEMA_DEFINITIONS)
         module_logger.info("Database schema verified/created.")
-        conn.commit() # Commit schema changes before data loading.
+        conn.commit()  # Commit schema changes before data loading.
 
         # --- 2. TRANSFORM & VALIDATE & 3. LOAD (File by File) ---
         module_logger.info(
@@ -167,7 +169,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
         total_records_processed = 0
         total_records_loaded_successfully = 0
-        total_records_sent_to_dlq = 0 # Requires full validate/transform integration
+        total_records_sent_to_dlq = 0  # Requires full validate/transform integration
 
         # Iterate through GTFS files in a defined load order (from update_gtfs).
         for gtfs_filename in GTFS_LOAD_ORDER:
@@ -197,8 +199,8 @@ def run_full_gtfs_etl_pipeline() -> bool:
                 raw_df = pd.read_csv(
                     file_path_on_disk,
                     dtype='str',
-                    keep_default_na=False, # Keep empty strings as is
-                    na_values=[""], # Treat empty strings as NA for some ops if needed later
+                    keep_default_na=False,  # Keep empty strings as is
+                    na_values=[""],  # Treat empty strings as NA for some ops if needed later
                 )
                 module_logger.info(
                     f"Read {len(raw_df)} raw records from {gtfs_filename}."
@@ -247,7 +249,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
             # For this simplified pipeline structure, we'll do basic column selection
             # and pass to load.py, assuming more complex V&T is done by a dedicated processor.
             # This placeholder logic prepares the DataFrame for the current `load.py`.
-            df_for_loading = raw_df # Placeholder: should be output of transform.py
+            df_for_loading = raw_df  # Placeholder: should be output of transform.py
 
             # Prepare DataFrame columns based on schema for loading.
             # This logic might be better inside transform.py or load.py.
@@ -270,7 +272,6 @@ def run_full_gtfs_etl_pipeline() -> bool:
                     # This implies transform.py would create this column with WKT strings.
                     final_df_for_loading[geom_col_name] = None
 
-
             module_logger.info(
                 f"Preparing to load data for table "
                 f"'{file_schema_definition['db_table_name']}'..."
@@ -281,15 +282,15 @@ def run_full_gtfs_etl_pipeline() -> bool:
                 conn,
                 final_df_for_loading,
                 file_schema_definition["db_table_name"],
-                file_schema_definition, # Pass full schema info for column mapping and geom handling
+                file_schema_definition,  # Pass full schema info for column mapping and geom handling
                 dlq_table_name=f"dlq_{file_schema_definition['db_table_name']}",
             )
             total_records_loaded_successfully += loaded_count
-            total_records_sent_to_dlq += dlq_count_from_load # Basic DLQ from load.py
+            total_records_sent_to_dlq += dlq_count_from_load  # Basic DLQ from load.py
 
         # After all tables are loaded, attempt to create foreign keys.
         module_logger.info("--- Adding Foreign Keys ---")
-        add_foreign_keys_from_schema(conn) # From update_gtfs or similar.
+        add_foreign_keys_from_schema(conn)  # From update_gtfs or similar.
 
         conn.commit()  # Final commit for the entire data load and FK process.
         module_logger.info("--- GTFS Data Load Phase Complete ---")
@@ -305,7 +306,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
         )
         return True
 
-    except ValueError as ve: # E.g., config error from download_and_extract_gtfs
+    except ValueError as ve:  # E.g., config error from download_and_extract_gtfs
         module_logger.critical(f"Configuration Error in pipeline: {ve}")
         if conn:
             conn.rollback()

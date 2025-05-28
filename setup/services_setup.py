@@ -11,13 +11,13 @@ functions (many as placeholders) and a group function to run them sequentially.
 import logging
 import os
 import subprocess  # For CalledProcessError specifically
-from typing import Optional, Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from setup import config
-from setup.command_utils import run_elevated_command, log_map_server
+from setup.cli_handler import cli_prompt_for_rerun
+from setup.command_utils import log_map_server, run_elevated_command
 from setup.helpers import backup_file, validate_cidr
 from setup.step_executor import execute_step
-from setup.cli_handler import cli_prompt_for_rerun
 
 module_logger = logging.getLogger(__name__)
 
@@ -494,7 +494,7 @@ def services_setup_group(current_logger: logging.Logger) -> bool:
         if not execute_step(
             step_tag=tag,
             step_description=desc,
-            step_function=func, # type: ignore
+            step_function=func,  # type: ignore
             current_logger_instance=logger_to_use,
             prompt_user_for_rerun=cli_prompt_for_rerun
         ):

@@ -73,7 +73,7 @@ PYTHON_SYSTEM_PACKAGES: list[str] = [
     "python3-yaml",
     "python3-pandas",
     "python3-psycopg2",
-    "python3-psycopg", # General purpose PostgreSQL adapter
+    "python3-psycopg",  # General purpose PostgreSQL adapter
     "python3-pydantic",
 ]
 

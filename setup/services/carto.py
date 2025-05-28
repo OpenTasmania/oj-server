@@ -18,11 +18,12 @@ from typing import Optional
 
 from setup import config
 from setup.command_utils import (
+    command_exists,
+    log_map_server,
     run_command,
     run_elevated_command,
-    log_map_server,
-    command_exists,
 )
+
 # No specific helpers needed from helpers.py for this function directly,
 # but systemd_reload might be used by an orchestrator after many services.
 
@@ -85,7 +86,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         carto_version_result = run_command(
             ["carto", "-v"],
             capture_output=True,
-            check=False, # Don't fail the script if version check has an issue
+            check=False,  # Don't fail the script if version check has an issue
             current_logger=logger_to_use,
         )
         carto_version = (
@@ -119,8 +120,8 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
     # Check if the directory exists using an elevated command.
     dir_exists_check = run_elevated_command(
         ["test", "-d", osm_carto_base_dir],
-        check=False, # `test -d` returns 0 if exists, 1 if not.
-        capture_output=True, # Suppress output of 'test' command.
+        check=False,  # `test -d` returns 0 if exists, 1 if not.
+        capture_output=True,  # Suppress output of 'test' command.
         current_logger=logger_to_use,
     )
     if dir_exists_check.returncode != 0:
@@ -132,7 +133,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         run_elevated_command(
             [
-                "git", "clone", "--depth", "1", # Shallow clone for speed
+                "git", "clone", "--depth", "1",  # Shallow clone for speed
                 "https://github.com/gravitystorm/openstreetmap-carto.git",
                 osm_carto_base_dir,
             ],
@@ -182,7 +183,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         # Find python3 or python executable.
         python_exe_path = shutil.which("python3") or shutil.which("python")
         if python_exe_path:
-            run_command( # Run as current user due to chown.
+            run_command(  # Run as current user due to chown.
                 [python_exe_path, "scripts/get-external-data.py"],
                 current_logger=logger_to_use,
             )
@@ -205,10 +206,10 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
         # Assumes 'carto' is in PATH for the current user.
         carto_cmd = ["carto", "project.mml"]
-        carto_result = run_command( # Run as current user.
+        carto_result = run_command(  # Run as current user.
             carto_cmd,
             capture_output=True,
-            check=False, # Check return code manually.
+            check=False,  # Check return code manually.
             current_logger=logger_to_use,
         )
 
@@ -265,7 +266,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                     "success",
                     logger_to_use,
                 )
-            else: # File exists but is empty or other issue.
+            else:  # File exists but is empty or other issue.
                 log_map_server(
                     f"{config.SYMBOLS['error']} mapnik.xml was created but "
                     "is empty or invalid. Check "
@@ -273,7 +274,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                     "error",
                     logger_to_use,
                 )
-                mapnik_xml_created_successfully = False # Mark as failure.
+                mapnik_xml_created_successfully = False  # Mark as failure.
     except Exception as e_carto_processing:
         log_map_server(
             f"{config.SYMBOLS['error']} Error during OpenStreetMap-Carto "
@@ -281,9 +282,9 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             "error",
             logger_to_use,
         )
-        mapnik_xml_created_successfully = False # Ensure failure status.
+        mapnik_xml_created_successfully = False  # Ensure failure status.
     finally:
-        os.chdir(original_cwd) # Always change back to original directory.
+        os.chdir(original_cwd)  # Always change back to original directory.
         log_map_server(
             f"{config.SYMBOLS['info']} Reverting ownership of "
             f"{osm_carto_base_dir} to root:root.",

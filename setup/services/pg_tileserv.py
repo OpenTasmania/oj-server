@@ -18,10 +18,10 @@ from typing import Optional
 
 from setup import config
 from setup.command_utils import (
+    command_exists,
+    log_map_server,
     run_command,
     run_elevated_command,
-    log_map_server,
-    command_exists,
 )
 from setup.helpers import systemd_reload
 from setup.state_manager import get_current_script_hash
@@ -238,7 +238,7 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
             [
                 "useradd", "--system", "--shell", "/usr/sbin/nologin",
                 "--home-dir", "/var/empty",
-                "--user-group", # Creates group with same name
+                "--user-group",  # Creates group with same name
                 pgtileserv_system_user,
             ],
             current_logger=logger_to_use,
@@ -271,7 +271,7 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
 
     # Ensure PostgreSQL role for pg_tileserv exists
     pg_db_port = config.PGPORT
-    pgtileserv_db_role = pgtileserv_system_user # Use the same name for simplicity
+    pgtileserv_db_role = pgtileserv_system_user  # Use the same name for simplicity
     app_db_name = config.PGDATABASE
 
     log_map_server(
@@ -283,7 +283,7 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
     # SQL command to create the role with LOGIN permission.
     sql_create_role_cmd_list = [
         "sudo", "-u", "postgres", "psql", "-p", pg_db_port,
-        "-d", "postgres", # Connect to 'postgres' db to create roles
+        "-d", "postgres",  # Connect to 'postgres' db to create roles
         "-c", f"CREATE ROLE {pgtileserv_db_role} WITH LOGIN;"
     ]
     try:
@@ -355,7 +355,7 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
     # Grant CONNECT permission on the application database
     sql_grant_connect_cmd_list = [
         "sudo", "-u", "postgres", "psql", "-p", pg_db_port,
-        "-d", app_db_name, # Connect to the specific app database
+        "-d", app_db_name,  # Connect to the specific app database
         "-c", f"GRANT CONNECT ON DATABASE {app_db_name} TO {pgtileserv_db_role};"
     ]
     try:

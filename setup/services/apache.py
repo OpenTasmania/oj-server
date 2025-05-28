@@ -15,9 +15,9 @@ from typing import Optional
 
 from setup import config
 from setup.command_utils import (
-    run_elevated_command,
-    log_map_server,
     command_exists,
+    log_map_server,
+    run_elevated_command,
 )
 from setup.helpers import backup_file, systemd_reload
 from setup.state_manager import get_current_script_hash
@@ -75,7 +75,7 @@ def apache_modtile_setup(
         # This sed command replaces "Listen 80" with "Listen 8080".
         run_elevated_command(
             [
-                "sed", "-i.bak_ports_sed", # Create another backup before sed
+                "sed", "-i.bak_ports_sed",  # Create another backup before sed
                 "s/^Listen 80$/Listen 8080/",
                 ports_conf_path,
             ],
@@ -84,7 +84,7 @@ def apache_modtile_setup(
         # Also check for IPv6 Listen [::]:80 and change to [::]:8080.
         run_elevated_command(
             [
-                "sed", "-i", # In-place edit, previous backup already made
+                "sed", "-i",  # In-place edit, previous backup already made
                 "s/^Listen \\[::\\]:80$/Listen [::]:8080/",
                 ports_conf_path,
             ],
@@ -130,7 +130,7 @@ ModTileMaxLoadMissing 5
 </IfModule>
 """
     run_elevated_command(
-        ["tee", mod_tile_conf_available_path], # Overwrites or creates
+        ["tee", mod_tile_conf_available_path],  # Overwrites or creates
         cmd_input=mod_tile_conf_content,
         current_logger=logger_to_use,
     )
@@ -150,7 +150,7 @@ ModTileMaxLoadMissing 5
     server_name_for_site = (
         config.VM_IP_OR_DOMAIN
         if config.VM_IP_OR_DOMAIN != config.VM_IP_OR_DOMAIN_DEFAULT
-        else "tiles.localhost" # Fallback for local/default setup
+        else "tiles.localhost"  # Fallback for local/default setup
     )
     admin_email_for_site = (
         f"webmaster@{config.VM_IP_OR_DOMAIN}"
@@ -178,7 +178,7 @@ ModTileMaxLoadMissing 5
 </VirtualHost>
 """
     run_elevated_command(
-        ["tee", apache_tiles_site_conf_available_path], # Overwrites or creates
+        ["tee", apache_tiles_site_conf_available_path],  # Overwrites or creates
         cmd_input=apache_tiles_site_content,
         current_logger=logger_to_use,
     )
@@ -190,7 +190,7 @@ ModTileMaxLoadMissing 5
     )
 
     # Enable necessary Apache modules and the new configuration/site.
-    apache_configs_to_enable = ["mod_tile.conf"] # As a conf, not a mod
+    apache_configs_to_enable = ["mod_tile.conf"]  # As a conf, not a mod
     for conf_name in apache_configs_to_enable:
         log_map_server(
             f"{config.SYMBOLS['gear']} Enabling Apache configuration: {conf_name}...",
@@ -200,8 +200,7 @@ ModTileMaxLoadMissing 5
         run_elevated_command(["a2enconf", conf_name.replace(".conf", "")],
                              current_logger=logger_to_use)
 
-
-    apache_modules_to_enable = ["expires", "headers"] # mod_tile is loaded by its conf
+    apache_modules_to_enable = ["expires", "headers"]  # mod_tile is loaded by its conf
     for mod in apache_modules_to_enable:
         log_map_server(
             f"{config.SYMBOLS['gear']} Enabling Apache module: {mod}...",
@@ -231,7 +230,7 @@ ModTileMaxLoadMissing 5
         ["test", "-L", default_site_enabled_path],
         check=False, capture_output=True, current_logger=logger_to_use,
     )
-    if is_link_check.returncode == 0: # Symlink exists, so site is enabled.
+    if is_link_check.returncode == 0:  # Symlink exists, so site is enabled.
         log_map_server(
             f"{config.SYMBOLS['info']} Disabling default Apache site "
             f"({default_site_name})...",

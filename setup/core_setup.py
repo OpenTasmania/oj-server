@@ -17,8 +17,11 @@ from typing import Optional
 
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun
-from setup.command_utils import run_command, run_elevated_command, \
-    log_map_server
+from setup.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from setup.helpers import backup_file
 from setup.step_executor import execute_step
 
@@ -48,9 +51,9 @@ def boot_verbosity(current_logger: Optional[logging.Logger] = None) -> None:
             sed_expressions = [
                 r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bquiet\b//g",
                 r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bsplash\b//g",
-                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/  +/ /g", # Compact spaces
-                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/" /"/g', # Trim leading space in value
-                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g', # Trim trailing space in value
+                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/  +/ /g",  # Compact spaces
+                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/" /"/g',  # Trim leading space in value
+                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g',  # Trim trailing space in value
             ]
             run_elevated_command(
                 ["sed", "-i"] + sed_expressions + [grub_file],
@@ -235,7 +238,7 @@ def core_install(current_logger: Optional[logging.Logger] = None) -> None:
         }
 
         for category, packages in package_categories.items():
-            if packages: # Only attempt install if list is not empty
+            if packages:  # Only attempt install if list is not empty
                 log_map_server(
                     f"{config.SYMBOLS['package']} Installing {category}...",
                     "info",

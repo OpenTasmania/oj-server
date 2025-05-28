@@ -15,9 +15,13 @@ import subprocess  # For CalledProcessError
 from typing import Optional
 
 from setup import config
-from setup.command_utils import run_command, run_elevated_command, \
-    log_map_server
+from setup.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from setup.helpers import backup_file, validate_cidr
+
 # Assuming get_current_script_hash is needed for comments in config files
 from setup.state_manager import get_current_script_hash
 
@@ -206,7 +210,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
     if backup_file(pg_conf_file, current_logger=logger_to_use):
         # Marker to check if customizations have already been applied
         customisation_marker = (
-            f"# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V"
+            "# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V"
         )  # Partial marker to find any version
         postgresql_custom_conf_content = f"""
 # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash_for_comments} ---

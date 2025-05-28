@@ -10,7 +10,7 @@ and state of each service setup step.
 """
 
 import logging
-from typing import Optional, List, Tuple, Callable, Any
+from typing import Any, Callable, List, Optional, Tuple
 
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun

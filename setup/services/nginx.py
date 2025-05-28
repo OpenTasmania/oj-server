@@ -12,16 +12,18 @@ restarts the Nginx service.
 
 import logging
 import os
-import subprocess # For CalledProcessError
+import subprocess  # For CalledProcessError
 from typing import Optional
 
 from setup import config
 from setup.command_utils import (
-    run_elevated_command,
-    log_map_server,
     command_exists,
+    log_map_server,
+    run_elevated_command,
 )
-from setup.helpers import systemd_reload # For reloading systemd after service changes
+from setup.helpers import (
+    systemd_reload,  # For reloading systemd after service changes
+)
 from setup.state_manager import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
@@ -104,7 +106,7 @@ def nginx_setup(current_logger: Optional[logging.Logger] = None) -> None:
 """
     index_html_path = os.path.join(test_page_dir, "index.html")
     run_elevated_command(
-        ["tee", index_html_path], # Overwrites or creates
+        ["tee", index_html_path],  # Overwrites or creates
         cmd_input=simple_index_html_content,
         current_logger=logger_to_use,
     )
@@ -177,7 +179,7 @@ server {{
     # If any $variable was missed, it would need manual escaping here.
 
     run_elevated_command(
-        ["tee", nginx_conf_available_path], # Overwrites or creates
+        ["tee", nginx_conf_available_path],  # Overwrites or creates
         cmd_input=nginx_transit_proxy_conf_content,
         current_logger=logger_to_use,
     )
@@ -211,7 +213,7 @@ server {{
     default_nginx_symlink = "/etc/nginx/sites-enabled/default"
     # Check if it's a symlink and exists before trying to remove.
     is_link_check = run_elevated_command(
-        ["test", "-L", default_nginx_symlink], # -L tests if it's a symlink
+        ["test", "-L", default_nginx_symlink],  # -L tests if it's a symlink
         check=False, capture_output=True, current_logger=logger_to_use,
     )
     if is_link_check.returncode == 0:  # Symlink exists, so site is enabled.
@@ -272,7 +274,7 @@ server {{
             "error",
             logger_to_use,
         )
-        raise # Propagate failure for this critical step.
+        raise  # Propagate failure for this critical step.
     except Exception as e:
         log_map_server(
             f"{config.SYMBOLS['error']} An unexpected error occurred during "

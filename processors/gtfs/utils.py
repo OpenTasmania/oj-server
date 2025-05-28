@@ -15,13 +15,13 @@ package for Pydantic model validation.
 
 import logging
 import os
-from sys import stderr, stdout
 from pathlib import Path
-from typing import Tuple, List, Dict, Any, Optional, Type
+from sys import stderr, stdout
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import pandas as pd
-import psycopg2 # For get_db_connection, though not used by validate_dataframe
-from pydantic import ValidationError, BaseModel
+import psycopg2  # For get_db_connection, though not used by validate_dataframe
+from pydantic import BaseModel, ValidationError
 
 # Import schema definitions from the local package.
 from . import schema_definitions as schemas
@@ -72,17 +72,15 @@ def setup_logging(
                 file=stderr
             )
 
-
     if log_to_console:
         console_handler = logging.StreamHandler(stdout)
         handlers.append(console_handler)
 
-    if not handlers: # Ensure there's at least one handler if none specified
+    if not handlers:  # Ensure there's at least one handler if none specified
         console_handler = logging.StreamHandler(stdout)
         handlers.append(console_handler)
-        if log_level > logging.INFO: # If default level too high, ensure some output
+        if log_level > logging.INFO:  # If default level too high, ensure some output
             log_level = logging.INFO
-
 
     logging.basicConfig(
         level=log_level,
@@ -160,7 +158,7 @@ def cleanup_directory(directory_path: Path) -> None:
     Args:
         directory_path: Path object representing the directory to clean up.
     """
-    import shutil # Import here to keep it local to this function's use
+    import shutil  # Import here to keep it local to this function's use
 
     if directory_path.exists():
         if directory_path.is_dir():
@@ -263,7 +261,7 @@ def validate_dataframe_with_pydantic(
                 f"Validation failed for record at index {index} from "
                 f"{gtfs_filename}: {e_val.errors()}"
             )
-        except Exception as ex_other: # Catch other unexpected errors
+        except Exception as ex_other:  # Catch other unexpected errors
             invalid_record_info = {
                 "original_record": row.to_dict(),
                 "errors": [{
@@ -309,7 +307,7 @@ if __name__ == "__main__":
     # Setup basic logging for direct script execution test.
     # In a real pipeline, main_pipeline.py or run_gtfs_update.py
     # would set up logging.
-    setup_logging(log_level=logging.DEBUG) # Use our own setup for testing.
+    setup_logging(log_level=logging.DEBUG)  # Use our own setup for testing.
     module_logger.info("--- Testing osm.processors.gtfs.utils.py ---")
 
     # --- Test with Stop Model ---
@@ -373,7 +371,7 @@ if __name__ == "__main__":
         )
     else:
         module_logger.info("\n--- Testing Database Connection ---")
-        test_conn = get_db_connection() # Uses DEFAULT_DB_PARAMS or env vars
+        test_conn = get_db_connection()  # Uses DEFAULT_DB_PARAMS or env vars
         if test_conn:
             module_logger.info("Test DB connection successful.")
             try:

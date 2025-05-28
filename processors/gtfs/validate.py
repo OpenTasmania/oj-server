@@ -14,10 +14,10 @@ It appears to serve as a general utilities module.
 
 import logging
 import os
+import shutil  # For cleanup_directory if full recursive delete is needed
 import sys
-import shutil # For cleanup_directory if full recursive delete is needed
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import psycopg2
 from psycopg2.extensions import connection as PgConnection
@@ -31,7 +31,7 @@ DEFAULT_DB_PARAMS: Dict[str, str] = {
     "user": os.environ.get("PG_OSM_USER", "osmuser"),
     "password": os.environ.get(
         "PG_OSM_PASSWORD", "yourStrongPasswordHere_utils_default"
-    ), # CRITICAL: Change this default or ensure env var is securely set.
+    ),  # CRITICAL: Change this default or ensure env var is securely set.
     "host": os.environ.get("PG_HOST", "localhost"),
     "port": os.environ.get("PG_PORT", "5432"),
 }
@@ -87,7 +87,7 @@ def setup_logging(
             log_file_path = Path(log_file)
             # Ensure log directory exists.
             log_file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(log_file_path, mode="a") # Append mode
+            file_handler = logging.FileHandler(log_file_path, mode="a")  # Append mode
             file_handler.setFormatter(formatter)
             root_logger.addHandler(file_handler)
             handlers_added = True
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     # --- Test logging setup ---
     print("--- Testing utils.py (was validate.py) Logging ---")
     # Test default logging (INFO to console)
-    setup_logging(log_level=logging.DEBUG) # Set to DEBUG to see all messages
+    setup_logging(log_level=logging.DEBUG)  # Set to DEBUG to see all messages
     module_logger.debug("This is a debug message from utils.py direct test.")
     module_logger.info("This is an info message from utils.py direct test.")
     module_logger.warning("This is a warning message.")
@@ -246,7 +246,7 @@ if __name__ == "__main__":
     module_logger.critical("This is a critical message.")
 
     # Test logging to a file
-    TEST_LOG_FILE = Path("/tmp/utils_module_test.log") # Unique name
+    TEST_LOG_FILE = Path("/tmp/utils_module_test.log")  # Unique name
     setup_logging(
         log_level=logging.INFO, log_file=TEST_LOG_FILE, log_to_console=False
     )
@@ -304,7 +304,7 @@ if __name__ == "__main__":
     TEST_CLEANUP_DIR = Path("/tmp/test_cleanup_dir_validate_content")
 
     # Test 1: Cleanup a directory that doesn't exist, ensure it's created.
-    if TEST_CLEANUP_DIR.exists(): # Cleanup from previous test if any
+    if TEST_CLEANUP_DIR.exists():  # Cleanup from previous test if any
         shutil.rmtree(TEST_CLEANUP_DIR, ignore_errors=True)
     module_logger.info(f"Testing cleanup of non-existent directory, ensuring creation: {TEST_CLEANUP_DIR}")
     cleanup_directory(TEST_CLEANUP_DIR, ensure_dir_exists_after=True)
@@ -314,7 +314,7 @@ if __name__ == "__main__":
         module_logger.error(f"Test 1 FAILED. Directory {TEST_CLEANUP_DIR} does not exist.")
 
     # Test 2: Create directory with content, clean it, ensure it's recreated empty.
-    TEST_CLEANUP_DIR.mkdir(parents=True, exist_ok=True) # Ensure it exists for this test
+    TEST_CLEANUP_DIR.mkdir(parents=True, exist_ok=True)  # Ensure it exists for this test
     (TEST_CLEANUP_DIR / "file1.txt").touch()
     (TEST_CLEANUP_DIR / "subdir").mkdir(exist_ok=True)
     (TEST_CLEANUP_DIR / "subdir" / "file3.txt").touch()

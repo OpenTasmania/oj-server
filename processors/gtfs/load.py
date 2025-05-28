@@ -13,12 +13,13 @@ failed records to a Dead-Letter Queue (DLQ) table.
 import json
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import psycopg2
 from psycopg2 import sql
-from psycopg2.extensions import connection as PgConnection, cursor as PgCursor
+from psycopg2.extensions import connection as PgConnection
+from psycopg2.extensions import cursor as PgCursor
 from psycopg2.extras import execute_values
 
 module_logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ def load_dataframe_to_db(
         return 0, 0
 
     successful_loads = 0
-    dlq_inserts = 0 # Currently minimal DLQ usage in this batch function.
+    dlq_inserts = 0  # Currently minimal DLQ usage in this batch function.
 
     # Determine columns for insertion based on the schema definition.
     # These are the keys of the 'columns' dictionary in file_schema_info.
@@ -162,9 +163,9 @@ def load_dataframe_to_db(
             f"Error converting DataFrame for '{table_name}' to tuples: {e}",
             exc_info=True
         )
-        return 0, 0 # Cannot proceed if data conversion fails.
+        return 0, 0  # Cannot proceed if data conversion fails.
 
-    with conn.cursor() as cursor: # Ensure cursor is closed
+    with conn.cursor() as cursor:  # Ensure cursor is closed
         # Truncate production table before loading new data.
         try:
             module_logger.info(f"Truncating table: {table_name}...")
@@ -178,7 +179,7 @@ def load_dataframe_to_db(
             module_logger.error(
                 f"Error truncating table {table_name}: {e}", exc_info=True
             )
-            conn.rollback() # Rollback on error
+            conn.rollback()  # Rollback on error
             return 0, 0  # Cannot proceed if truncate fails.
 
         # Prepare INSERT statement components.
@@ -188,7 +189,7 @@ def load_dataframe_to_db(
 
         # Handle geometry column specifically: wrap with ST_GeomFromText.
         if geom_col_name and geom_col_name in df_cols_for_db_insert and geom_config:
-            srid = geom_config.get("srid", 4326) # Default SRID if not specified
+            srid = geom_config.get("srid", 4326)  # Default SRID if not specified
             try:
                 geom_col_idx = df_cols_for_db_insert.index(geom_col_name)
                 placeholders_list[geom_col_idx] = sql.SQL(
@@ -211,25 +212,24 @@ def load_dataframe_to_db(
         )
         module_logger.debug(f"Insert statement for {table_name}: {insert_stmt.as_string(conn)}")
 
-
         module_logger.info(
             f"Attempting to load {len(data_tuples)} records into {table_name}..."
         )
         try:
             execute_values(
                 cursor,
-                insert_stmt.as_string(conn), # Get raw SQL string for execute_values
+                insert_stmt.as_string(conn),  # Get raw SQL string for execute_values
                 data_tuples,
-                page_size=1000 # Tunable batch size for execute_values
+                page_size=1000  # Tunable batch size for execute_values
             )
             successful_loads = cursor.rowcount if cursor.rowcount is not None \
                                else len(data_tuples)
-            conn.commit() # Commit after successful batch insert.
+            conn.commit()  # Commit after successful batch insert.
             module_logger.info(
                 f"Successfully loaded {successful_loads} records into {table_name}."
             )
         except psycopg2.Error as e_db_insert:
-            conn.rollback() # Rollback on batch insert error.
+            conn.rollback()  # Rollback on batch insert error.
             module_logger.error(
                 f"Error during bulk insert into {table_name}: {e_db_insert}. "
                 "No records loaded into production table for this batch.",
@@ -251,7 +251,7 @@ def load_dataframe_to_db(
                         str(e_db_insert),
                         f"Batch insert failure for table: {table_name}"
                     )
-                    dlq_inserts = 1 # Indicate one DLQ entry for the batch
+                    dlq_inserts = 1  # Indicate one DLQ entry for the batch
                 except Exception as e_dlq_log:
                     module_logger.error(f"Failed to log batch failure to DLQ: {e_dlq_log}")
         except Exception as e_unexpected:
@@ -267,9 +267,9 @@ def load_dataframe_to_db(
 def log_to_dlq(
     conn: PgConnection,
     dlq_table_name: str,
-    failed_record_data: Dict, # Original record data or batch summary
+    failed_record_data: Dict,  # Original record data or batch summary
     error_reason: str,
-    source_info: str, # e.g., filename, specific error context
+    source_info: str,  # e.g., filename, specific error context
 ) -> None:
     """
     Log a failed record or batch failure information to a Dead-Letter Queue (DLQ) table.
@@ -307,13 +307,13 @@ def log_to_dlq(
                 dlq_insert_stmt,
                 (record_json, error_reason, source_info, timestamp_now),
             )
-        conn.commit() # Commit DLQ insert immediately or batch them if preferred.
+        conn.commit()  # Commit DLQ insert immediately or batch them if preferred.
         module_logger.debug(
             f"Record/Info logged to DLQ table '{dlq_table_name}' "
             f"for source: {source_info}"
         )
     except psycopg2.Error as e_db_dlq:
-        conn.rollback() # Rollback if DLQ insert fails.
+        conn.rollback()  # Rollback if DLQ insert fails.
         module_logger.error(
             f"Database error inserting record into DLQ table "
             f"'{dlq_table_name}': {e_db_dlq}", exc_info=True

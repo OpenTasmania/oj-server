@@ -83,7 +83,7 @@ def log_map_server(
         # Mark that some configuration has happened to avoid repeating this.
         # Add a custom attribute to track if fallback was configured.
         if effective_logger is module_logger:
-            setattr(module_logger, 'is_fallback_configured', True)
+            module_logger.is_fallback_configured = True
 
     if level == "warning":
         effective_logger.warning(message)

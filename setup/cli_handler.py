@@ -12,8 +12,9 @@ import logging
 
 from . import config  # For SYMBOLS, config values
 from .command_utils import log_map_server
+
 # Assuming direct use for CLI menu:
-from .state_manager import view_completed_steps, clear_state_file
+from .state_manager import clear_state_file, view_completed_steps
 
 module_logger = logging.getLogger(__name__)
 

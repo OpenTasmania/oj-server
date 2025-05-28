@@ -12,9 +12,10 @@ into LineString geometries.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
+
 # Import Pydantic models and schema definitions if needed for reference
 # or type hints.
 # from . import schema_definitions as schemas
@@ -36,7 +37,7 @@ def clean_string_field(value: Any) -> Optional[str]:
     Returns:
         The cleaned string if it's not empty, otherwise None.
     """
-    if pd.isna(value): # Handles None, NaN, NaT
+    if pd.isna(value):  # Handles None, NaN, NaT
         return None
     if isinstance(value, str):
         stripped_value = value.strip()
@@ -167,7 +168,7 @@ def transform_dataframe(
 
     # Create PostGIS geometry WKT string if configured in the schema.
     geom_config = file_schema_info.get("geom_config")
-    final_columns_ordered = list(expected_db_columns) # Start with DB columns
+    final_columns_ordered = list(expected_db_columns)  # Start with DB columns
 
     if geom_config:
         lat_col = geom_config.get("lat_col")
@@ -210,8 +211,7 @@ def transform_dataframe(
             if geom_col_name not in transformed_df.columns:
                 transformed_df[geom_col_name] = None
             if geom_col_name not in final_columns_ordered:
-                 final_columns_ordered.append(geom_col_name)
-
+                final_columns_ordered.append(geom_col_name)
 
     # Ensure all columns defined in the schema exist in the DataFrame,
     # adding missing ones with None.
@@ -223,7 +223,7 @@ def transform_dataframe(
                 f"Column '{col_name}' from schema not in DataFrame for "
                 f"{table_name_for_log}; adding as None."
             )
-            output_df[col_name] = None # Creates a column of NaNs/Nones
+            output_df[col_name] = None  # Creates a column of NaNs/Nones
         else:
             output_df[col_name] = transformed_df[col_name]
 
@@ -304,7 +304,7 @@ def transform_shape_points_to_lines_df(
 
     # Drop rows where essential geo-data or sequence is missing after coercion.
     working_df.dropna(
-        subset=required_cols, # Check all required columns for NaN after coercion
+        subset=required_cols,  # Check all required columns for NaN after coercion
         inplace=True,
     )
     if working_df.empty:
@@ -313,7 +313,6 @@ def transform_shape_points_to_lines_df(
             "conversion and NaN drop. Returning empty LineString DataFrame."
         )
         return pd.DataFrame(columns=["shape_id", "geom"])
-
 
     # Sort by shape_id and then by sequence to ensure correct line ordering.
     sorted_shapes = working_df.sort_values(
@@ -332,7 +331,7 @@ def transform_shape_points_to_lines_df(
         # Create coordinate pairs (lon, lat) for the WKT string.
         coords_str = ", ".join(
             f"{row.shape_pt_lon} {row.shape_pt_lat}"
-            for _, row in group.iterrows() # Iterate over sorted points in group
+            for _, row in group.iterrows()  # Iterate over sorted points in group
         )
         wkt_linestring = f"SRID=4326;LINESTRING({coords_str})"
         lines_data.append({"shape_id": shape_id, "geom": wkt_linestring})
@@ -352,9 +351,9 @@ if __name__ == "__main__":
 
     # Mock schema definition for stops.txt
     mock_stop_schema = {
-        "db_table_name": "gtfs_stops", # Changed from table_name for consistency
-        "columns": { # Simulates structure from schema_definitions.py
-            "stop_id": {"type": "TEXT", "pk": True}, # Example type/pk info
+        "db_table_name": "gtfs_stops",  # Changed from table_name for consistency
+        "columns": {  # Simulates structure from schema_definitions.py
+            "stop_id": {"type": "TEXT", "pk": True},  # Example type/pk info
             "stop_name": {"type": "TEXT"},
             "stop_lat": {"type": "DOUBLE PRECISION"},
             "stop_lon": {"type": "DOUBLE PRECISION"},
@@ -364,7 +363,7 @@ if __name__ == "__main__":
         "geom_config": {
             "lat_col": "stop_lat",
             "lon_col": "stop_lon",
-            "geom_col": "geom", # This is the target column name for WKT
+            "geom_col": "geom",  # This is the target column name for WKT
             "srid": 4326,
         },
     }
@@ -378,8 +377,8 @@ if __name__ == "__main__":
         ],
         "stop_lat": ["40.7128 ", "40.7321", None, "95.0", " "],
         "stop_lon": [" -74.0060", "-74.0001", "-74.0010", "-74.0020", "-74.0030 "],
-        "extra_column": ["a", "b", "c", "d", "e"], # This should be dropped
-        "location_type": [0, 1, None, 0, 2], # Added for schema completeness
+        "extra_column": ["a", "b", "c", "d", "e"],  # This should be dropped
+        "location_type": [0, 1, None, 0, 2],  # Added for schema completeness
     }
     raw_stops_df = pd.DataFrame(raw_stop_data)
     module_logger.info(f"Raw stops DataFrame:\n{raw_stops_df}")
@@ -396,10 +395,10 @@ if __name__ == "__main__":
 
     # Test shape points to lines transformation
     mock_shapes_points_data = {
-        "shape_id": ["shp1", "shp1", "shp1", "shp2", "shp2_bad", "shp3", "shp1"], # Unordered point for shp1
+        "shape_id": ["shp1", "shp1", "shp1", "shp2", "shp2_bad", "shp3", "shp1"],  # Unordered point for shp1
         "shape_pt_lat": [40.0, 40.1, 40.2, 39.0, "invalid", 38.0, 39.9],
         "shape_pt_lon": [-74.0, -74.1, -74.2, -73.0, -73.1, -72.0, -73.9],
-        "shape_pt_sequence": [1, 3, 2, 1, "nan", 1, 0], # Unordered sequence for shp1, bad seq
+        "shape_pt_sequence": [1, 3, 2, 1, "nan", 1, 0],  # Unordered sequence for shp1, bad seq
     }
     raw_shapes_df = pd.DataFrame(mock_shapes_points_data)
     module_logger.info(f"\nRaw shapes points DataFrame:\n{raw_shapes_df}")

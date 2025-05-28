@@ -10,11 +10,12 @@ domain if it's a valid FQDN.
 
 import logging
 import re  # For IP address and FQDN validation
-import subprocess # For CalledProcessError
+import subprocess  # For CalledProcessError
 from typing import Optional
 
 from setup import config
-from setup.command_utils import run_elevated_command, log_map_server
+from setup.command_utils import log_map_server, run_elevated_command
+
 # `command_exists` was removed from imports in the original as not used;
 # keeping it out unless a need arises.
 
@@ -63,7 +64,6 @@ def certbot_setup(current_logger: Optional[logging.Logger] = None) -> None:
         "." in domain_to_certify and not is_ip_address and not is_localhost
     )
 
-
     if is_default_domain or is_ip_address or is_localhost or not is_fqdn_like:
         log_map_server(
             f"{config.SYMBOLS['warning']} Skipping Certbot: VM_IP_OR_DOMAIN "
@@ -77,10 +77,10 @@ def certbot_setup(current_logger: Optional[logging.Logger] = None) -> None:
             f"   Ensure DNS records for '{domain_to_certify}' point to this "
             "server's public IP and that Nginx (ports 80/443) is "
             "accessible externally if you wish to use Certbot.",
-            "info", # Informational, not a warning for the skip itself
+            "info",  # Informational, not a warning for the skip itself
             logger_to_use,
         )
-        return # Skip Certbot setup.
+        return  # Skip Certbot setup.
 
     log_map_server(
         f"{config.SYMBOLS['package']} Installing Certbot and Nginx plugin...",

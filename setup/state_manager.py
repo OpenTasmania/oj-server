@@ -17,9 +17,12 @@ import subprocess
 import tempfile
 from typing import List, Optional
 
-from setup.command_utils import run_elevated_command, log_map_server
+from setup.command_utils import log_map_server, run_elevated_command
 from setup.config import (
-    STATE_FILE_PATH, SCRIPT_VERSION, SYMBOLS, OSM_PROJECT_ROOT
+    OSM_PROJECT_ROOT,
+    SCRIPT_VERSION,
+    STATE_FILE_PATH,
+    SYMBOLS,
 )
 from setup.helpers import calculate_project_hash
 
@@ -293,7 +296,7 @@ def mark_step_completed(
         result = run_elevated_command(
             ["grep", "-Fxq", step_tag, str(STATE_FILE_PATH)],
             check=False,  # Do not raise error if grep doesn't find the tag.
-            capture_output=True, # Though quiet, capture for completeness.
+            capture_output=True,  # Though quiet, capture for completeness.
             current_logger=logger_to_use,
         )
         if result.returncode != 0:  # Step tag not found, so add it.
@@ -306,7 +309,7 @@ def mark_step_completed(
             run_elevated_command(
                 ["tee", "-a", str(STATE_FILE_PATH)],
                 cmd_input=f"{step_tag}\n",
-                capture_output=False, # No need to capture output for tee -a.
+                capture_output=False,  # No need to capture output for tee -a.
                 current_logger=logger_to_use,
             )
         else:
@@ -378,7 +381,7 @@ def view_completed_steps(
         result = run_elevated_command(
             ["grep", "-v", "^#", str(STATE_FILE_PATH)],
             capture_output=True,
-            check=False, # Don't fail if no non-comment lines are found.
+            check=False,  # Don't fail if no non-comment lines are found.
             current_logger=logger_to_use,
         )
 

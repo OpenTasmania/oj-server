@@ -14,10 +14,10 @@ import logging
 import os
 import subprocess
 import traceback
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 from setup import config
-from setup.command_utils import run_elevated_command, log_map_server
+from setup.command_utils import log_map_server, run_elevated_command
 
 module_logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ GEOFABRIK_AUSTRALIA_PBF_URL = (
     f"https://download.geofabrik.de/australia-oceania/"
     f"{AUSTRALIA_PBF_FILENAME}"
 )
-OSM_CARTO_DIR = "/opt/openstreetmap-carto" # Used for osm2pgsql style
+OSM_CARTO_DIR = "/opt/openstreetmap-carto"  # Used for osm2pgsql style
 
 # OSRM Docker processing constants
 OSRM_DOCKER_IMAGE = "osrm/osrm-backend:latest"  # Or a specific version
@@ -44,7 +44,7 @@ DEFAULT_DB_CONFIG: Dict[str, str] = {
     "port": "5432",
     "dbname": "gis",
     "user": "osmuser",
-    "password": "yourStrongPasswordHere", # Should be overridden by config
+    "password": "yourStrongPasswordHere",  # Should be overridden by config
 }
 
 
@@ -85,7 +85,7 @@ def _ensure_directory_exists(
         log_map_server(
             f"{config.SYMBOLS['gear']} Ensuring ownership "
             f"({uid}:{gid}) and permissions for existing directory: {path}",
-            "debug", logger # More of a debug log if it already exists
+            "debug", logger  # More of a debug log if it already exists
         )
         run_elevated_command(
             ["chown", f"{uid}:{gid}", path], current_logger=logger
@@ -111,7 +111,7 @@ def _setup_asset_directories(
     """
     log_map_server(
         f"{config.SYMBOLS['debug']} Calculating asset directories.",
-        "debug", logger # Changed to debug as it's an internal step
+        "debug", logger  # Changed to debug as it's an internal step
     )
     assets_regions_dir = os.path.join(base_script_dir, "assets", "regions")
     australia_dir = os.path.join(assets_regions_dir, "Australia")
@@ -217,7 +217,7 @@ def _download_osm_pbf(
             f"{os.path.dirname(pbf_full_path)}...",
             "info", logger
         )
-        run_elevated_command( # wget might need sudo if path is restricted
+        run_elevated_command(  # wget might need sudo if path is restricted
             ["wget", download_url, "-O", pbf_full_path], current_logger=logger
         )
     else:
@@ -312,7 +312,7 @@ def _extract_region_with_osmium(
         )
         if result.stdout:
             logger.debug(f"Osmium stdout for {region_name_log}:\n{result.stdout}")
-        if result.stderr: # Osmium can be verbose on stderr for progress.
+        if result.stderr:  # Osmium can be verbose on stderr for progress.
             log_level = "error" if result.returncode != 0 else "debug"
             logger.log(
                 getattr(logging, log_level.upper()),
@@ -349,7 +349,7 @@ def _extract_region_with_osmium(
 
 def _import_pbf_to_postgis_flex(
     pbf_file_path: str,
-    db_config_dict: Dict[str, str], # Renamed for clarity
+    db_config_dict: Dict[str, str],  # Renamed for clarity
     osm_carto_style_dir: str,
     flat_nodes_storage_dir: str,
     logger: logging.Logger,
@@ -382,7 +382,7 @@ def _import_pbf_to_postgis_flex(
     # Locate the Lua transformation script for osm2pgsql Flex backend.
     lua_candidates = [
         os.path.join(osm_carto_style_dir, "openstreetmap-carto-flex.lua"),
-        os.path.join(osm_carto_style_dir, "openstreetmap-carto.lua") # Fallback
+        os.path.join(osm_carto_style_dir, "openstreetmap-carto.lua")  # Fallback
     ]
     lua_script_found = next(
         (candidate for candidate in lua_candidates if os.path.isfile(candidate)),
@@ -401,9 +401,9 @@ def _import_pbf_to_postgis_flex(
         "debug", logger
     )
 
-    num_processes = os.cpu_count() or 1 # Default to 1 if cpu_count is None
+    num_processes = os.cpu_count() or 1  # Default to 1 if cpu_count is None
     # Determine cache size for osm2pgsql.
-    default_cache_str = "20000" # Default 20GB
+    default_cache_str = "20000"  # Default 20GB
     cache_size_to_use = osm2pgsql_cache_mb
     if cache_size_to_use is None:
         try:
@@ -435,7 +435,7 @@ def _import_pbf_to_postgis_flex(
         "--port", str(db_config_dict["port"]),
         "--slim", "--hstore", "--multi-geometry",
         "--tag-transform-script", lua_script_found,
-        "--style", lua_script_found, # Style and transform can be same for flex
+        "--style", lua_script_found,  # Style and transform can be same for flex
         "--output=flex",
         "-C", str(cache_size_to_use),
         "--number-processes", str(num_processes),
@@ -465,8 +465,8 @@ def _import_pbf_to_postgis_flex(
             logger.debug(
                 f"osm2pgsql STDOUT for {region_name}:\n{completed_process.stdout}"
             )
-        if completed_process.stderr: # osm2pgsql often uses stderr for progress.
-            log_level_stderr = "error" if completed_process.returncode !=0 else "debug"
+        if completed_process.stderr:  # osm2pgsql often uses stderr for progress.
+            log_level_stderr = "error" if completed_process.returncode != 0 else "debug"
             logger.log(
                 getattr(logging, log_level_stderr.upper()),
                 f"osm2pgsql STDERR for {region_name}:\n{completed_process.stderr}"
@@ -504,15 +504,15 @@ def _import_pbf_to_postgis_flex(
 
 def _run_osrm_docker_command(
     command_args: List[str],
-    region_osrm_data_dir: str, # Host path where OSRM will write processed files
-    pbf_host_path: Optional[str], # Host path to the input PBF
-    pbf_filename_in_container: Optional[str], # Name of PBF inside /mnt_readonly_pbf
+    region_osrm_data_dir: str,  # Host path where OSRM will write processed files
+    pbf_host_path: Optional[str],  # Host path to the input PBF
+    pbf_filename_in_container: Optional[str],  # Name of PBF inside /mnt_readonly_pbf
     uid: str,
     gid: str,
     docker_image: str,
     logger: logging.Logger,
-    step_name: str, # e.g., "osrm-extract"
-    region_name: str # For logging
+    step_name: str,  # e.g., "osrm-extract"
+    region_name: str  # For logging
 ) -> bool:
     """
     Helper to run OSRM Docker commands for processing steps.
@@ -554,7 +554,7 @@ def _run_osrm_docker_command(
     full_docker_cmd = (
         docker_base_cmd +
         volume_mounts +
-        ["-w", "/data_processing", docker_image] + # Set working dir in container
+        ["-w", "/data_processing", docker_image] +  # Set working dir in container
         command_args
     )
 
@@ -583,7 +583,7 @@ def _run_osrm_docker_command(
             )
             return False
 
-        if result.stdout: # OSRM tools often use stdout for progress/info.
+        if result.stdout:  # OSRM tools often use stdout for progress/info.
             logger.debug(
                 f"Docker {step_name} STDOUT for {region_name}:\n{result.stdout}"
             )
@@ -618,18 +618,18 @@ def _run_osrm_docker_command(
             f"for {region_name}: {e}",
             "critical", logger
         )
-        logger.error(traceback.format_exc()) # Log full traceback for exceptions
+        logger.error(traceback.format_exc())  # Log full traceback for exceptions
         return False
 
 
 def _run_osrm_extract_docker(
-    pbf_host_path: str, # Full path to PBF on host
-    region_osrm_data_dir: str, # Host dir for OSRM processed files for this region
-    data_label_for_outputs: str, # Basename for output files (e.g., "TasmaniaRegionMap")
+    pbf_host_path: str,  # Full path to PBF on host
+    region_osrm_data_dir: str,  # Host dir for OSRM processed files for this region
+    data_label_for_outputs: str,  # Basename for output files (e.g., "TasmaniaRegionMap")
     uid: str,
     gid: str,
     docker_image: str,
-    profile_in_container: str, # Path to LUA profile in container
+    profile_in_container: str,  # Path to LUA profile in container
     logger: logging.Logger
 ) -> bool:
     """
@@ -670,8 +670,8 @@ def _run_osrm_extract_docker(
     return _run_osrm_docker_command(
         command_args=docker_command_args,
         region_osrm_data_dir=region_osrm_data_dir,
-        pbf_host_path=pbf_host_path, # Mount original PBF read-only
-        pbf_filename_in_container=pbf_filename_on_host, # Name it as on host in mount
+        pbf_host_path=pbf_host_path,  # Mount original PBF read-only
+        pbf_filename_in_container=pbf_filename_on_host,  # Name it as on host in mount
         uid=uid, gid=gid, docker_image=docker_image, logger=logger,
         step_name="osrm-extract", region_name=data_label_for_outputs
     )
@@ -679,19 +679,19 @@ def _run_osrm_extract_docker(
 
 def _run_osrm_partition_docker(
     region_osrm_data_dir: str,
-    data_label: str, # Basename of the .osrm file (e.g., "TasmaniaRegionMap")
+    data_label: str,  # Basename of the .osrm file (e.g., "TasmaniaRegionMap")
     uid: str,
     gid: str,
     docker_image: str,
     logger: logging.Logger
 ) -> bool:
     """Run the osrm-partition step using Docker."""
-    osrm_base_file_in_container = f"./{data_label}.osrm" # Relative to /data_processing
+    osrm_base_file_in_container = f"./{data_label}.osrm"  # Relative to /data_processing
     docker_command_args = ["osrm-partition", osrm_base_file_in_container]
     return _run_osrm_docker_command(
         command_args=docker_command_args,
         region_osrm_data_dir=region_osrm_data_dir,
-        pbf_host_path=None, # No PBF input for this step
+        pbf_host_path=None,  # No PBF input for this step
         pbf_filename_in_container=None,
         uid=uid, gid=gid, docker_image=docker_image, logger=logger,
         step_name="osrm-partition", region_name=data_label
@@ -700,19 +700,19 @@ def _run_osrm_partition_docker(
 
 def _run_osrm_customize_docker(
     region_osrm_data_dir: str,
-    data_label: str, # Basename of the .osrm file
+    data_label: str,  # Basename of the .osrm file
     uid: str,
     gid: str,
     docker_image: str,
     logger: logging.Logger
 ) -> bool:
     """Run the osrm-customize step using Docker."""
-    osrm_base_file_in_container = f"./{data_label}.osrm" # Relative to /data_processing
+    osrm_base_file_in_container = f"./{data_label}.osrm"  # Relative to /data_processing
     docker_command_args = ["osrm-customize", osrm_base_file_in_container]
     return _run_osrm_docker_command(
         command_args=docker_command_args,
         region_osrm_data_dir=region_osrm_data_dir,
-        pbf_host_path=None, # No PBF input for this step
+        pbf_host_path=None,  # No PBF input for this step
         pbf_filename_in_container=None,
         uid=uid, gid=gid, docker_image=docker_image, logger=logger,
         step_name="osrm-customize", region_name=data_label
@@ -744,7 +744,6 @@ def osm_osrm_server_setup(
         "password": config.PGPASSWORD
     }
 
-
     log_map_server(
         f"{config.SYMBOLS['step']} Setting up OSM data, OSRM, and PostGIS...",
         "info", logger_to_use
@@ -773,7 +772,7 @@ def osm_osrm_server_setup(
         # Determine project script directory to find assets.
         script_dir = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        ) # Assumes this file is in setup/services/
+        )  # Assumes this file is in setup/services/
         assets_regions_dir = _setup_asset_directories(script_dir, logger_to_use)
     except Exception as e_setup_paths:
         log_map_server(
@@ -797,7 +796,7 @@ def osm_osrm_server_setup(
     )
 
     # Discover and extract regional PBFs using Osmium.
-    extracted_pbf_paths: Dict[str, str] = {} # {region_base_name: full_pbf_path}
+    extracted_pbf_paths: Dict[str, str] = {}  # {region_base_name: full_pbf_path}
     log_map_server(
         f"{config.SYMBOLS['step']} Discovering and extracting regional PBFs "
         "(using Osmium)...",
@@ -833,7 +832,7 @@ def osm_osrm_server_setup(
                 )
                 if extracted_path:
                     extracted_pbf_paths[region_base_name] = extracted_path
-            elif geojson_filename.endswith(".json"): # Log other JSONs if any
+            elif geojson_filename.endswith(".json"):  # Log other JSONs if any
                 logger_to_use.debug(
                     f"Found non-regionmap JSON: {os.path.join(root, geojson_filename)}"
                 )
@@ -929,15 +928,15 @@ def osm_osrm_server_setup(
                     logger_to_use.debug(
                         f"Could not list contents of {region_osrm_data_dir_host}: {e_ls}"
                     )
-                continue # Skip to the next region.
+                continue  # Skip to the next region.
 
             # Verify expected files after extract before proceeding.
             expected_base_osrm_file = os.path.join(
                 region_osrm_data_dir_host, f"{data_label}.osrm"
             )
-            expected_ebg_file = os.path.join( # Example, actual files may vary
-                region_osrm_data_dir_host, f"{data_label}.osrm.ebg"
-            )
+            # expected_ebg_file = os.path.join(  # Example, actual files may vary
+            #     region_osrm_data_dir_host, f"{data_label}.osrm.ebg"
+            #  )
             logger_to_use.debug(
                 f"Checking for OSRM files post-extract for {data_label}:"
             )
@@ -947,7 +946,7 @@ def osm_osrm_server_setup(
             )
             # Add more checks for other essential files created by osrm-extract.
 
-            if not (os.path.isfile(expected_base_osrm_file)): # Basic check
+            if not (os.path.isfile(expected_base_osrm_file)):  # Basic check
                 log_map_server(
                     f"{config.SYMBOLS['error']} OSRM extract for {data_label} "
                     f"reported success, but essential file ({data_label}.osrm) "
@@ -1000,5 +999,5 @@ def osm_osrm_server_setup(
     log_map_server(
         f"{config.SYMBOLS['success']} Full OSRM and PostGIS data setup "
         "script finished.",
-        "info", logger_to_use # Changed to info as it's an end-of-function log
+        "info", logger_to_use  # Changed to info as it's an end-of-function log
     )

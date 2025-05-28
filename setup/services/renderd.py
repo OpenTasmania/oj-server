@@ -14,12 +14,14 @@ from typing import Optional
 
 from setup import config
 from setup.command_utils import (
+    command_exists,
+    log_map_server,
     run_command,
     run_elevated_command,
-    log_map_server,
-    command_exists,
 )
-from setup.helpers import systemd_reload # For reloading systemd after service file changes
+from setup.helpers import (
+    systemd_reload,  # For reloading systemd after service file changes
+)
 
 module_logger = logging.getLogger(__name__)
 
@@ -60,7 +62,7 @@ def renderd_setup(current_logger: Optional[logging.Logger] = None) -> None:
             mapnik_config_res = run_command(
                 ["mapnik-config", "--input-plugins"],
                 capture_output=True,
-                check=True, # Expect mapnik-config to succeed
+                check=True,  # Expect mapnik-config to succeed
                 current_logger=logger_to_use,
             )
             # Output of mapnik-config --input-plugins is the directory path.
@@ -118,7 +120,7 @@ TILESIZE=256
 """
     try:
         run_elevated_command(
-            ["tee", renderd_conf_path], # Overwrites or creates the file
+            ["tee", renderd_conf_path],  # Overwrites or creates the file
             cmd_input=renderd_conf_content,
             current_logger=logger_to_use,
         )
@@ -133,7 +135,7 @@ TILESIZE=256
             "error",
             logger_to_use,
         )
-        raise # This configuration is critical.
+        raise  # This configuration is critical.
 
     # Systemd service file for Renderd
     renderd_service_path = "/etc/systemd/system/renderd.service"
@@ -165,7 +167,7 @@ WantedBy=multi-user.target
 """
     try:
         run_elevated_command(
-            ["tee", renderd_service_path], # Overwrites or creates the file
+            ["tee", renderd_service_path],  # Overwrites or creates the file
             cmd_input=renderd_service_content,
             current_logger=logger_to_use,
         )
@@ -180,7 +182,7 @@ WantedBy=multi-user.target
             "error",
             logger_to_use,
         )
-        raise # Service file is critical.
+        raise  # Service file is critical.
 
     # Create necessary directories and set permissions
     log_map_server(

@@ -16,8 +16,11 @@ from tempfile import NamedTemporaryFile
 
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun
-from setup.command_utils import run_command, run_elevated_command, \
-    log_map_server
+from setup.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from setup.step_executor import execute_step
 
 # Attempt to import GTFS processing modules.
@@ -25,8 +28,10 @@ from setup.step_executor import execute_step
 # not found, though GTFS processing will fail.
 try:
     from processors.gtfs import (
-        utils as gtfs_utils,
         main_pipeline as gtfs_main_pipeline,
+    )
+    from processors.gtfs import (
+        utils as gtfs_utils,
     )
 except ImportError as e:
     gtfs_main_pipeline = None

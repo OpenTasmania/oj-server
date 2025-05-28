@@ -9,7 +9,7 @@ viewing configuration, managing state, and selecting steps to run.
 
 import logging
 from sys import stderr
-from typing import List, Tuple, Callable, Optional
+from typing import Callable, List, Optional, Tuple
 
 import urwid
 
@@ -321,7 +321,7 @@ class InstallerTUI:
         self.log_display.add_message(
             "Select Specific Steps - TUI Placeholder", "header"
         )
-        self.frame.body = self.log_display # Show logs during selection setup
+        self.frame.body = self.log_display  # Show logs during selection setup
 
         items_to_run: List[Tuple[str, str, Callable]] = []
 
@@ -356,7 +356,7 @@ class InstallerTUI:
             for item_tag, item_desc, item_func in items_to_run:
                 # This is where self.execute_installer_step would be called.
                 self.log_display.add_message(
-                    f"Executing (placeholder): {item_desc}", "info"
+                    f"Executing (placeholder): {item_tag} {item_desc} {item_func}", "info"
                 )
                 # self.execute_installer_step(item_tag, item_desc, item_func)
             self.show_main_menu()  # Go back to main menu after.
@@ -415,7 +415,7 @@ class InstallerTUI:
                 min_width=24, min_height=8
             ),
             palette=palette,
-            unhandled_input=self._handle_global_keys, # Reuse global keys
+            unhandled_input=self._handle_global_keys,  # Reuse global keys
             pop_ups=True
         )
 
@@ -476,7 +476,6 @@ class InstallerTUI:
                 f"Critical error during TUI execution of step {tag}"
             )
 
-
     def confirm_exit(self, button: Optional[urwid.Button] = None) -> None:
         """Display a confirmation dialog before exiting the TUI."""
         def do_exit(result: bool) -> None:
@@ -497,7 +496,6 @@ class InstallerTUI:
         )
         # Show the overlay by making it the new top widget.
         self.main_loop.widget = overlay
-
 
     def run(self) -> None:
         """Start the TUI main event loop."""
@@ -525,10 +523,11 @@ def run_tui_installer_standalone() -> None:
         )
         handler.setFormatter(formatter)
         module_logger.addHandler(handler)
-        module_logger.setLevel(logging.INFO) # Or DEBUG for more TUI logs.
+        module_logger.setLevel(logging.INFO)  # Or DEBUG for more TUI logs.
 
     app = InstallerTUI()
     app.run()
+
 
 # Dummy log_map_server for standalone tui.py testing
 def log_map_server_tui(
@@ -543,7 +542,7 @@ def log_map_server_tui(
         _logger.warning(message)
     elif level == "error":
         _logger.error(message)
-    else: # debug, critical etc.
+    else:  # debug, critical etc.
         _logger.debug(message)
 
 
@@ -577,7 +576,7 @@ if __name__ == '__main__':
                 f"Dummy Re-running: {desc}", "info", current_logger_instance
             )
         try:
-            func(current_logger_instance) # Pass logger to dummy func
+            func(current_logger_instance)  # Pass logger to dummy func
             log_map_server_tui(
                 f"Completed (dummy): {desc}", "info", current_logger_instance
             )

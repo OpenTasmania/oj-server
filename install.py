@@ -177,6 +177,7 @@ def get_debian_codename_prereq() -> Optional[str]:
         )
         return None
 
+
 def ensure_pip_installed_prereq() -> bool:
     """
     Ensure 'pip' (Python package installer) is available.
@@ -186,7 +187,7 @@ def ensure_pip_installed_prereq() -> bool:
         True if 'pip' is available or successfully installed, False otherwise.
     """
     log_prereq(
-        f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python','🐍')} "
+        f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python', '🐍')} "
         "Checking for 'pip' command...",
         "info"
     )
@@ -273,6 +274,7 @@ def ensure_pip_installed_prereq() -> bool:
             "error"
         )
         return False
+
 
 # --- UV Installation Logic ---
 def _install_uv_with_pipx_prereq() -> bool:
@@ -759,7 +761,7 @@ if __name__ == "__main__":
         if not outer_logger.handlers:  # Basic logger setup if not done.
             _handler_ex = logging.StreamHandler(sys.stdout)
             _formatter_ex = logging.Formatter(
-                f"[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
+                "[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
                 datefmt="%Y-%m-%d %H:%M:%S"
             )
             _handler_ex.setFormatter(_formatter_ex)

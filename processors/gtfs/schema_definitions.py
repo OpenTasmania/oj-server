@@ -15,18 +15,19 @@ corresponding Pydantic model, database table name, and primary key columns.
 
 import logging
 from datetime import datetime
-from typing import Optional, Literal, Annotated, Dict, Type, List, Any
+from typing import Annotated, Any, Dict, List, Literal, Optional, Type
 
 from pydantic import (
     BaseModel,
     Field,
-    conint,
-    confloat,
-    model_validator,
-    field_validator,
-    ValidationError,
     StringConstraints,  # Explicitly import if needed, often part of Annotated
+    ValidationError,
+    confloat,
+    conint,
+    field_validator,
+    model_validator,
 )
+
 
 # --- Pydantic Model Configuration ---
 class GTFSBaseModel(BaseModel):
@@ -146,7 +147,7 @@ class Route(GTFSBaseModel):
     route_short_name: Optional[str] = Field("", max_length=50)
     route_long_name: Optional[str] = Field("", max_length=255)
     route_desc: Optional[str] = None
-    route_type: conint(ge=0, le=7) # GTFS standard route types
+    route_type: conint(ge=0, le=7)  # GTFS standard route types
     route_url: Optional[
         Annotated[str, StringConstraints(pattern=r"^https?://.+")]
     ] = None
@@ -347,7 +348,7 @@ class Frequency(GTFSBaseModel):
     end_time: Annotated[
         str, StringConstraints(pattern=r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$")
     ]
-    headway_secs: conint(gt=0) # Headway must be positive
+    headway_secs: conint(gt=0)  # Headway must be positive
     exact_times: Optional[Literal[0, 1]] = Field(None)
 
 
@@ -396,7 +397,7 @@ class FeedInfo(GTFSBaseModel):
     """
     feed_publisher_name: Annotated[str, StringConstraints(min_length=1)]
     feed_publisher_url: Annotated[str, StringConstraints(pattern=r"^https?://.+")]
-    feed_lang: Annotated[str, StringConstraints(min_length=2)] # e.g., 'en', 'fr-CA'
+    feed_lang: Annotated[str, StringConstraints(min_length=2)]  # e.g., 'en', 'fr-CA'
     default_lang: Optional[Annotated[str, StringConstraints(min_length=2)]] = None
     feed_start_date: Optional[
         Annotated[str, StringConstraints(pattern=r"^[0-9]{8}$")]
@@ -418,7 +419,7 @@ class FeedInfo(GTFSBaseModel):
     @classmethod
     def check_date_format_optional(cls, v: Optional[str]) -> Optional[str]:
         """Validate optional date strings (YYYYMMDD) if provided."""
-        if v is not None and str(v).strip() != "": # Process if not None or empty
+        if v is not None and str(v).strip() != "":  # Process if not None or empty
             try:
                 datetime.strptime(v, "%Y%m%d").date()
             except ValueError as e:
@@ -426,7 +427,7 @@ class FeedInfo(GTFSBaseModel):
                     f"Date {v} is not a valid YYYYMMDD date."
                 ) from e
             return v
-        return None # Return None if input was None or empty string
+        return None  # Return None if input was None or empty string
 
 
 # --- Main Schema Dictionary ---
@@ -437,7 +438,7 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "agency.txt": {
         "model": Agency,
         "db_table_name": "gtfs_agency",
-        "pk_cols": ["agency_id"], # Assuming agency_id becomes required for DB
+        "pk_cols": ["agency_id"],  # Assuming agency_id becomes required for DB
     },
     "stops.txt": {
         "model": Stop,
@@ -457,7 +458,7 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "stop_times.txt": {
         "model": StopTime,
         "db_table_name": "gtfs_stop_times",
-        "pk_cols": ["trip_id", "stop_sequence"], # Composite PK
+        "pk_cols": ["trip_id", "stop_sequence"],  # Composite PK
     },
     "calendar.txt": {
         "model": Calendar,
@@ -467,17 +468,17 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "calendar_dates.txt": {
         "model": CalendarDate,
         "db_table_name": "gtfs_calendar_dates",
-        "pk_cols": ["service_id", "date"], # Composite PK
+        "pk_cols": ["service_id", "date"],  # Composite PK
     },
-    "shapes.txt": { # Describes points that make up a shape
+    "shapes.txt": {  # Describes points that make up a shape
         "model": ShapePoint,
-        "db_table_name": "gtfs_shapes_points", # Staging table for points
-        "pk_cols": ["shape_id", "shape_pt_sequence"], # Composite PK
+        "db_table_name": "gtfs_shapes_points",  # Staging table for points
+        "pk_cols": ["shape_id", "shape_pt_sequence"],  # Composite PK
     },
     "frequencies.txt": {
         "model": Frequency,
         "db_table_name": "gtfs_frequencies",
-        "pk_cols": ["trip_id", "start_time"], # Composite PK
+        "pk_cols": ["trip_id", "start_time"],  # Composite PK
     },
     "transfers.txt": {
         "model": Transfer,
@@ -541,7 +542,6 @@ if __name__ == "__main__":
             )
             test_results["invalid"].append(f"{model_name} (unexpected exception)")
 
-
     # Agency tests
     _test_model(Agency, {
         "agency_id": "MBTA", "agency_name": "MBTA",
@@ -550,7 +550,7 @@ if __name__ == "__main__":
     _test_model(Agency, {
         "agency_name": "Test", "agency_url": "badurl",
         "agency_timezone": "Test/Zone"
-    }, False) # Expect agency_url to fail
+    }, False)  # Expect agency_url to fail
 
     # Stop tests
     _test_model(Stop, {
@@ -559,17 +559,17 @@ if __name__ == "__main__":
     }, True)
     _test_model(Stop, {
         "stop_id": "bad-lat", "stop_lat": 95.0, "stop_lon": -70.0
-    }, False) # Expect stop_lat > 90 to fail
+    }, False)  # Expect stop_lat > 90 to fail
 
     # StopTime tests
     _test_model(StopTime, {
         "trip_id": "t1", "stop_id": "s1", "stop_sequence": 1,
         "arrival_time": "08:00:00"
     }, True)
-    _test_model(StopTime, { # Both times None is currently allowed by validator
+    _test_model(StopTime, {  # Both times None is currently allowed by validator
         "trip_id": "t2", "stop_id": "s2", "stop_sequence": 1,
         "arrival_time": None, "departure_time": None
-    }, True) # If validator changes to disallow, this becomes False
+    }, True)  # If validator changes to disallow, this becomes False
 
     # Transfer tests
     _test_model(Transfer, {
@@ -579,7 +579,7 @@ if __name__ == "__main__":
         "from_stop_id": "s3", "to_stop_id": "s4", "transfer_type": 2,
         "min_transfer_time": 120
     }, True)
-    _test_model(Transfer, { # transfer_type 2 requires min_transfer_time
+    _test_model(Transfer, {  # transfer_type 2 requires min_transfer_time
         "from_stop_id": "s5", "to_stop_id": "s6", "transfer_type": 2,
         "min_transfer_time": None
     }, False)

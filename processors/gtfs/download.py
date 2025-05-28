@@ -37,9 +37,9 @@ def download_gtfs_feed(
     Returns:
         True if the download was successful, False otherwise.
     """
-    download_path = Path(download_to_path) # Ensure it's a Path object
+    download_path = Path(download_to_path)  # Ensure it's a Path object
     module_logger.info(f"Attempting to download GTFS feed from: {feed_url}")
-    response: Optional[requests.Response] = None # Initialize for status code access in except
+    response: Optional[requests.Response] = None  # Initialize for status code access in except
 
     try:
         # Ensure the directory for the download path exists.
@@ -54,8 +54,8 @@ def download_gtfs_feed(
         response.raise_for_status()
 
         with open(download_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192): # Download in chunks
-                if chunk: # filter out keep-alive new chunks
+            for chunk in response.iter_content(chunk_size=8192):  # Download in chunks
+                if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
 
         module_logger.info(
@@ -87,7 +87,7 @@ def download_gtfs_feed(
         # Catch-all for any other unexpected errors.
         module_logger.error(
             f"A general error occurred in download_gtfs_feed: {e}",
-            exc_info=True, # Include traceback for general exceptions
+            exc_info=True,  # Include traceback for general exceptions
         )
     return False
 
@@ -116,7 +116,7 @@ def extract_gtfs_feed(
         f"Attempting to extract GTFS feed '{zip_path}' to '{extract_path}'"
     )
 
-    if not zip_path.is_file(): # More specific check than exists()
+    if not zip_path.is_file():  # More specific check than exists()
         module_logger.error(f"Zip file not found or is not a file: {zip_path}")
         return False
 
@@ -175,7 +175,7 @@ def extract_gtfs_feed(
     except Exception as e:
         module_logger.error(
             f"A general error occurred in extract_gtfs_feed: {e}",
-            exc_info=True, # Include traceback for general exceptions
+            exc_info=True,  # Include traceback for general exceptions
         )
     return False
 
@@ -189,10 +189,10 @@ def cleanup_temp_file(file_path: Union[str, Path]) -> None:
     """
     path_to_remove = Path(file_path)
     try:
-        if path_to_remove.is_file(): # Check if it's a file before unlinking
+        if path_to_remove.is_file():  # Check if it's a file before unlinking
             path_to_remove.unlink()
             module_logger.info(f"Cleaned up temporary file: {path_to_remove}")
-        elif path_to_remove.exists(): # It exists but is not a file (e.g. directory)
+        elif path_to_remove.exists():  # It exists but is not a file (e.g. directory)
             module_logger.warning(
                 f"Path '{path_to_remove}' exists but is not a file. "
                 "Not removed by this function."
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler()] # Log to console
+        handlers=[logging.StreamHandler()]  # Log to console
     )
 
     # --- TEST PARAMETERS (REPLACE WITH ACTUAL TEST VALUES IF NEEDED) ---
@@ -261,14 +261,14 @@ if __name__ == "__main__":
                 f_routes.write("R1,10,Main Street Express,3\n")
 
             with zipfile.ZipFile(TEST_ZIP_FILE, "w") as zf:
-                zf.write(dummy_stops_path, arcname="stops.txt") # Use standard names in zip
+                zf.write(dummy_stops_path, arcname="stops.txt")  # Use standard names in zip
                 zf.write(dummy_routes_path, arcname="routes.txt")
             dummy_zip_created = True
             source_zip_for_extraction = TEST_ZIP_FILE
             module_logger.info(f"Created dummy test zip: {TEST_ZIP_FILE}")
         except Exception as e_dummy:
             module_logger.error(f"Could not create dummy zip file: {e_dummy}")
-            source_zip_for_extraction = None # Ensure it's None if dummy creation fails
+            source_zip_for_extraction = None  # Ensure it's None if dummy creation fails
         finally:
             # Clean up individual dummy text files after zipping (or attempting to).
             if dummy_stops_path.exists():
@@ -311,6 +311,5 @@ if __name__ == "__main__":
     #             module_logger.info(f"Test directory {TEST_DOWNLOAD_DIR} not empty, not removed.")
     #     except OSError as e_rmdir:
     #         module_logger.warning(f"Could not remove test directory {TEST_DOWNLOAD_DIR}: {e_rmdir}")
-
 
     module_logger.info(f"--- {__file__} test finished ---")
