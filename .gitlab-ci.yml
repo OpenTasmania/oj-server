@@ -16,7 +16,10 @@ variables:
   GIT_USER_NAME: "GitLab CI Bot"
 
 cache:
-  key: "${CI_JOB_NAME}"
+  key:
+    files :
+    - pyproject.toml
+    - uv.lock
   paths:
     - ".cache/pip"
     - ".cache/uv"
@@ -30,13 +33,7 @@ cache:
   before_script:
     - echo "Setting up Python environment with uv..."
     - apt-get update -y
-    - apt-get install -y curl git python3-full python3-pip
-    - echo "--- System Python and Pip versions ---"
-    - python3 -V
-    - python3 -m pip --version
-    - echo "--- Installing pipx ---"
-    - python3 -m pip install --user pipx
-    - export PATH="$HOME/.local/bin:$PATH"
+    - apt-get install -y curl git python3-full python3-pipx
     - echo "--- Pipx version ---"
     - pipx --version
     - echo "--- Installing uv using pipx ---"
@@ -89,14 +86,7 @@ generate_documentation:
   before_script:
     - echo "Starting documentation generation for tag $CI_COMMIT_TAG"
     - apt-get update -y
-    - apt-get install -y git curl python3-pip wget
-    - echo "--- System Python and Pip versions ---"
-    - python3 -V
-    - python3 -m pip --version
-    - echo "--- Installing pipx ---"
-    - python3 -m pip install --user pipx
-    - export PATH="$HOME/.local/bin:$PATH"
-    - echo "--- Pipx version ---"
+    - apt-get install -y git curl python3-pipx
     - pipx --version
     - echo "--- Installing todocheck and git-cliff using pipx ---"
     - pipx install todocheck
