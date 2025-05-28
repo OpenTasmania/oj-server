@@ -305,8 +305,7 @@ def check_package_installed(
         )
         # Expected output for installed package contains "install ok installed".
         return (
-            result.returncode == 0 and
-            "install ok installed" in result.stdout
+            result.returncode == 0 and "install ok installed" in result.stdout
         )
     except FileNotFoundError:
         # This should be caught by run_command if dpkg-query is missing.

@@ -154,14 +154,18 @@ def load_dataframe_to_db(
     # Pandas NA/NaN values are converted to None for PostgreSQL NULL.
     try:
         data_tuples = [
-            tuple(x) for x in df_to_load_final.replace(
-                {pd.NA: None, float("nan"): None, float("inf"): None, float("-inf"): None}
-            ).to_numpy()
+            tuple(x)
+            for x in df_to_load_final.replace({
+                pd.NA: None,
+                float("nan"): None,
+                float("inf"): None,
+                float("-inf"): None,
+            }).to_numpy()
         ]
     except Exception as e:
         module_logger.error(
             f"Error converting DataFrame for '{table_name}' to tuples: {e}",
-            exc_info=True
+            exc_info=True,
         )
         return 0, 0  # Cannot proceed if data conversion fails.
 
@@ -183,13 +187,21 @@ def load_dataframe_to_db(
             return 0, 0  # Cannot proceed if truncate fails.
 
         # Prepare INSERT statement components.
-        quoted_db_cols = [sql.Identifier(col) for col in df_cols_for_db_insert]
+        quoted_db_cols = [
+            sql.Identifier(col) for col in df_cols_for_db_insert
+        ]
         cols_sql_segment = sql.SQL(", ").join(quoted_db_cols)
         placeholders_list = [sql.Placeholder()] * len(df_cols_for_db_insert)
 
         # Handle geometry column specifically: wrap with ST_GeomFromText.
-        if geom_col_name and geom_col_name in df_cols_for_db_insert and geom_config:
-            srid = geom_config.get("srid", 4326)  # Default SRID if not specified
+        if (
+            geom_col_name
+            and geom_col_name in df_cols_for_db_insert
+            and geom_config
+        ):
+            srid = geom_config.get(
+                "srid", 4326
+            )  # Default SRID if not specified
             try:
                 geom_col_idx = df_cols_for_db_insert.index(geom_col_name)
                 placeholders_list[geom_col_idx] = sql.SQL(
@@ -208,9 +220,11 @@ def load_dataframe_to_db(
         insert_stmt = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
             sql.Identifier(table_name),
             cols_sql_segment,
-            placeholders_sql_segment
+            placeholders_sql_segment,
         )
-        module_logger.debug(f"Insert statement for {table_name}: {insert_stmt.as_string(conn)}")
+        module_logger.debug(
+            f"Insert statement for {table_name}: {insert_stmt.as_string(conn)}"
+        )
 
         module_logger.info(
             f"Attempting to load {len(data_tuples)} records into {table_name}..."
@@ -218,12 +232,17 @@ def load_dataframe_to_db(
         try:
             execute_values(
                 cursor,
-                insert_stmt.as_string(conn),  # Get raw SQL string for execute_values
+                insert_stmt.as_string(
+                    conn
+                ),  # Get raw SQL string for execute_values
                 data_tuples,
-                page_size=1000  # Tunable batch size for execute_values
+                page_size=1000,  # Tunable batch size for execute_values
             )
-            successful_loads = cursor.rowcount if cursor.rowcount is not None \
-                               else len(data_tuples)
+            successful_loads = (
+                cursor.rowcount
+                if cursor.rowcount is not None
+                else len(data_tuples)
+            )
             conn.commit()  # Commit after successful batch insert.
             module_logger.info(
                 f"Successfully loaded {successful_loads} records into {table_name}."
@@ -233,7 +252,7 @@ def load_dataframe_to_db(
             module_logger.error(
                 f"Error during bulk insert into {table_name}: {e_db_insert}. "
                 "No records loaded into production table for this batch.",
-                exc_info=True
+                exc_info=True,
             )
             # Basic DLQ for the entire failed batch.
             # Granular DLQ should happen at validation/transform stages.
@@ -244,16 +263,23 @@ def load_dataframe_to_db(
                 )
                 try:
                     log_to_dlq(
-                        conn, dlq_table_name,
-                        {"batch_summary": f"Failed to insert {len(data_tuples)} records.",
-                         "first_record_example": data_tuples[0] if data_tuples else None,
-                         "column_names": df_cols_for_db_insert},
+                        conn,
+                        dlq_table_name,
+                        {
+                            "batch_summary": f"Failed to insert {len(data_tuples)} records.",
+                            "first_record_example": data_tuples[0]
+                            if data_tuples
+                            else None,
+                            "column_names": df_cols_for_db_insert,
+                        },
                         str(e_db_insert),
-                        f"Batch insert failure for table: {table_name}"
+                        f"Batch insert failure for table: {table_name}",
                     )
                     dlq_inserts = 1  # Indicate one DLQ entry for the batch
                 except Exception as e_dlq_log:
-                    module_logger.error(f"Failed to log batch failure to DLQ: {e_dlq_log}")
+                    module_logger.error(
+                        f"Failed to log batch failure to DLQ: {e_dlq_log}"
+                    )
         except Exception as e_unexpected:
             conn.rollback()
             module_logger.error(
@@ -316,7 +342,8 @@ def log_to_dlq(
         conn.rollback()  # Rollback if DLQ insert fails.
         module_logger.error(
             f"Database error inserting record into DLQ table "
-            f"'{dlq_table_name}': {e_db_dlq}", exc_info=True
+            f"'{dlq_table_name}': {e_db_dlq}",
+            exc_info=True,
         )
     except Exception as e_unexpected_dlq:
         conn.rollback()

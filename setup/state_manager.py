@@ -33,7 +33,7 @@ CURRENT_SCRIPT_HASH: Optional[str] = None
 
 
 def get_current_script_hash(
-    logger_instance: Optional[logging.Logger] = None
+    logger_instance: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """
     Get the current script hash, calculating it if not already cached.
@@ -57,7 +57,7 @@ def get_current_script_hash(
 
 
 def initialize_state_system(
-    current_logger: Optional[logging.Logger] = None
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Initialize the state management system.
@@ -78,7 +78,7 @@ def initialize_state_system(
             f"{SYMBOLS['critical']} Could not calculate current SCRIPT_HASH. "
             "State management cannot proceed reliably.",
             "critical",
-            logger_to_use
+            logger_to_use,
         )
         # Proceeding with caution; state might be cleared if file exists
         # without hash or has an old hash. A more robust approach might
@@ -109,7 +109,7 @@ def initialize_state_system(
             ["test", "-f", str(STATE_FILE_PATH)],
             check=False,  # Do not raise an error if test fails.
             capture_output=True,
-            current_logger=logger_to_use
+            current_logger=logger_to_use,
         )
         if result.returncode == 0:
             state_file_exists_and_is_file = True
@@ -121,7 +121,7 @@ def initialize_state_system(
                 f"{STATE_FILE_PATH} returned unexpected code: "
                 f"{result.returncode}. Stderr: {result.stderr}",
                 "warning",
-                logger_to_use
+                logger_to_use,
             )
             state_file_exists_and_is_file = False
     except Exception as e:
@@ -129,7 +129,7 @@ def initialize_state_system(
             f"{SYMBOLS['error']} Exception while checking state file "
             f"existence with elevated privileges: {e}",
             "error",
-            logger_to_use
+            logger_to_use,
         )
         state_file_exists_and_is_file = False
 
@@ -143,8 +143,11 @@ def initialize_state_system(
         temp_file_path = ""
         try:
             with tempfile.NamedTemporaryFile(
-                mode="w", delete=False, prefix="mapstate_init_",
-                suffix=".txt", encoding="utf-8"
+                mode="w",
+                delete=False,
+                prefix="mapstate_init_",
+                suffix=".txt",
+                encoding="utf-8",
             ) as temp_f:
                 temp_f.write(state_file_header)
                 temp_f.write(human_readable_version_line)
@@ -179,9 +182,12 @@ def initialize_state_system(
                     stored_hash = stored_hash_match.group(1)
 
             if not current_hash or (stored_hash != current_hash):
-                reason = ("Could not calculate current hash" if not current_hash
-                          else "SCRIPT_HASH mismatch. "
-                               f"Stored: {stored_hash}, Current: {current_hash}")
+                reason = (
+                    "Could not calculate current hash"
+                    if not current_hash
+                    else "SCRIPT_HASH mismatch. "
+                    f"Stored: {stored_hash}, Current: {current_hash}"
+                )
                 log_map_server(
                     f"{SYMBOLS['warning']} {reason}", "warning", logger_to_use
                 )
@@ -193,7 +199,7 @@ def initialize_state_system(
                 )
                 clear_state_file(
                     script_hash_to_write=current_hash,
-                    current_logger=logger_to_use
+                    current_logger=logger_to_use,
                 )
             # If current_hash is valid and matches stored_hash, do nothing.
         except Exception as e:
@@ -204,13 +210,14 @@ def initialize_state_system(
                 logger_to_use,
             )
             clear_state_file(
-                script_hash_to_write=current_hash, current_logger=logger_to_use
+                script_hash_to_write=current_hash,
+                current_logger=logger_to_use,
             )
 
 
 def clear_state_file(
     script_hash_to_write: Optional[str] = None,
-    current_logger: Optional[logging.Logger] = None
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Clear the state file, writing only the SCRIPT_HASH and version.
@@ -230,15 +237,14 @@ def clear_state_file(
 
     effective_hash = script_hash_to_write
     if effective_hash is None:  # If not passed, try to calculate it.
-        effective_hash = (get_current_script_hash(
-            logger_instance=logger_to_use
-        ) or "UNKNOWN_HASH_AT_CLEAR")
+        effective_hash = (
+            get_current_script_hash(logger_instance=logger_to_use)
+            or "UNKNOWN_HASH_AT_CLEAR"
+        )
 
     content_to_write = f"# SCRIPT_HASH: {effective_hash}\n"
     # Optionally, keep the human-readable version for reference.
-    content_to_write += (
-        f"# Human-readable Script Version: {SCRIPT_VERSION}\n"
-    )
+    content_to_write += f"# Human-readable Script Version: {SCRIPT_VERSION}\n"
     content_to_write += (
         f"# State cleared/re-initialized on "
         f"{datetime.datetime.now().isoformat()}\n"
@@ -247,8 +253,11 @@ def clear_state_file(
     temp_file_path = ""
     try:
         with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, prefix="mapstate_clear_",
-            suffix=".txt", encoding="utf-8"
+            mode="w",
+            delete=False,
+            prefix="mapstate_clear_",
+            suffix=".txt",
+            encoding="utf-8",
         ) as temp_f:
             temp_f.write(content_to_write)
             temp_file_path = temp_f.name
@@ -361,7 +370,7 @@ def is_step_completed(
 
 
 def view_completed_steps(
-    current_logger: Optional[logging.Logger] = None
+    current_logger: Optional[logging.Logger] = None,
 ) -> List[str]:
     """
     Retrieve a list of all step tags marked as completed in the state file.
@@ -388,7 +397,8 @@ def view_completed_steps(
         if result.returncode == 0 and result.stdout and result.stdout.strip():
             # Grep succeeded and found lines.
             return [
-                line for line in result.stdout.strip().split("\n")
+                line
+                for line in result.stdout.strip().split("\n")
                 if line.strip()  # Ensure no empty strings from multiple newlines.
             ]
         elif result.returncode == 1:

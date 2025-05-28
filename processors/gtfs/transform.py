@@ -51,13 +51,13 @@ def clean_string_field(value: Any) -> Optional[str]:
         return stripped_value if stripped_value else None
     except Exception:
         # In case str(value) fails for some unusual object.
-        module_logger.warning(f"Could not convert value to string for cleaning: {type(value)}")
+        module_logger.warning(
+            f"Could not convert value to string for cleaning: {type(value)}"
+        )
         return None
 
 
-def create_point_wkt(
-    lon: Any, lat: Any, srid: int = 4326
-) -> Optional[str]:
+def create_point_wkt(lon: Any, lat: Any, srid: int = 4326) -> Optional[str]:
     """
     Create a WKT (Well-Known Text) string for a PostGIS Point geometry.
 
@@ -72,8 +72,12 @@ def create_point_wkt(
     """
     try:
         # Ensure lon and lat can be converted to float and are not None or empty.
-        if (lon is None or str(lon).strip() == "" or
-                lat is None or str(lat).strip() == ""):
+        if (
+            lon is None
+            or str(lon).strip() == ""
+            or lat is None
+            or str(lat).strip() == ""
+        ):
             module_logger.debug(
                 f"Missing latitude or longitude for WKT creation: "
                 f"lat='{lat}', lon='{lon}'"
@@ -126,7 +130,9 @@ def transform_dataframe(
         A Pandas DataFrame with transformed data, ready for loading. Columns
         will match those specified in the schema and be in the defined order.
     """
-    table_name_for_log = file_schema_info.get('db_table_name', 'unknown table')
+    table_name_for_log = file_schema_info.get(
+        "db_table_name", "unknown table"
+    )
     if df.empty:
         module_logger.info(
             f"DataFrame for {table_name_for_log} is empty. "
@@ -134,7 +140,9 @@ def transform_dataframe(
         )
         # Return an empty DataFrame with columns matching the schema.
         expected_cols = list(file_schema_info.get("columns", {}).keys())
-        geom_col_name = file_schema_info.get("geom_config", {}).get("geom_col")
+        geom_col_name = file_schema_info.get("geom_config", {}).get(
+            "geom_col"
+        )
         if geom_col_name and geom_col_name not in expected_cols:
             expected_cols.append(geom_col_name)
         return pd.DataFrame(columns=expected_cols)
@@ -181,7 +189,10 @@ def transform_dataframe(
                 f"geom_config provided for {table_name_for_log} but "
                 f"'geom_col' name is missing. Cannot create geometry column."
             )
-        elif lat_col in transformed_df.columns and lon_col in transformed_df.columns:
+        elif (
+            lat_col in transformed_df.columns
+            and lon_col in transformed_df.columns
+        ):
             module_logger.debug(
                 f"Creating WKT for geometry column '{geom_col_name}' from "
                 f"'{lat_col}' and '{lon_col}' for {table_name_for_log}."
@@ -262,7 +273,10 @@ def transform_shape_points_to_lines_df(
         return pd.DataFrame(columns=["shape_id", "geom"])
 
     required_cols = [
-        "shape_id", "shape_pt_lon", "shape_pt_lat", "shape_pt_sequence",
+        "shape_id",
+        "shape_pt_lon",
+        "shape_pt_lat",
+        "shape_pt_sequence",
     ]
     missing_cols = [
         col for col in required_cols if col not in shapes_points_df.columns
@@ -337,7 +351,9 @@ def transform_shape_points_to_lines_df(
         lines_data.append({"shape_id": shape_id, "geom": wkt_linestring})
 
     lines_df = pd.DataFrame(lines_data)
-    module_logger.info(f"Aggregated shape points into {len(lines_df)} LineStrings.")
+    module_logger.info(
+        f"Aggregated shape points into {len(lines_df)} LineStrings."
+    )
     return lines_df
 
 
@@ -372,11 +388,20 @@ if __name__ == "__main__":
     raw_stop_data = {
         "stop_id": ["s1", "s2", "s3", "s4", "s5"],
         "stop_name": [
-            " Stop One ", "Stop Two", "Stop Three (No Coords)",
-            "Stop Four (Bad Coords)", "Stop Five "
+            " Stop One ",
+            "Stop Two",
+            "Stop Three (No Coords)",
+            "Stop Four (Bad Coords)",
+            "Stop Five ",
         ],
         "stop_lat": ["40.7128 ", "40.7321", None, "95.0", " "],
-        "stop_lon": [" -74.0060", "-74.0001", "-74.0010", "-74.0020", "-74.0030 "],
+        "stop_lon": [
+            " -74.0060",
+            "-74.0001",
+            "-74.0010",
+            "-74.0020",
+            "-74.0030 ",
+        ],
         "extra_column": ["a", "b", "c", "d", "e"],  # This should be dropped
         "location_type": [0, 1, None, 0, 2],  # Added for schema completeness
     }
@@ -384,28 +409,52 @@ if __name__ == "__main__":
     module_logger.info(f"Raw stops DataFrame:\n{raw_stops_df}")
 
     transformed_stops_df = transform_dataframe(raw_stops_df, mock_stop_schema)
-    module_logger.info(f"\nTransformed stops DataFrame:\n{transformed_stops_df}")
+    module_logger.info(
+        f"\nTransformed stops DataFrame:\n{transformed_stops_df}"
+    )
     module_logger.info(
         "Transformed stops DataFrame columns: "
         f"{transformed_stops_df.columns.tolist()}"
     )
-    module_logger.info(f"Transformed stops dtypes:\n{transformed_stops_df.dtypes}")
+    module_logger.info(
+        f"Transformed stops dtypes:\n{transformed_stops_df.dtypes}"
+    )
     # Expected columns based on mock_stop_schema:
     # ['stop_id', 'stop_name', 'stop_lat', 'stop_lon', 'location_type', 'geom']
 
     # Test shape points to lines transformation
     mock_shapes_points_data = {
-        "shape_id": ["shp1", "shp1", "shp1", "shp2", "shp2_bad", "shp3", "shp1"],  # Unordered point for shp1
+        "shape_id": [
+            "shp1",
+            "shp1",
+            "shp1",
+            "shp2",
+            "shp2_bad",
+            "shp3",
+            "shp1",
+        ],  # Unordered point for shp1
         "shape_pt_lat": [40.0, 40.1, 40.2, 39.0, "invalid", 38.0, 39.9],
         "shape_pt_lon": [-74.0, -74.1, -74.2, -73.0, -73.1, -72.0, -73.9],
-        "shape_pt_sequence": [1, 3, 2, 1, "nan", 1, 0],  # Unordered sequence for shp1, bad seq
+        "shape_pt_sequence": [
+            1,
+            3,
+            2,
+            1,
+            "nan",
+            1,
+            0,
+        ],  # Unordered sequence for shp1, bad seq
     }
     raw_shapes_df = pd.DataFrame(mock_shapes_points_data)
     module_logger.info(f"\nRaw shapes points DataFrame:\n{raw_shapes_df}")
 
     shapes_lines_df = transform_shape_points_to_lines_df(raw_shapes_df)
-    module_logger.info(f"\nTransformed shapes lines DataFrame:\n{shapes_lines_df}")
+    module_logger.info(
+        f"\nTransformed shapes lines DataFrame:\n{shapes_lines_df}"
+    )
     # Expected: shp1 should be ordered by sequence (0,1,2,3),
     # shp2 should be skipped (invalid lat), shp3 skipped (1 point)
 
-    module_logger.info("--- osm.processors.gtfs.transform.py test finished ---")
+    module_logger.info(
+        "--- osm.processors.gtfs.transform.py test finished ---"
+    )

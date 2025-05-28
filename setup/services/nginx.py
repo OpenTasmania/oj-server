@@ -58,7 +58,8 @@ def nginx_setup(current_logger: Optional[logging.Logger] = None) -> None:
         logger_to_use,
     )
     script_hash_for_comments = (
-        get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
+        get_current_script_hash(logger_instance=logger_to_use)
+        or "UNKNOWN_HASH"
     )
 
     if not command_exists("nginx"):
@@ -214,7 +215,9 @@ server {{
     # Check if it's a symlink and exists before trying to remove.
     is_link_check = run_elevated_command(
         ["test", "-L", default_nginx_symlink],  # -L tests if it's a symlink
-        check=False, capture_output=True, current_logger=logger_to_use,
+        check=False,
+        capture_output=True,
+        current_logger=logger_to_use,
     )
     if is_link_check.returncode == 0:  # Symlink exists, so site is enabled.
         run_elevated_command(

@@ -58,7 +58,8 @@ def pg_tileserv_setup(
         logger_to_use,
     )
     script_hash_for_comments = (
-        get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
+        get_current_script_hash(logger_instance=logger_to_use)
+        or "UNKNOWN_HASH"
     )
     pg_tileserv_bin_path = "/usr/local/bin/pg_tileserv"
 
@@ -83,7 +84,9 @@ def pg_tileserv_setup(
             # Download as current user to the temporary file path.
             run_command(
                 [
-                    "wget", config.PG_TILESERV_BINARY_LOCATION, "-O",
+                    "wget",
+                    config.PG_TILESERV_BINARY_LOCATION,
+                    "-O",
                     temp_zip_path,
                 ],
                 current_logger=logger_to_use,
@@ -95,7 +98,11 @@ def pg_tileserv_setup(
             # directly in temp_dir_extract.
             run_command(
                 [
-                    "unzip", "-j", temp_zip_path, "pg_tileserv", "-d",
+                    "unzip",
+                    "-j",
+                    temp_zip_path,
+                    "pg_tileserv",
+                    "-d",
                     temp_dir_extract,
                 ],
                 current_logger=logger_to_use,
@@ -157,8 +164,7 @@ def pg_tileserv_setup(
         pg_tileserv_config_dir, "config.toml"
     )
     run_elevated_command(
-        ["mkdir", "-p", pg_tileserv_config_dir],
-        current_logger=logger_to_use
+        ["mkdir", "-p", pg_tileserv_config_dir], current_logger=logger_to_use
     )
 
     # Construct DatabaseURL for pg_tileserv config
@@ -168,8 +174,10 @@ def pg_tileserv_setup(
         f"postgresql://{config.PGUSER}:{config.PGPASSWORD}@"
         f"{config.PGHOST}:{config.PGPORT}/{config.PGDATABASE}"
     )
-    if (config.PGPASSWORD == config.PGPASSWORD_DEFAULT and
-            not config.DEV_OVERRIDE_UNSAFE_PASSWORD):
+    if (
+        config.PGPASSWORD == config.PGPASSWORD_DEFAULT
+        and not config.DEV_OVERRIDE_UNSAFE_PASSWORD
+    ):
         log_map_server(
             f"{config.SYMBOLS['warning']} Default PGPASSWORD detected and dev "
             "override not active. Using placeholder in pg_tileserv config. "
@@ -218,7 +226,9 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
         # Check if user already exists
         run_command(
             ["id", pgtileserv_system_user],
-            check=True, capture_output=True, current_logger=logger_to_use,
+            check=True,
+            capture_output=True,
+            current_logger=logger_to_use,
         )
         log_map_server(
             f"{config.SYMBOLS['info']} System user {pgtileserv_system_user} "
@@ -236,8 +246,12 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
         )
         run_elevated_command(
             [
-                "useradd", "--system", "--shell", "/usr/sbin/nologin",
-                "--home-dir", "/var/empty",
+                "useradd",
+                "--system",
+                "--shell",
+                "/usr/sbin/nologin",
+                "--home-dir",
+                "/var/empty",
                 "--user-group",  # Creates group with same name
                 pgtileserv_system_user,
             ],
@@ -252,16 +266,22 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
 
     # Set ownership and permissions for pg_tileserv files
     run_elevated_command(
-        ["chown", f"{pgtileserv_system_user}:{pgtileserv_system_user}",
-         pg_tileserv_bin_path],
+        [
+            "chown",
+            f"{pgtileserv_system_user}:{pgtileserv_system_user}",
+            pg_tileserv_bin_path,
+        ],
         current_logger=logger_to_use,
     )
     run_elevated_command(
         ["chmod", "750", pg_tileserv_bin_path], current_logger=logger_to_use
     )
     run_elevated_command(
-        ["chown", f"{pgtileserv_system_user}:{pgtileserv_system_user}",
-         pg_tileserv_config_file],
+        [
+            "chown",
+            f"{pgtileserv_system_user}:{pgtileserv_system_user}",
+            pg_tileserv_config_file,
+        ],
         current_logger=logger_to_use,
     )
     run_elevated_command(
@@ -271,7 +291,9 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
 
     # Ensure PostgreSQL role for pg_tileserv exists
     pg_db_port = config.PGPORT
-    pgtileserv_db_role = pgtileserv_system_user  # Use the same name for simplicity
+    pgtileserv_db_role = (
+        pgtileserv_system_user  # Use the same name for simplicity
+    )
     app_db_name = config.PGDATABASE
 
     log_map_server(
@@ -282,9 +304,16 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
     )
     # SQL command to create the role with LOGIN permission.
     sql_create_role_cmd_list = [
-        "sudo", "-u", "postgres", "psql", "-p", pg_db_port,
-        "-d", "postgres",  # Connect to 'postgres' db to create roles
-        "-c", f"CREATE ROLE {pgtileserv_db_role} WITH LOGIN;"
+        "sudo",
+        "-u",
+        "postgres",
+        "psql",
+        "-p",
+        pg_db_port,
+        "-d",
+        "postgres",  # Connect to 'postgres' db to create roles
+        "-c",
+        f"CREATE ROLE {pgtileserv_db_role} WITH LOGIN;",
     ]
     try:
         log_map_server(
@@ -294,8 +323,9 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
             logger_to_use,
         )
         run_command(
-            sql_create_role_cmd_list, capture_output=True,
-            current_logger=logger_to_use
+            sql_create_role_cmd_list,
+            capture_output=True,
+            current_logger=logger_to_use,
         )
         log_map_server(
             f"{config.SYMBOLS['success']} Successfully created PostgreSQL role "
@@ -304,8 +334,11 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
             logger_to_use,
         )
     except subprocess.CalledProcessError as e:
-        if hasattr(e, 'stderr') and e.stderr and \
-           "already exists" in e.stderr.lower():
+        if (
+            hasattr(e, "stderr")
+            and e.stderr
+            and "already exists" in e.stderr.lower()
+        ):
             log_map_server(
                 f"{config.SYMBOLS['info']} PostgreSQL role "
                 f"'{pgtileserv_db_role}' already exists. Ensuring LOGIN "
@@ -315,14 +348,22 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
             )
             # If role exists, try to grant LOGIN permission (idempotent)
             sql_alter_role_login_cmd_list = [
-                "sudo", "-u", "postgres", "psql", "-p", pg_db_port,
-                "-d", "postgres",
-                "-c", f"ALTER ROLE {pgtileserv_db_role} WITH LOGIN;"
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-p",
+                pg_db_port,
+                "-d",
+                "postgres",
+                "-c",
+                f"ALTER ROLE {pgtileserv_db_role} WITH LOGIN;",
             ]
             try:
                 run_command(
-                    sql_alter_role_login_cmd_list, capture_output=True,
-                    current_logger=logger_to_use
+                    sql_alter_role_login_cmd_list,
+                    capture_output=True,
+                    current_logger=logger_to_use,
                 )
                 log_map_server(
                     f"{config.SYMBOLS['success']} Ensured LOGIN permission for "
@@ -331,9 +372,11 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
                     logger_to_use,
                 )
             except subprocess.CalledProcessError as alter_e:
-                err_msg_alter = alter_e.stderr.strip() if hasattr(
-                    alter_e, 'stderr') and alter_e.stderr else \
-                    f"Unknown psql error during ALTER ROLE {pgtileserv_db_role} LOGIN."
+                err_msg_alter = (
+                    alter_e.stderr.strip()
+                    if hasattr(alter_e, "stderr") and alter_e.stderr
+                    else f"Unknown psql error during ALTER ROLE {pgtileserv_db_role} LOGIN."
+                )
                 log_map_server(
                     f"{config.SYMBOLS['warning']} Failed to grant LOGIN to "
                     f"existing role '{pgtileserv_db_role}'. Error: {err_msg_alter}",
@@ -341,9 +384,11 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
                     logger_to_use,
                 )
         else:
-            err_msg_create = e.stderr.strip() if hasattr(
-                e, 'stderr') and e.stderr else \
-                f"Unknown psql error during CREATE ROLE {pgtileserv_db_role}."
+            err_msg_create = (
+                e.stderr.strip()
+                if hasattr(e, "stderr") and e.stderr
+                else f"Unknown psql error during CREATE ROLE {pgtileserv_db_role}."
+            )
             log_map_server(
                 f"{config.SYMBOLS['error']} Failed to create PostgreSQL role "
                 f"'{pgtileserv_db_role}'. Error: {err_msg_create}",
@@ -354,9 +399,16 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
 
     # Grant CONNECT permission on the application database
     sql_grant_connect_cmd_list = [
-        "sudo", "-u", "postgres", "psql", "-p", pg_db_port,
-        "-d", app_db_name,  # Connect to the specific app database
-        "-c", f"GRANT CONNECT ON DATABASE {app_db_name} TO {pgtileserv_db_role};"
+        "sudo",
+        "-u",
+        "postgres",
+        "psql",
+        "-p",
+        pg_db_port,
+        "-d",
+        app_db_name,  # Connect to the specific app database
+        "-c",
+        f"GRANT CONNECT ON DATABASE {app_db_name} TO {pgtileserv_db_role};",
     ]
     try:
         log_map_server(
@@ -366,8 +418,9 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
             logger_to_use,
         )
         run_command(
-            sql_grant_connect_cmd_list, capture_output=True,
-            current_logger=logger_to_use
+            sql_grant_connect_cmd_list,
+            capture_output=True,
+            current_logger=logger_to_use,
         )
         log_map_server(
             f"{config.SYMBOLS['success']} Successfully granted CONNECT on "
@@ -376,9 +429,11 @@ AllowFunctionSources = true    # Allow functions to be sources for tiles
             logger_to_use,
         )
     except subprocess.CalledProcessError as e:
-        err_msg_grant = e.stderr.strip() if hasattr(
-            e, 'stderr') and e.stderr else \
-            f"Unknown psql error during GRANT CONNECT to {pgtileserv_db_role} on {app_db_name}."
+        err_msg_grant = (
+            e.stderr.strip()
+            if hasattr(e, "stderr") and e.stderr
+            else f"Unknown psql error during GRANT CONNECT to {pgtileserv_db_role} on {app_db_name}."
+        )
         log_map_server(
             f"{config.SYMBOLS['warning']} Failed to grant CONNECT on database "
             f"'{app_db_name}' to role '{pgtileserv_db_role}'. "

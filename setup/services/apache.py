@@ -56,7 +56,8 @@ def apache_modtile_setup(
         logger_to_use,
     )
     script_hash_for_comments = (
-        get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
+        get_current_script_hash(logger_instance=logger_to_use)
+        or "UNKNOWN_HASH"
     )
 
     # Check for apache2ctl as a proxy for Apache2 installation.
@@ -75,7 +76,8 @@ def apache_modtile_setup(
         # This sed command replaces "Listen 80" with "Listen 8080".
         run_elevated_command(
             [
-                "sed", "-i.bak_ports_sed",  # Create another backup before sed
+                "sed",
+                "-i.bak_ports_sed",  # Create another backup before sed
                 "s/^Listen 80$/Listen 8080/",
                 ports_conf_path,
             ],
@@ -84,7 +86,8 @@ def apache_modtile_setup(
         # Also check for IPv6 Listen [::]:80 and change to [::]:8080.
         run_elevated_command(
             [
-                "sed", "-i",  # In-place edit, previous backup already made
+                "sed",
+                "-i",  # In-place edit, previous backup already made
                 "s/^Listen \\[::\\]:80$/Listen [::]:8080/",
                 ports_conf_path,
             ],
@@ -178,7 +181,10 @@ ModTileMaxLoadMissing 5
 </VirtualHost>
 """
     run_elevated_command(
-        ["tee", apache_tiles_site_conf_available_path],  # Overwrites or creates
+        [
+            "tee",
+            apache_tiles_site_conf_available_path,
+        ],  # Overwrites or creates
         cmd_input=apache_tiles_site_content,
         current_logger=logger_to_use,
     )
@@ -197,10 +203,15 @@ ModTileMaxLoadMissing 5
             "info",
             logger_to_use,
         )
-        run_elevated_command(["a2enconf", conf_name.replace(".conf", "")],
-                             current_logger=logger_to_use)
+        run_elevated_command(
+            ["a2enconf", conf_name.replace(".conf", "")],
+            current_logger=logger_to_use,
+        )
 
-    apache_modules_to_enable = ["expires", "headers"]  # mod_tile is loaded by its conf
+    apache_modules_to_enable = [
+        "expires",
+        "headers",
+    ]  # mod_tile is loaded by its conf
     for mod in apache_modules_to_enable:
         log_map_server(
             f"{config.SYMBOLS['gear']} Enabling Apache module: {mod}...",
@@ -216,7 +227,12 @@ ModTileMaxLoadMissing 5
         logger_to_use,
     )
     run_elevated_command(
-        ["a2ensite", os.path.basename(apache_tiles_site_conf_available_path).replace(".conf", "")],
+        [
+            "a2ensite",
+            os.path.basename(apache_tiles_site_conf_available_path).replace(
+                ".conf", ""
+            ),
+        ],
         current_logger=logger_to_use,
     )
 
@@ -228,7 +244,9 @@ ModTileMaxLoadMissing 5
     # Check if the default site is enabled (is a symlink).
     is_link_check = run_elevated_command(
         ["test", "-L", default_site_enabled_path],
-        check=False, capture_output=True, current_logger=logger_to_use,
+        check=False,
+        capture_output=True,
+        current_logger=logger_to_use,
     )
     if is_link_check.returncode == 0:  # Symlink exists, so site is enabled.
         log_map_server(

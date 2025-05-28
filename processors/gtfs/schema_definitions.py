@@ -41,6 +41,7 @@ class GTFSBaseModel(BaseModel):
     - `validate_assignment = True`: Validates fields on assignment after
                                     initialization.
     """
+
     class Config:
         extra = "ignore"
         str_strip_whitespace = True
@@ -48,6 +49,7 @@ class GTFSBaseModel(BaseModel):
 
 
 # --- GTFS File Specific Models ---
+
 
 class Agency(GTFSBaseModel):
     """
@@ -64,7 +66,10 @@ class Agency(GTFSBaseModel):
         agency_fare_url: Optional. URL for purchasing fares online.
         agency_email: Optional. Email address for contacting the agency.
     """
-    agency_id: Optional[Annotated[str, StringConstraints(min_length=1)]] = None
+
+    agency_id: Optional[Annotated[str, StringConstraints(min_length=1)]] = (
+        None
+    )
     agency_name: Annotated[str, StringConstraints(min_length=1)]
     agency_url: Annotated[str, StringConstraints(pattern=r"^https?://.+")]
     agency_timezone: Annotated[str, StringConstraints(min_length=1)]
@@ -76,9 +81,12 @@ class Agency(GTFSBaseModel):
         Annotated[str, StringConstraints(pattern=r"^https?://.+")]
     ] = None
     agency_email: Optional[
-        Annotated[str, StringConstraints(
-            pattern=r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+"
-        )]
+        Annotated[
+            str,
+            StringConstraints(
+                pattern=r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+"
+            ),
+        ]
     ] = None
 
 
@@ -106,9 +114,12 @@ class Stop(GTFSBaseModel):
         level_id: Optional. Level of the platform.
         platform_code: Optional. Platform identifier for the stop.
     """
+
     stop_id: Annotated[str, StringConstraints(min_length=1)]
     stop_code: Optional[str] = None
-    stop_name: Optional[Annotated[str, StringConstraints(min_length=1)]] = None
+    stop_name: Optional[Annotated[str, StringConstraints(min_length=1)]] = (
+        None
+    )
     stop_desc: Optional[str] = None
     stop_lat: confloat(ge=-90, le=90)
     stop_lon: confloat(ge=-180, le=180)
@@ -142,6 +153,7 @@ class Route(GTFSBaseModel):
         continuous_pickup: Optional. Indicates continuous pickup policy.
         continuous_drop_off: Optional. Indicates continuous drop-off policy.
     """
+
     route_id: Annotated[str, StringConstraints(min_length=1)]
     agency_id: Optional[str] = None
     route_short_name: Optional[str] = Field("", max_length=50)
@@ -180,6 +192,7 @@ class Trip(GTFSBaseModel):
         wheelchair_accessible: Optional. Wheelchair accessibility for the trip.
         bikes_allowed: Optional. Indicates if bikes are allowed on this trip.
     """
+
     route_id: Annotated[str, StringConstraints(min_length=1)]
     service_id: Annotated[str, StringConstraints(min_length=1)]
     trip_id: Annotated[str, StringConstraints(min_length=1)]
@@ -210,16 +223,19 @@ class StopTime(GTFSBaseModel):
         shape_dist_traveled: Optional. Distance from first shape point.
         timepoint: Optional. Indicates if this stop is a timepoint.
     """
+
     trip_id: Annotated[str, StringConstraints(min_length=1)]
     arrival_time: Optional[
-        Annotated[str, StringConstraints(
-            pattern=r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$"
-        )]
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$"),
+        ]
     ] = None
     departure_time: Optional[
-        Annotated[str, StringConstraints(
-            pattern=r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$"
-        )]
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$"),
+        ]
     ] = None
     stop_id: Annotated[str, StringConstraints(min_length=1)]
     stop_sequence: conint(ge=0)
@@ -263,6 +279,7 @@ class Calendar(GTFSBaseModel):
         start_date: Required. Start date for the service (YYYYMMDD).
         end_date: Required. End date for the service (YYYYMMDD).
     """
+
     service_id: Annotated[str, StringConstraints(min_length=1)]
     monday: Literal[0, 1]
     tuesday: Literal[0, 1]
@@ -295,6 +312,7 @@ class CalendarDate(GTFSBaseModel):
         exception_type: Required. Type of exception (1: Service added,
                         2: Service removed).
     """
+
     service_id: Annotated[str, StringConstraints(min_length=1)]
     date: Annotated[str, StringConstraints(pattern=r"^[0-9]{8}$")]
     exception_type: Literal[1, 2]
@@ -322,6 +340,7 @@ class ShapePoint(GTFSBaseModel):
         shape_dist_traveled: Optional. Distance traveled along the shape
                              from the first point.
     """
+
     shape_id: Annotated[str, StringConstraints(min_length=1)]
     shape_pt_lat: confloat(ge=-90, le=90)
     shape_pt_lon: confloat(ge=-180, le=180)
@@ -341,6 +360,7 @@ class Frequency(GTFSBaseModel):
         exact_times: Optional. Indicates if service is frequency-based (0) or
                      schedule-based (1) for this period.
     """
+
     trip_id: Annotated[str, StringConstraints(min_length=1)]
     start_time: Annotated[
         str, StringConstraints(pattern=r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$")
@@ -364,6 +384,7 @@ class Transfer(GTFSBaseModel):
         min_transfer_time: Optional. Minimum time for the transfer (seconds).
                            Required if `transfer_type` is 2.
     """
+
     from_stop_id: Annotated[str, StringConstraints(min_length=1)]
     to_stop_id: Annotated[str, StringConstraints(min_length=1)]
     transfer_type: conint(ge=0, le=3)
@@ -395,10 +416,17 @@ class FeedInfo(GTFSBaseModel):
         feed_contact_email: Optional. Contact email for the feed.
         feed_contact_url: Optional. Contact URL for the feed.
     """
+
     feed_publisher_name: Annotated[str, StringConstraints(min_length=1)]
-    feed_publisher_url: Annotated[str, StringConstraints(pattern=r"^https?://.+")]
-    feed_lang: Annotated[str, StringConstraints(min_length=2)]  # e.g., 'en', 'fr-CA'
-    default_lang: Optional[Annotated[str, StringConstraints(min_length=2)]] = None
+    feed_publisher_url: Annotated[
+        str, StringConstraints(pattern=r"^https?://.+")
+    ]
+    feed_lang: Annotated[
+        str, StringConstraints(min_length=2)
+    ]  # e.g., 'en', 'fr-CA'
+    default_lang: Optional[
+        Annotated[str, StringConstraints(min_length=2)]
+    ] = None
     feed_start_date: Optional[
         Annotated[str, StringConstraints(pattern=r"^[0-9]{8}$")]
     ] = None
@@ -407,9 +435,12 @@ class FeedInfo(GTFSBaseModel):
     ] = None
     feed_version: Optional[str] = None
     feed_contact_email: Optional[
-        Annotated[str, StringConstraints(
-            pattern=r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+"
-        )]
+        Annotated[
+            str,
+            StringConstraints(
+                pattern=r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+"
+            ),
+        ]
     ] = None
     feed_contact_url: Optional[
         Annotated[str, StringConstraints(pattern=r"^https?://.+")]
@@ -419,7 +450,9 @@ class FeedInfo(GTFSBaseModel):
     @classmethod
     def check_date_format_optional(cls, v: Optional[str]) -> Optional[str]:
         """Validate optional date strings (YYYYMMDD) if provided."""
-        if v is not None and str(v).strip() != "":  # Process if not None or empty
+        if (
+            v is not None and str(v).strip() != ""
+        ):  # Process if not None or empty
             try:
                 datetime.strptime(v, "%Y%m%d").date()
             except ValueError as e:
@@ -438,7 +471,9 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "agency.txt": {
         "model": Agency,
         "db_table_name": "gtfs_agency",
-        "pk_cols": ["agency_id"],  # Assuming agency_id becomes required for DB
+        "pk_cols": [
+            "agency_id"
+        ],  # Assuming agency_id becomes required for DB
     },
     "stops.txt": {
         "model": Stop,
@@ -509,7 +544,9 @@ if __name__ == "__main__":
 
     test_results: Dict[str, List[str]] = {"valid": [], "invalid": []}
 
-    def _test_model(ModelClass: Type[BaseModel], data: Dict, is_valid_expected: bool):
+    def _test_model(
+        ModelClass: Type[BaseModel], data: Dict, is_valid_expected: bool
+    ):
         model_name = ModelClass.__name__
         try:
             instance = ModelClass(**data)
@@ -522,14 +559,18 @@ if __name__ == "__main__":
                 logger.error(
                     f"UNEXPECTEDLY VALID {model_name} for data: {data}"
                 )
-                test_results["invalid"].append(f"{model_name} (unexpectedly valid)")
+                test_results["invalid"].append(
+                    f"{model_name} (unexpectedly valid)"
+                )
         except ValidationError as e_val:
             if is_valid_expected:
                 logger.error(
                     f"UNEXPECTEDLY INVALID {model_name} for data {data}: "
                     f"{e_val.errors()}"
                 )
-                test_results["invalid"].append(f"{model_name} (unexpectedly invalid)")
+                test_results["invalid"].append(
+                    f"{model_name} (unexpectedly invalid)"
+                )
             else:
                 logger.info(
                     f"Caught EXPECTED validation error for {model_name}: "
@@ -540,56 +581,107 @@ if __name__ == "__main__":
             logger.error(
                 f"UNEXPECTED Exception during {model_name} test with {data}: {e_other}"
             )
-            test_results["invalid"].append(f"{model_name} (unexpected exception)")
+            test_results["invalid"].append(
+                f"{model_name} (unexpected exception)"
+            )
 
     # Agency tests
-    _test_model(Agency, {
-        "agency_id": "MBTA", "agency_name": "MBTA",
-        "agency_url": "http://mbta.com", "agency_timezone": "America/New_York"
-    }, True)
-    _test_model(Agency, {
-        "agency_name": "Test", "agency_url": "badurl",
-        "agency_timezone": "Test/Zone"
-    }, False)  # Expect agency_url to fail
+    _test_model(
+        Agency,
+        {
+            "agency_id": "MBTA",
+            "agency_name": "MBTA",
+            "agency_url": "http://mbta.com",
+            "agency_timezone": "America/New_York",
+        },
+        True,
+    )
+    _test_model(
+        Agency,
+        {
+            "agency_name": "Test",
+            "agency_url": "badurl",
+            "agency_timezone": "Test/Zone",
+        },
+        False,
+    )  # Expect agency_url to fail
 
     # Stop tests
-    _test_model(Stop, {
-        "stop_id": "place-north", "stop_name": "North Station",
-        "stop_lat": 42.365577, "stop_lon": -71.06129, "location_type": 1
-    }, True)
-    _test_model(Stop, {
-        "stop_id": "bad-lat", "stop_lat": 95.0, "stop_lon": -70.0
-    }, False)  # Expect stop_lat > 90 to fail
+    _test_model(
+        Stop,
+        {
+            "stop_id": "place-north",
+            "stop_name": "North Station",
+            "stop_lat": 42.365577,
+            "stop_lon": -71.06129,
+            "location_type": 1,
+        },
+        True,
+    )
+    _test_model(
+        Stop,
+        {"stop_id": "bad-lat", "stop_lat": 95.0, "stop_lon": -70.0},
+        False,
+    )  # Expect stop_lat > 90 to fail
 
     # StopTime tests
-    _test_model(StopTime, {
-        "trip_id": "t1", "stop_id": "s1", "stop_sequence": 1,
-        "arrival_time": "08:00:00"
-    }, True)
-    _test_model(StopTime, {  # Both times None is currently allowed by validator
-        "trip_id": "t2", "stop_id": "s2", "stop_sequence": 1,
-        "arrival_time": None, "departure_time": None
-    }, True)  # If validator changes to disallow, this becomes False
+    _test_model(
+        StopTime,
+        {
+            "trip_id": "t1",
+            "stop_id": "s1",
+            "stop_sequence": 1,
+            "arrival_time": "08:00:00",
+        },
+        True,
+    )
+    _test_model(
+        StopTime,
+        {  # Both times None is currently allowed by validator
+            "trip_id": "t2",
+            "stop_id": "s2",
+            "stop_sequence": 1,
+            "arrival_time": None,
+            "departure_time": None,
+        },
+        True,
+    )  # If validator changes to disallow, this becomes False
 
     # Transfer tests
-    _test_model(Transfer, {
-        "from_stop_id": "s1", "to_stop_id": "s2", "transfer_type": 0
-    }, True)
-    _test_model(Transfer, {
-        "from_stop_id": "s3", "to_stop_id": "s4", "transfer_type": 2,
-        "min_transfer_time": 120
-    }, True)
-    _test_model(Transfer, {  # transfer_type 2 requires min_transfer_time
-        "from_stop_id": "s5", "to_stop_id": "s6", "transfer_type": 2,
-        "min_transfer_time": None
-    }, False)
+    _test_model(
+        Transfer,
+        {"from_stop_id": "s1", "to_stop_id": "s2", "transfer_type": 0},
+        True,
+    )
+    _test_model(
+        Transfer,
+        {
+            "from_stop_id": "s3",
+            "to_stop_id": "s4",
+            "transfer_type": 2,
+            "min_transfer_time": 120,
+        },
+        True,
+    )
+    _test_model(
+        Transfer,
+        {  # transfer_type 2 requires min_transfer_time
+            "from_stop_id": "s5",
+            "to_stop_id": "s6",
+            "transfer_type": 2,
+            "min_transfer_time": None,
+        },
+        False,
+    )
 
     logger.info("\n--- Schema Definition Test Summary ---")
     logger.info(f"Models behaving as expected: {len(test_results['valid'])}")
     for item in test_results["valid"]:
         logger.info(f"  - {item}")
     if test_results["invalid"]:
-        logger.error(f"Models NOT behaving as expected: {len(test_results['invalid'])}")
+        logger.error(
+            f"Models NOT behaving as expected: {len(test_results['invalid'])}"
+        )
         for item in test_results["invalid"]:
             logger.error(f"  - {item}")
     logger.info("--- Schema definition tests finished. ---")

@@ -56,16 +56,30 @@ def services_setup_group(
 
     # Define the sequence of service setup steps.
     # Each tuple: (step_tag, description, function_reference)
-    service_steps_to_run: List[Tuple[str, str, Callable[[Optional[logging.Logger]], Any]]] = [
+    service_steps_to_run: List[
+        Tuple[str, str, Callable[[Optional[logging.Logger]], Any]]
+    ] = [
         ("UFW_SETUP", "Setup UFW Firewall", ufw_setup),
-        ("POSTGRES_SETUP", "Setup PostgreSQL Database & User", postgres_setup),
+        (
+            "POSTGRES_SETUP",
+            "Setup PostgreSQL Database & User",
+            postgres_setup,
+        ),
         ("PGTILESERV_SETUP", "Setup pg_tileserv", pg_tileserv_setup),
         ("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style", carto_setup),
         ("RENDERD_SETUP", "Setup Renderd for Raster Tiles", renderd_setup),
-        ("OSM_OSRM_SERVER_SETUP", "Setup OSM Data & OSRM", osm_osrm_server_setup),
+        (
+            "OSM_OSRM_SERVER_SETUP",
+            "Setup OSM Data & OSRM",
+            osm_osrm_server_setup,
+        ),
         ("APACHE_SETUP", "Setup Apache for mod_tile", apache_modtile_setup),
         ("NGINX_SETUP", "Setup Nginx Reverse Proxy", nginx_setup),
-        ("CERTBOT_SETUP", "Setup Certbot for SSL (optional, requires FQDN)", certbot_setup),
+        (
+            "CERTBOT_SETUP",
+            "Setup Certbot for SSL (optional, requires FQDN)",
+            certbot_setup,
+        ),
     ]
 
     for tag, desc, func_ref in service_steps_to_run:
@@ -76,7 +90,7 @@ def services_setup_group(
             step_description=desc,
             step_function=func_ref,
             current_logger_instance=logger_to_use,
-            prompt_user_for_rerun=cli_prompt_for_rerun
+            prompt_user_for_rerun=cli_prompt_for_rerun,
         ):
             overall_success = False
             log_map_server(

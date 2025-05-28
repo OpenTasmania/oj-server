@@ -146,7 +146,7 @@ SYMBOLS: dict[str, str] = {
     "rocket": "🚀",
     "sparkles": "✨",
     "critical": "🔥",
-    "debug": "🐛"
+    "debug": "🐛",
 }
 
 

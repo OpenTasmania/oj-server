@@ -61,7 +61,7 @@ def setup_logging(
 
     if log_file:
         try:
-            file_handler = logging.FileHandler(log_file, mode='a')
+            file_handler = logging.FileHandler(log_file, mode="a")
             handlers.append(file_handler)
         except Exception as e:
             # Fallback or log an error if file handler can't be created.
@@ -69,7 +69,7 @@ def setup_logging(
             print(
                 f"Warning: Could not create file handler for log file "
                 f"{log_file}: {e}",
-                file=stderr
+                file=stderr,
             )
 
     if log_to_console:
@@ -79,7 +79,9 @@ def setup_logging(
     if not handlers:  # Ensure there's at least one handler if none specified
         console_handler = logging.StreamHandler(stdout)
         handlers.append(console_handler)
-        if log_level > logging.INFO:  # If default level too high, ensure some output
+        if (
+            log_level > logging.INFO
+        ):  # If default level too high, ensure some output
             log_level = logging.INFO
 
     logging.basicConfig(
@@ -99,7 +101,7 @@ def setup_logging(
 
 
 def get_db_connection(
-    db_params: Optional[Dict[str, str]] = None
+    db_params: Optional[Dict[str, str]] = None,
 ) -> Optional[psycopg2.extensions.connection]:
     """
     Establish and return a PostgreSQL database connection.
@@ -118,8 +120,10 @@ def get_db_connection(
         params_to_use.update(db_params)
 
     # Password security check
-    if params_to_use.get("password") == "yourStrongPasswordHere" and \
-       os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere":
+    if (
+        params_to_use.get("password") == "yourStrongPasswordHere"
+        and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
+    ):
         module_logger.critical(
             "CRITICAL: Default placeholder password is being used for database "
             "connection. Please configure a strong password in DB_PARAMS or "
@@ -146,7 +150,7 @@ def get_db_connection(
     except Exception as e:
         module_logger.error(
             f"An unexpected error occurred while connecting to the database: {e}",
-            exc_info=True
+            exc_info=True,
         )
     return None
 
@@ -170,7 +174,7 @@ def cleanup_directory(directory_path: Path) -> None:
             except Exception as e:
                 module_logger.error(
                     f"Failed to clean up directory {directory_path}: {e}",
-                    exc_info=True
+                    exc_info=True,
                 )
         else:
             module_logger.warning(
@@ -240,7 +244,9 @@ def validate_dataframe_with_pydantic(
                     record_dict_for_pydantic[col] = val
 
             # Attempt to parse and validate the record.
-            validated_model_instance = pydantic_model(**record_dict_for_pydantic)
+            validated_model_instance = pydantic_model(
+                **record_dict_for_pydantic
+            )
 
             # If successful, add the model's dictionary representation.
             # exclude_none=False ensures that fields explicitly set to None
@@ -264,10 +270,13 @@ def validate_dataframe_with_pydantic(
         except Exception as ex_other:  # Catch other unexpected errors
             invalid_record_info = {
                 "original_record": row.to_dict(),
-                "errors": [{
-                    "loc": ["unknown"], "msg": str(ex_other),
-                    "type": "unexpected_error",
-                }],
+                "errors": [
+                    {
+                        "loc": ["unknown"],
+                        "msg": str(ex_other),
+                        "type": "unexpected_error",
+                    }
+                ],
                 "source_filename": gtfs_filename,
                 "original_index": index,
             }
@@ -314,7 +323,9 @@ if __name__ == "__main__":
     # Get the Stop Pydantic model from schema_definitions.
     stop_model_definition = schemas.GTFS_FILE_SCHEMAS.get("stops.txt")
     if not stop_model_definition or "model" not in stop_model_definition:
-        module_logger.error("Stop model not found in schema_definitions. Skipping test.")
+        module_logger.error(
+            "Stop model not found in schema_definitions. Skipping test."
+        )
     else:
         stop_pydantic_model_class = stop_model_definition["model"]
 
@@ -323,19 +334,53 @@ if __name__ == "__main__":
             "stop_id": ["s1", "s2", "s3", "s4", "s5", "s6"],
             "stop_code": ["c1", "", None, "c4", "c5", "c6"],
             "stop_name": [
-                " Stop One ", "Stop Two (Good LatLon)", "  ",
-                "Stop Four (Bad Lat)", "Stop Five (Missing Lon)", "Stop Six (Good)"
+                " Stop One ",
+                "Stop Two (Good LatLon)",
+                "  ",
+                "Stop Four (Bad Lat)",
+                "Stop Five (Missing Lon)",
+                "Stop Six (Good)",
             ],
-            "stop_desc": ["Desc 1", None, "Desc 3", "Desc 4", "Desc 5", "Desc 6"],
-            "stop_lat": ["40.7128 ", "40.7321", "40.777", "95.0", "40.123", "34.0522"],
-            "stop_lon": [" -74.0060", "-74.0001", "-74.111", "-74.0020", "", "-118.2437"],
+            "stop_desc": [
+                "Desc 1",
+                None,
+                "Desc 3",
+                "Desc 4",
+                "Desc 5",
+                "Desc 6",
+            ],
+            "stop_lat": [
+                "40.7128 ",
+                "40.7321",
+                "40.777",
+                "95.0",
+                "40.123",
+                "34.0522",
+            ],
+            "stop_lon": [
+                " -74.0060",
+                "-74.0001",
+                "-74.111",
+                "-74.0020",
+                "",
+                "-118.2437",
+            ],
             "zone_id": ["z1", "z2", "z1", None, "z3", "z4"],
             "location_type": ["0", "1", "", "0", "2", None],
             "parent_station": [None, None, "s2", "s1", None, ""],
-            "extra_column_not_in_model": ["ex1", "ex2", "ex3", "ex4", "ex5", "ex6"],
+            "extra_column_not_in_model": [
+                "ex1",
+                "ex2",
+                "ex3",
+                "ex4",
+                "ex5",
+                "ex6",
+            ],
         }
         raw_stops_df = pd.DataFrame(raw_stop_data)
-        module_logger.info(f"\nRaw stops DataFrame for validation:\n{raw_stops_df}")
+        module_logger.info(
+            f"\nRaw stops DataFrame for validation:\n{raw_stops_df}"
+        )
 
         valid_stops_df, invalid_stops_info = validate_dataframe_with_pydantic(
             raw_stops_df, stop_pydantic_model_class, "stops.txt"
@@ -345,7 +390,11 @@ if __name__ == "__main__":
             f"\nValidated Stops DataFrame ({len(valid_stops_df)} records):\n"
             f"{valid_stops_df.head().to_string()}"
         )
-        if valid_stops_df.empty and not invalid_stops_info and not raw_stops_df.empty:
+        if (
+            valid_stops_df.empty
+            and not invalid_stops_info
+            and not raw_stops_df.empty
+        ):
             module_logger.warning(
                 "Validation returned empty valid DataFrame and no invalid "
                 "records - check logic if input was not empty."
@@ -355,7 +404,9 @@ if __name__ == "__main__":
             f"\nInvalid Stops Records/Info ({len(invalid_stops_info)} records):"
         )
         for invalid_info in invalid_stops_info:
-            module_logger.info(f"  Original: {invalid_info['original_record']}")
+            module_logger.info(
+                f"  Original: {invalid_info['original_record']}"
+            )
             module_logger.info(f"  Errors: {invalid_info['errors']}")
             # In a real pipeline, these invalid_stops_info would be passed
             # to a DLQ logging function.
@@ -363,8 +414,10 @@ if __name__ == "__main__":
     # --- Test DB Connection (if configured and desired) ---
     # Note: This requires a running PostgreSQL instance and correct DB_PARAMS.
     # By default, uses placeholder password.
-    if (DEFAULT_DB_PARAMS["password"] == "yourStrongPasswordHere" and
-            os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"):
+    if (
+        DEFAULT_DB_PARAMS["password"] == "yourStrongPasswordHere"
+        and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
+    ):
         module_logger.warning(
             "Skipping database connection test as password is the placeholder "
             "and PG_OSM_PASSWORD env var is not set differently."
@@ -379,9 +432,13 @@ if __name__ == "__main__":
                     cur.execute("SELECT version();")
                     pg_version = cur.fetchone()
                     if pg_version:
-                        module_logger.info(f"PostgreSQL version: {pg_version[0]}")
+                        module_logger.info(
+                            f"PostgreSQL version: {pg_version[0]}"
+                        )
             except Exception as e_db_test:
-                module_logger.error(f"Error executing test query: {e_db_test}")
+                module_logger.error(
+                    f"Error executing test query: {e_db_test}"
+                )
             finally:
                 test_conn.close()
                 module_logger.info("Test DB connection closed.")

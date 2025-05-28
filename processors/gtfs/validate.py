@@ -87,7 +87,9 @@ def setup_logging(
             log_file_path = Path(log_file)
             # Ensure log directory exists.
             log_file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(log_file_path, mode="a")  # Append mode
+            file_handler = logging.FileHandler(
+                log_file_path, mode="a"
+            )  # Append mode
             file_handler.setFormatter(formatter)
             root_logger.addHandler(file_handler)
             handlers_added = True
@@ -97,7 +99,7 @@ def setup_logging(
             print(
                 f"ERROR: Failed to configure file logging to '{log_file}': {e}. "
                 "Logging to console if enabled, or with basic config.",
-                file=sys.stderr
+                file=sys.stderr,
             )
             # If console logging was also off, ensure there's at least one handler.
             if not log_to_console:
@@ -112,7 +114,9 @@ def setup_logging(
         basic_console_handler = logging.StreamHandler(sys.stdout)
         basic_console_handler.setFormatter(formatter)
         root_logger.addHandler(basic_console_handler)
-        module_logger.debug("Default console handler added as no other handlers were configured.")
+        module_logger.debug(
+            "Default console handler added as no other handlers were configured."
+        )
 
     module_logger.debug(
         f"Root logger setup complete. Level: {logging.getLevelName(log_level)}"
@@ -120,7 +124,7 @@ def setup_logging(
 
 
 def get_db_connection(
-    db_params: Optional[Dict[str, Any]] = None
+    db_params: Optional[Dict[str, Any]] = None,
 ) -> Optional[PgConnection]:
     """
     Establish and return a PostgreSQL database connection.
@@ -144,8 +148,10 @@ def get_db_connection(
     # Critical check for placeholder password.
     # This checks against the specific default string in this module.
     placeholder_pw = "yourStrongPasswordHere_utils_default"
-    if (current_params.get("password") == placeholder_pw and
-            os.environ.get("PG_OSM_PASSWORD") == placeholder_pw):
+    if (
+        current_params.get("password") == placeholder_pw
+        and os.environ.get("PG_OSM_PASSWORD") == placeholder_pw
+    ):
         module_logger.critical(
             "CRITICAL: Default placeholder password is being used for database "
             "connection in utils.py (validate.py content)."
@@ -206,7 +212,8 @@ def cleanup_directory(
             except Exception as e:
                 module_logger.error(
                     f"Error removing directory {dir_to_clean} using "
-                    f"shutil.rmtree: {e}", exc_info=True
+                    f"shutil.rmtree: {e}",
+                    exc_info=True,
                 )
                 # Fallback: try to delete items individually if rmtree failed
                 # (e.g. permission issues with specific files)
@@ -229,7 +236,7 @@ def cleanup_directory(
         except Exception as e:
             module_logger.error(
                 f"Error creating directory {dir_to_clean} after cleanup: {e}",
-                exc_info=True
+                exc_info=True,
             )
 
 
@@ -254,7 +261,9 @@ if __name__ == "__main__":
         f"This message should go to the test log file: {TEST_LOG_FILE}"
     )
     if TEST_LOG_FILE.exists():
-        print(f"Test log file created at {TEST_LOG_FILE}. Check its contents.")
+        print(
+            f"Test log file created at {TEST_LOG_FILE}. Check its contents."
+        )
         # Clean up test log file after check.
         # TEST_LOG_FILE.unlink(missing_ok=True)
     else:
@@ -269,8 +278,12 @@ if __name__ == "__main__":
     # correctly configured (or env vars like PG_OSM_PASSWORD set) for success.
     print("\n--- Testing utils.py (was validate.py) DB Connection ---")
     # Check if password is still the placeholder defined in this module.
-    if (DEFAULT_DB_PARAMS["password"] == "yourStrongPasswordHere_utils_default" and
-            os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere_utils_default"):
+    if (
+        DEFAULT_DB_PARAMS["password"]
+        == "yourStrongPasswordHere_utils_default"
+        and os.environ.get("PG_OSM_PASSWORD")
+        == "yourStrongPasswordHere_utils_default"
+    ):
         module_logger.warning(
             "Skipping database connection test as password is the default "
             "placeholder for 'validate.py' content."
@@ -306,15 +319,23 @@ if __name__ == "__main__":
     # Test 1: Cleanup a directory that doesn't exist, ensure it's created.
     if TEST_CLEANUP_DIR.exists():  # Cleanup from previous test if any
         shutil.rmtree(TEST_CLEANUP_DIR, ignore_errors=True)
-    module_logger.info(f"Testing cleanup of non-existent directory, ensuring creation: {TEST_CLEANUP_DIR}")
+    module_logger.info(
+        f"Testing cleanup of non-existent directory, ensuring creation: {TEST_CLEANUP_DIR}"
+    )
     cleanup_directory(TEST_CLEANUP_DIR, ensure_dir_exists_after=True)
     if TEST_CLEANUP_DIR.exists() and TEST_CLEANUP_DIR.is_dir():
-        module_logger.info(f"Test 1 successful. Directory {TEST_CLEANUP_DIR} exists.")
+        module_logger.info(
+            f"Test 1 successful. Directory {TEST_CLEANUP_DIR} exists."
+        )
     else:
-        module_logger.error(f"Test 1 FAILED. Directory {TEST_CLEANUP_DIR} does not exist.")
+        module_logger.error(
+            f"Test 1 FAILED. Directory {TEST_CLEANUP_DIR} does not exist."
+        )
 
     # Test 2: Create directory with content, clean it, ensure it's recreated empty.
-    TEST_CLEANUP_DIR.mkdir(parents=True, exist_ok=True)  # Ensure it exists for this test
+    TEST_CLEANUP_DIR.mkdir(
+        parents=True, exist_ok=True
+    )  # Ensure it exists for this test
     (TEST_CLEANUP_DIR / "file1.txt").touch()
     (TEST_CLEANUP_DIR / "subdir").mkdir(exist_ok=True)
     (TEST_CLEANUP_DIR / "subdir" / "file3.txt").touch()
@@ -328,7 +349,11 @@ if __name__ == "__main__":
         str(p.relative_to(TEST_CLEANUP_DIR))
         for p in TEST_CLEANUP_DIR.rglob("*")
     ]
-    if TEST_CLEANUP_DIR.exists() and TEST_CLEANUP_DIR.is_dir() and not remaining_items:
+    if (
+        TEST_CLEANUP_DIR.exists()
+        and TEST_CLEANUP_DIR.is_dir()
+        and not remaining_items
+    ):
         module_logger.info(
             f"Test 2 successful. Directory {TEST_CLEANUP_DIR} exists and is empty."
         )

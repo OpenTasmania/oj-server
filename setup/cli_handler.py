@@ -30,16 +30,18 @@ def cli_prompt_for_rerun(prompt_message: str) -> bool:
         True if the user inputs 'y', False otherwise.
     """
     try:
-        user_input = input(
-            f"   {config.SYMBOLS['info']} {prompt_message} (y/N): "
-        ).strip().lower()
-        return user_input == 'y'
+        user_input = (
+            input(f"   {config.SYMBOLS['info']} {prompt_message} (y/N): ")
+            .strip()
+            .lower()
+        )
+        return user_input == "y"
     except EOFError:  # Handle non-interactive environments or Ctrl+D
         log_map_server(
             f"{config.SYMBOLS['warning']} No user input (EOF), defaulting to "
             f"'N' for prompt: '{prompt_message}'",
             "warning",
-            module_logger
+            module_logger,
         )
         return False
 
@@ -52,19 +54,17 @@ def view_configuration(current_logger: logging.Logger = None) -> None:
         current_logger: The logger instance to use. Defaults to module_logger.
     """
     logger_to_use = current_logger if current_logger else module_logger
-    config_text = (
-        f"{config.SYMBOLS['info']} Current effective configuration values:\n\n"
-    )
+    config_text = f"{config.SYMBOLS['info']} Current effective configuration values:\n\n"
     config_text += f"  ADMIN_GROUP_IP:              {config.ADMIN_GROUP_IP}\n"
     config_text += f"  GTFS_FEED_URL:               {config.GTFS_FEED_URL}\n"
-    config_text += f"  VM_IP_OR_DOMAIN:             {config.VM_IP_OR_DOMAIN}\n"
+    config_text += (
+        f"  VM_IP_OR_DOMAIN:             {config.VM_IP_OR_DOMAIN}\n"
+    )
     config_text += (
         f"  PG_TILESERV_BINARY_LOCATION: "
         f"{config.PG_TILESERV_BINARY_LOCATION}\n"
     )
-    config_text += (
-        f"  LOG_PREFIX (for logger):     {config.LOG_PREFIX}\n\n"
-    )
+    config_text += f"  LOG_PREFIX (for logger):     {config.LOG_PREFIX}\n\n"
     config_text += f"  PGHOST:                      {config.PGHOST}\n"
     config_text += f"  PGPORT:                      {config.PGPORT}\n"
     config_text += f"  PGDATABASE:                  {config.PGDATABASE}\n"
@@ -77,25 +77,25 @@ def view_configuration(current_logger: logging.Logger = None) -> None:
         pg_password_display = "[NOT SET or EMPTY]"
     config_text += f"  PGPASSWORD:                  {pg_password_display}\n\n"
 
-    config_text += f"  STATE_FILE_PATH:             {config.STATE_FILE_PATH}\n"
+    config_text += (
+        f"  STATE_FILE_PATH:             {config.STATE_FILE_PATH}\n"
+    )
     # SCRIPT_HASH would be more relevant than SCRIPT_VERSION here if shown.
     # from setup.state_manager import get_current_script_hash
     # current_hash = get_current_script_hash(
     #    logger_instance=logger_to_use
     # ) or "N/A"
     # config_text += f"  SCRIPT_HASH:                 {current_hash}\n"
-    config_text += (
-        f"  SCRIPT_VERSION (comments):   {config.SCRIPT_VERSION}\n"
-    )
+    config_text += f"  SCRIPT_VERSION (comments):   {config.SCRIPT_VERSION}\n"
     config_text += (
         f"  TIMESTAMP (current view):    "
         f"{datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S')}\n\n"
     )
-    config_text += "You can override these using command-line options (see -h)."
-
-    log_map_server(
-        "Displaying current configuration:", "info", logger_to_use
+    config_text += (
+        "You can override these using command-line options (see -h)."
     )
+
+    log_map_server("Displaying current configuration:", "info", logger_to_use)
     print(f"\n{config_text}\n")
 
 
@@ -125,10 +125,14 @@ def manage_state_interactive(current_logger: logging.Logger = None) -> None:
             else:
                 print("\nNo steps have been marked as completed yet.")
         elif choice == "2":
-            confirm = input(
-                f"{config.SYMBOLS['warning']} Are you sure you want to clear "
-                f"recorded progress from {config.STATE_FILE_PATH}? (yes/NO): "
-            ).strip().lower()
+            confirm = (
+                input(
+                    f"{config.SYMBOLS['warning']} Are you sure you want to clear "
+                    f"recorded progress from {config.STATE_FILE_PATH}? (yes/NO): "
+                )
+                .strip()
+                .lower()
+            )
             if confirm == "yes":
                 # clear_state_file in state_manager handles writing the
                 # current hash.
@@ -178,14 +182,16 @@ def show_menu(
         elif choice == "2":
             manage_state_interactive(current_logger=logger_to_use)
         elif choice == "3":
-            confirm_exit = input(
-                "Are you sure you want to exit? (y/N): "
-            ).strip().lower()
+            confirm_exit = (
+                input("Are you sure you want to exit? (y/N): ")
+                .strip()
+                .lower()
+            )
             if confirm_exit == "y":
                 log_map_server(
                     "Exiting script by user choice from CLI menu.",
                     "info",
-                    logger_to_use
+                    logger_to_use,
                 )
                 break
         else:

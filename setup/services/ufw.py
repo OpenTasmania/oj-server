@@ -81,16 +81,35 @@ def ufw_setup(current_logger: Optional[logging.Logger] = None) -> None:
         # Allow SSH and PostgreSQL from admin IP
         run_elevated_command(
             [
-                "ufw", "allow", "from", config.ADMIN_GROUP_IP, "to", "any",
-                "port", "22", "proto", "tcp", "comment", "SSH from Admin",
+                "ufw",
+                "allow",
+                "from",
+                config.ADMIN_GROUP_IP,
+                "to",
+                "any",
+                "port",
+                "22",
+                "proto",
+                "tcp",
+                "comment",
+                "SSH from Admin",
             ],
             current_logger=logger_to_use,
         )
         run_elevated_command(
             [
-                "ufw", "allow", "from", config.ADMIN_GROUP_IP, "to", "any",
-                "port", "5432", "proto", "tcp",
-                "comment", "PostgreSQL from Admin",
+                "ufw",
+                "allow",
+                "from",
+                config.ADMIN_GROUP_IP,
+                "to",
+                "any",
+                "port",
+                "5432",
+                "proto",
+                "tcp",
+                "comment",
+                "PostgreSQL from Admin",
             ],
             current_logger=logger_to_use,
         )
@@ -121,8 +140,10 @@ def ufw_setup(current_logger: Optional[logging.Logger] = None) -> None:
             current_logger=logger_to_use,
         )
 
-        if status_result.stdout and \
-                "inactive" in status_result.stdout.lower():
+        if (
+            status_result.stdout
+            and "inactive" in status_result.stdout.lower()
+        ):
             # The 'ufw enable' command prompts for confirmation.
             # 'cmd_input="y\n"' provides 'y' followed by a newline.
             run_elevated_command(
@@ -137,7 +158,11 @@ def ufw_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 logger_to_use,
             )
         else:
-            status_output = status_result.stdout.strip() if status_result.stdout else "N/A"
+            status_output = (
+                status_result.stdout.strip()
+                if status_result.stdout
+                else "N/A"
+            )
             log_map_server(
                 f"{config.SYMBOLS['info']} UFW is already active or status "
                 f"not 'inactive'. Status: {status_output}",

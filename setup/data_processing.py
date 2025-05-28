@@ -4,6 +4,7 @@
 Functions for data preparation, including GTFS processing and placeholders
 for tile rendering and website setup.
 """
+
 import logging
 from getpass import getuser
 from grp import getgrgid
@@ -76,8 +77,11 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             # Fallback to GID if group name is not found
             current_group_name = str(getgid())
         run_elevated_command(
-            ["chown", f"{current_user_name}:{current_group_name}",
-             gtfs_log_file],
+            [
+                "chown",
+                f"{current_user_name}:{current_group_name}",
+                gtfs_log_file,
+            ],
             current_logger=logger_to_use,
         )
         log_map_server(
@@ -166,11 +170,16 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
                 run_command(
                     [
                         "psql",
-                        "-h", config.PGHOST,
-                        "-p", config.PGPORT,
-                        "-U", config.PGUSER,
-                        "-d", config.PGDATABASE,
-                        "-c", "SELECT COUNT(*) FROM gtfs_stops;",
+                        "-h",
+                        config.PGHOST,
+                        "-p",
+                        config.PGPORT,
+                        "-U",
+                        config.PGUSER,
+                        "-d",
+                        config.PGDATABASE,
+                        "-c",
+                        "SELECT COUNT(*) FROM gtfs_stops;",
                     ],
                     capture_output=True,
                     current_logger=logger_to_use,
@@ -179,11 +188,16 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
                 run_command(
                     [
                         "psql",
-                        "-h", config.PGHOST,
-                        "-p", config.PGPORT,
-                        "-U", config.PGUSER,
-                        "-d", config.PGDATABASE,
-                        "-c", "SELECT COUNT(*) FROM gtfs_routes;",
+                        "-h",
+                        config.PGHOST,
+                        "-p",
+                        config.PGPORT,
+                        "-U",
+                        config.PGUSER,
+                        "-d",
+                        config.PGDATABASE,
+                        "-c",
+                        "SELECT COUNT(*) FROM gtfs_routes;",
                     ],
                     capture_output=True,
                     current_logger=logger_to_use,
@@ -298,7 +312,8 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
 
         # Avoid duplicate job entries.
         new_crontab_lines = [
-            line for line in existing_crontab_content.splitlines()
+            line
+            for line in existing_crontab_content.splitlines()
             if "gtfs_processor.update_gtfs" not in line
         ]
         new_crontab_content = "\n".join(new_crontab_lines)
@@ -307,7 +322,7 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         new_crontab_content += cron_job_line + "\n"
 
         with NamedTemporaryFile(
-                mode="w", delete=False, prefix="gtfscron_"
+            mode="w", delete=False, prefix="gtfscron_"
         ) as temp_f:
             temp_f.write(new_crontab_content)
             temp_cron_path = temp_f.name
@@ -402,11 +417,11 @@ def data_prep_group(current_logger: logging.Logger) -> bool:
     ]
     for tag, desc, func in step_definitions_in_group:
         if not execute_step(
-                tag,
-                desc,
-                func,
-                logger_to_use,
-                prompt_user_for_rerun=cli_prompt_for_rerun
+            tag,
+            desc,
+            func,
+            logger_to_use,
+            prompt_user_for_rerun=cli_prompt_for_rerun,
         ):
             overall_success = False
             log_map_server(

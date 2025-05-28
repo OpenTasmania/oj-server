@@ -51,9 +51,10 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         "info",
         logger_to_use,
     )
-    script_hash_for_comments = get_current_script_hash(
-        logger_instance=logger_to_use
-    ) or "UNKNOWN_HASH"
+    script_hash_for_comments = (
+        get_current_script_hash(logger_instance=logger_to_use)
+        or "UNKNOWN_HASH"
+    )
 
     # TODO: Make pg_version dynamically detectable or a central config.
     pg_version = "15"
@@ -93,7 +94,11 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         # run_command uses sudo -u postgres internally for psql.
         run_command(
             [
-                "sudo", "-u", "postgres", "psql", "-c",
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-c",
                 f"CREATE USER {config.PGUSER} WITH PASSWORD '{config.PGPASSWORD}';",
             ],
             capture_output=True,  # Capture output to check for "already exists"
@@ -109,15 +114,22 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
             )
             run_command(
                 [
-                    "sudo", "-u", "postgres", "psql", "-c",
+                    "sudo",
+                    "-u",
+                    "postgres",
+                    "psql",
+                    "-c",
                     f"ALTER USER {config.PGUSER} WITH PASSWORD '{config.PGPASSWORD}';",
                 ],
                 capture_output=True,  # Capture to avoid verbose output on success
                 current_logger=logger_to_use,
             )
         else:
-            err_msg = e.stderr.strip() if e.stderr else \
-                "Unknown psql error during user creation."
+            err_msg = (
+                e.stderr.strip()
+                if e.stderr
+                else "Unknown psql error during user creation."
+            )
             log_map_server(
                 f"{config.SYMBOLS['error']} Failed to create/alter PostgreSQL "
                 f"user '{config.PGUSER}'. Error: {err_msg}",
@@ -136,7 +148,11 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         run_command(
             [
-                "sudo", "-u", "postgres", "psql", "-c",
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-c",
                 f"CREATE DATABASE {config.PGDATABASE} WITH OWNER {config.PGUSER} "
                 f"ENCODING 'UTF8' LC_COLLATE='en_AU.UTF-8' "
                 f"LC_CTYPE='en_AU.UTF-8' TEMPLATE template0;",
@@ -153,8 +169,11 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 logger_to_use,
             )
         else:
-            err_msg = e.stderr.strip() if e.stderr else \
-                "Unknown psql error during database creation."
+            err_msg = (
+                e.stderr.strip()
+                if e.stderr
+                else "Unknown psql error during database creation."
+            )
             log_map_server(
                 f"{config.SYMBOLS['error']} Failed to create PostgreSQL "
                 f"database '{config.PGDATABASE}'. Error: {err_msg}",
@@ -174,8 +193,14 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         run_command(
             [
-                "sudo", "-u", "postgres", "psql", "-d", config.PGDATABASE,
-                "-c", f"CREATE EXTENSION IF NOT EXISTS {ext};",
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-d",
+                config.PGDATABASE,
+                "-c",
+                f"CREATE EXTENSION IF NOT EXISTS {ext};",
             ],
             current_logger=logger_to_use,  # Output is usually minimal here
         )
@@ -196,7 +221,16 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
     ]
     for cmd_sql in db_permission_commands:
         run_command(
-            ["sudo", "-u", "postgres", "psql", "-d", config.PGDATABASE, "-c", cmd_sql],
+            [
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-d",
+                config.PGDATABASE,
+                "-c",
+                cmd_sql,
+            ],
             current_logger=logger_to_use,
         )
     log_map_server(
@@ -209,9 +243,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
     # Customize postgresql.conf
     if backup_file(pg_conf_file, current_logger=logger_to_use):
         # Marker to check if customizations have already been applied
-        customisation_marker = (
-            "# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V"
-        )  # Partial marker to find any version
+        customisation_marker = "# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V"  # Partial marker to find any version
         postgresql_custom_conf_content = f"""
 # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash_for_comments} ---
 listen_addresses = '*'
@@ -233,9 +265,13 @@ log_min_duration_statement = 250ms # Log statements slower than this (ms)
             # Check if the customisation marker is already in the file
             grep_result = run_elevated_command(
                 ["grep", "-qF", customisation_marker, pg_conf_file],
-                check=False, capture_output=True, current_logger=logger_to_use,
+                check=False,
+                capture_output=True,
+                current_logger=logger_to_use,
             )
-            if grep_result.returncode != 0:  # Marker not found, append settings
+            if (
+                grep_result.returncode != 0
+            ):  # Marker not found, append settings
                 run_elevated_command(
                     ["tee", "-a", pg_conf_file],  # Append to the file
                     cmd_input=postgresql_custom_conf_content,
@@ -244,30 +280,36 @@ log_min_duration_statement = 250ms # Log statements slower than this (ms)
                 log_map_server(
                     f"{config.SYMBOLS['success']} Appended custom settings to "
                     f"{pg_conf_file}",
-                    "success", logger_to_use
+                    "success",
+                    logger_to_use,
                 )
             else:
                 log_map_server(
                     f"{config.SYMBOLS['info']} Customizations marker already "
                     f"found in {pg_conf_file}. Assuming settings are applied "
                     "or managed manually.",
-                    "info", logger_to_use
+                    "info",
+                    logger_to_use,
                 )
         except Exception as e:
             log_map_server(
                 f"{config.SYMBOLS['error']} Error updating {pg_conf_file}: {e}",
-                "error", logger_to_use
+                "error",
+                logger_to_use,
             )
             # Non-critical, proceed with HBA config
 
     # Customize pg_hba.conf
     if backup_file(pg_hba_file, current_logger=logger_to_use):
-        if not validate_cidr(config.ADMIN_GROUP_IP, current_logger=logger_to_use):
+        if not validate_cidr(
+            config.ADMIN_GROUP_IP, current_logger=logger_to_use
+        ):
             log_map_server(
                 f"{config.SYMBOLS['error']} Invalid ADMIN_GROUP_IP "
                 f"'{config.ADMIN_GROUP_IP}' for pg_hba.conf. "
                 "Skipping HBA update.",
-                "error", logger_to_use
+                "error",
+                logger_to_use,
             )
         else:
             pg_hba_content = f"""# pg_hba.conf configured by script V{script_hash_for_comments}
@@ -300,19 +342,22 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
                 log_map_server(
                     f"{config.SYMBOLS['success']} Overwrote {pg_hba_file} "
                     "with new rules.",
-                    "success", logger_to_use
+                    "success",
+                    logger_to_use,
                 )
             except Exception as e:
                 log_map_server(
                     f"{config.SYMBOLS['error']} Error writing {pg_hba_file}: {e}",
-                    "error", logger_to_use
+                    "error",
+                    logger_to_use,
                 )
                 # pg_hba.conf is critical; consider re-raising if overwrite fails.
 
     # Restart and enable PostgreSQL service
     log_map_server(
         f"{config.SYMBOLS['gear']} Restarting and enabling PostgreSQL service...",
-        "info", logger_to_use
+        "info",
+        logger_to_use,
     )
     run_elevated_command(
         ["systemctl", "restart", "postgresql"], current_logger=logger_to_use
@@ -322,7 +367,8 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
     )
     log_map_server(
         f"{config.SYMBOLS['info']} PostgreSQL service status:",
-        "info", logger_to_use
+        "info",
+        logger_to_use,
     )
     run_elevated_command(
         ["systemctl", "status", "postgresql", "--no-pager", "-l"],
@@ -330,5 +376,6 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
     )
     log_map_server(
         f"{config.SYMBOLS['success']} PostgreSQL setup completed.",
-        "success", logger_to_use
+        "success",
+        logger_to_use,
     )

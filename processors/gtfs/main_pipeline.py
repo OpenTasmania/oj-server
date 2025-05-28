@@ -56,13 +56,13 @@ except ImportError:
         print(
             "CRITICAL: GTFS_FEED_URL environment variable not set and "
             "setup.config.GTFS_FEED_URL could not be imported. Pipeline cannot run.",
-            file=sys.stderr
+            file=sys.stderr,
         )
         # Exit or raise an error to prevent running without a URL
         # For now, let it try to proceed and fail in download if URL is bad.
     GTFS_FEED_URL = os.environ.get(
         "GTFS_FEED_URL",
-        "https://example.com/default_gtfs_feed.zip"  # Placeholder default
+        "https://example.com/default_gtfs_feed.zip",  # Placeholder default
     )
 
 
@@ -74,7 +74,9 @@ module_logger = logging.getLogger(__name__)
 # The `utils.get_db_connection` function will use its defaults if these are
 # not explicitly passed or if environment variables it checks are not set.
 DB_PARAMS: dict[str, str] = {
-    "dbname": os.environ.get("PG_GIS_DB", "gis"),  # Consistent with update_gtfs.py
+    "dbname": os.environ.get(
+        "PG_GIS_DB", "gis"
+    ),  # Consistent with update_gtfs.py
     "user": os.environ.get("PG_OSM_USER", "osmuser"),
     "password": os.environ.get("PG_OSM_PASSWORD", "yourStrongPasswordHere"),
     "host": os.environ.get("PG_HOST", "localhost"),
@@ -86,7 +88,9 @@ TEMP_DOWNLOAD_DIR = Path(
     os.environ.get("GTFS_TEMP_DOWNLOAD_DIR", "/tmp/gtfs_pipeline_downloads")
 )
 TEMP_ZIP_FILENAME = "gtfs_feed.zip"  # Name for the downloaded zip file.
-TEMP_EXTRACT_DIR_NAME = "gtfs_extracted_feed"  # Subdirectory for extracted files.
+TEMP_EXTRACT_DIR_NAME = (
+    "gtfs_extracted_feed"  # Subdirectory for extracted files.
+)
 
 # Full paths for download and extraction.
 TEMP_DOWNLOAD_PATH = TEMP_DOWNLOAD_DIR / TEMP_ZIP_FILENAME
@@ -134,13 +138,21 @@ def run_full_gtfs_etl_pipeline() -> bool:
     conn: Optional[psycopg2.extensions.connection] = None
     try:
         # --- 1. EXTRACT: Download and Unzip GTFS Feed ---
-        module_logger.info("--- Step 1: Downloading and Extracting GTFS Feed ---")
+        module_logger.info(
+            "--- Step 1: Downloading and Extracting GTFS Feed ---"
+        )
         if not download.download_gtfs_feed(GTFS_FEED_URL, TEMP_DOWNLOAD_PATH):
-            module_logger.critical("Failed to download GTFS feed. Pipeline aborted.")
+            module_logger.critical(
+                "Failed to download GTFS feed. Pipeline aborted."
+            )
             return False
 
-        if not download.extract_gtfs_feed(TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH):
-            module_logger.critical("Failed to extract GTFS feed. Pipeline aborted.")
+        if not download.extract_gtfs_feed(
+            TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH
+        ):
+            module_logger.critical(
+                "Failed to extract GTFS feed. Pipeline aborted."
+            )
             return False
         module_logger.info("GTFS feed downloaded and extracted successfully.")
 
@@ -148,7 +160,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
         # `utils.get_db_connection` uses DB_PARAMS or its own defaults.
         conn = utils.get_db_connection(DB_PARAMS)
         if not conn:
-            module_logger.critical("Failed to connect to the database. Pipeline aborted.")
+            module_logger.critical(
+                "Failed to connect to the database. Pipeline aborted."
+            )
             return False
         conn.autocommit = False  # Ensure transactions are managed.
 
@@ -169,11 +183,15 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
         total_records_processed = 0
         total_records_loaded_successfully = 0
-        total_records_sent_to_dlq = 0  # Requires full validate/transform integration
+        total_records_sent_to_dlq = (
+            0  # Requires full validate/transform integration
+        )
 
         # Iterate through GTFS files in a defined load order (from update_gtfs).
         for gtfs_filename in GTFS_LOAD_ORDER:
-            file_schema_definition = schemas.GTFS_FILE_SCHEMAS.get(gtfs_filename)
+            file_schema_definition = schemas.GTFS_FILE_SCHEMAS.get(
+                gtfs_filename
+            )
             if not file_schema_definition:
                 module_logger.warning(
                     f"No schema definition found for '{gtfs_filename}' in "
@@ -198,21 +216,26 @@ def run_full_gtfs_etl_pipeline() -> bool:
                 # Read all as string initially to preserve original values for validation.
                 raw_df = pd.read_csv(
                     file_path_on_disk,
-                    dtype='str',
+                    dtype="str",
                     keep_default_na=False,  # Keep empty strings as is
-                    na_values=[""],  # Treat empty strings as NA for some ops if needed later
+                    na_values=[
+                        ""
+                    ],  # Treat empty strings as NA for some ops if needed later
                 )
                 module_logger.info(
                     f"Read {len(raw_df)} raw records from {gtfs_filename}."
                 )
                 total_records_processed += len(raw_df)
             except pd.errors.EmptyDataError:
-                module_logger.info(f"File {gtfs_filename} is empty. Skipping.")
+                module_logger.info(
+                    f"File {gtfs_filename} is empty. Skipping."
+                )
                 continue
             except Exception as e_read:
                 module_logger.error(
                     f"Failed to read {gtfs_filename} into DataFrame: {e_read}. "
-                    "Skipping file.", exc_info=True
+                    "Skipping file.",
+                    exc_info=True,
                 )
                 # Optionally, log this file itself to a "failed files" log/table.
                 continue
@@ -249,11 +272,15 @@ def run_full_gtfs_etl_pipeline() -> bool:
             # For this simplified pipeline structure, we'll do basic column selection
             # and pass to load.py, assuming more complex V&T is done by a dedicated processor.
             # This placeholder logic prepares the DataFrame for the current `load.py`.
-            df_for_loading = raw_df  # Placeholder: should be output of transform.py
+            df_for_loading = (
+                raw_df  # Placeholder: should be output of transform.py
+            )
 
             # Prepare DataFrame columns based on schema for loading.
             # This logic might be better inside transform.py or load.py.
-            schema_cols = list(file_schema_definition.get("columns", {}).keys())
+            schema_cols = list(
+                file_schema_definition.get("columns", {}).keys()
+            )
             df_cols_to_load = [
                 col for col in schema_cols if col in df_for_loading.columns
             ]
@@ -268,7 +295,10 @@ def run_full_gtfs_etl_pipeline() -> bool:
             geom_config = file_schema_definition.get("geom_config")
             if geom_config:
                 geom_col_name = geom_config.get("geom_col")
-                if geom_col_name and geom_col_name not in final_df_for_loading.columns:
+                if (
+                    geom_col_name
+                    and geom_col_name not in final_df_for_loading.columns
+                ):
                     # This implies transform.py would create this column with WKT strings.
                     final_df_for_loading[geom_col_name] = None
 
@@ -286,7 +316,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
                 dlq_table_name=f"dlq_{file_schema_definition['db_table_name']}",
             )
             total_records_loaded_successfully += loaded_count
-            total_records_sent_to_dlq += dlq_count_from_load  # Basic DLQ from load.py
+            total_records_sent_to_dlq += (
+                dlq_count_from_load  # Basic DLQ from load.py
+            )
 
         # After all tables are loaded, attempt to create foreign keys.
         module_logger.info("--- Adding Foreign Keys ---")
@@ -306,7 +338,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
         )
         return True
 
-    except ValueError as ve:  # E.g., config error from download_and_extract_gtfs
+    except (
+        ValueError
+    ) as ve:  # E.g., config error from download_and_extract_gtfs
         module_logger.critical(f"Configuration Error in pipeline: {ve}")
         if conn:
             conn.rollback()
@@ -350,16 +384,21 @@ if __name__ == "__main__":
     utils.setup_logging(log_level=logging.INFO)
 
     # Check critical environment variables for direct execution.
-    if (GTFS_FEED_URL == "https://example.com/default_gtfs_feed.zip" and
-            os.environ.get("GTFS_FEED_URL", "").strip() == ""):
+    if (
+        GTFS_FEED_URL == "https://example.com/default_gtfs_feed.zip"
+        and os.environ.get("GTFS_FEED_URL", "").strip() == ""
+    ):
         module_logger.warning(
             "CRITICAL: GTFS_FEED_URL is a placeholder or not set. "
             "Pipeline might fail at download."
         )
-        module_logger.warning("Set it like: export GTFS_FEED_URL='your_actual_url'")
+        module_logger.warning(
+            "Set it like: export GTFS_FEED_URL='your_actual_url'"
+        )
 
-    if (DB_PARAMS["password"] == "yourStrongPasswordHere" and
-            not os.environ.get("PG_OSM_PASSWORD")):
+    if DB_PARAMS[
+        "password"
+    ] == "yourStrongPasswordHere" and not os.environ.get("PG_OSM_PASSWORD"):
         module_logger.warning(
             "CRITICAL: PostgreSQL password is a placeholder in DB_PARAMS and "
             "PG_OSM_PASSWORD env var is not set."
@@ -371,6 +410,10 @@ if __name__ == "__main__":
 
     pipeline_succeeded = run_full_gtfs_etl_pipeline()
     if pipeline_succeeded:
-        module_logger.info("Main pipeline execution completed successfully (from __main__ call).")
+        module_logger.info(
+            "Main pipeline execution completed successfully (from __main__ call)."
+        )
     else:
-        module_logger.error("Main pipeline execution failed (from __main__ call).")
+        module_logger.error(
+            "Main pipeline execution failed (from __main__ call)."
+        )

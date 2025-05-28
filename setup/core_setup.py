@@ -49,11 +49,16 @@ def boot_verbosity(current_logger: Optional[logging.Logger] = None) -> None:
         try:
             # SED expressions to remove 'quiet' and 'splash' from GRUB config.
             sed_expressions = [
-                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bquiet\b//g",
-                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bsplash\b//g",
-                r"-e", r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/  +/ /g",  # Compact spaces
-                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/" /"/g',  # Trim leading space in value
-                r"-e", r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g',  # Trim trailing space in value
+                r"-e",
+                r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bquiet\b//g",
+                r"-e",
+                r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/\bsplash\b//g",
+                r"-e",
+                r"/^GRUB_CMDLINE_LINUX_DEFAULT=/s/  +/ /g",  # Compact spaces
+                r"-e",
+                r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/" /"/g',  # Trim leading space in value
+                r"-e",
+                r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g',  # Trim trailing space in value
             ]
             run_elevated_command(
                 ["sed", "-i"] + sed_expressions + [grub_file],
@@ -124,8 +129,14 @@ def boot_verbosity(current_logger: Optional[logging.Logger] = None) -> None:
             ["apt", "--yes", "upgrade"], current_logger=logger_to_use
         )
         essential_utils = [
-            "curl", "wget", "bash", "btop", "screen",
-            "ca-certificates", "lsb-release", "gnupg",
+            "curl",
+            "wget",
+            "bash",
+            "btop",
+            "screen",
+            "ca-certificates",
+            "lsb-release",
+            "gnupg",
         ]
         run_elevated_command(
             ["apt", "--yes", "install"] + essential_utils,
@@ -148,7 +159,7 @@ def boot_verbosity(current_logger: Optional[logging.Logger] = None) -> None:
 
 
 def core_conflict_removal(
-    current_logger: Optional[logging.Logger] = None
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Remove potentially conflicting system-installed Node.js packages.
@@ -312,7 +323,7 @@ def docker_install(current_logger: Optional[logging.Logger] = None) -> None:
         )
         # Create a temporary file for the GPG key.
         with tempfile.NamedTemporaryFile(
-                delete=False, prefix="dockerkey_", suffix=".asc"
+            delete=False, prefix="dockerkey_", suffix=".asc"
         ) as temp_f:
             key_dest_tmp = temp_f.name
         # Download the key.
@@ -361,13 +372,17 @@ def docker_install(current_logger: Optional[logging.Logger] = None) -> None:
         # Determine system architecture and Debian codename.
         arch_result = run_command(
             ["dpkg", "--print-architecture"],
-            capture_output=True, check=True, current_logger=logger_to_use
+            capture_output=True,
+            check=True,
+            current_logger=logger_to_use,
         )
         arch = arch_result.stdout.strip()
 
         codename_result = run_command(
             ["lsb_release", "-cs"],
-            capture_output=True, check=True, current_logger=logger_to_use
+            capture_output=True,
+            check=True,
+            current_logger=logger_to_use,
         )
         codename = codename_result.stdout.strip()
     except Exception as e:
@@ -413,8 +428,11 @@ def docker_install(current_logger: Optional[logging.Logger] = None) -> None:
     run_elevated_command(["apt", "update"], current_logger=logger_to_use)
 
     docker_packages_list = [
-        "docker-ce", "docker-ce-cli", "containerd.io",
-        "docker-buildx-plugin", "docker-compose-plugin",
+        "docker-ce",
+        "docker-ce-cli",
+        "containerd.io",
+        "docker-buildx-plugin",
+        "docker-compose-plugin",
     ]
     log_map_server(
         f"{config.SYMBOLS['package']} Installing Docker packages: "
@@ -468,11 +486,11 @@ def docker_install(current_logger: Optional[logging.Logger] = None) -> None:
     )
     run_elevated_command(
         ["systemctl", "enable", "docker.service"],
-        current_logger=logger_to_use
+        current_logger=logger_to_use,
     )
     run_elevated_command(
         ["systemctl", "enable", "containerd.service"],
-        current_logger=logger_to_use
+        current_logger=logger_to_use,
     )
     run_elevated_command(
         ["systemctl", "start", "docker.service"], current_logger=logger_to_use
@@ -485,7 +503,7 @@ def docker_install(current_logger: Optional[logging.Logger] = None) -> None:
 
 
 def node_js_lts_install(
-    current_logger: Optional[logging.Logger] = None
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Install Node.js LTS (Long Term Support) version using NodeSource repository.
@@ -549,15 +567,21 @@ def node_js_lts_install(
         # Verify installation by checking versions.
         node_version = (
             run_command(
-                ["node", "--version"], capture_output=True, check=False,
-                current_logger=logger_to_use
-            ).stdout.strip() or "Not detected"
+                ["node", "--version"],
+                capture_output=True,
+                check=False,
+                current_logger=logger_to_use,
+            ).stdout.strip()
+            or "Not detected"
         )
         npm_version = (
             run_command(
-                ["npm", "--version"], capture_output=True, check=False,
-                current_logger=logger_to_use
-            ).stdout.strip() or "Not detected"
+                ["npm", "--version"],
+                capture_output=True,
+                check=False,
+                current_logger=logger_to_use,
+            ).stdout.strip()
+            or "Not detected"
         )
         log_map_server(
             f"{config.SYMBOLS['success']} Node.js installed. Version: "
@@ -574,9 +598,7 @@ def node_js_lts_install(
         raise  # Node.js might be critical for Carto or other tools.
 
 
-def core_conflict_removal_group(
-    current_logger: logging.Logger
-) -> bool:
+def core_conflict_removal_group(current_logger: logging.Logger) -> bool:
     """
     Execute the core conflict removal step as a group.
 
@@ -598,7 +620,7 @@ def core_conflict_removal_group(
         step_description="Remove Core Conflicts (e.g. system node)",
         step_function=core_conflict_removal,
         current_logger_instance=logger_to_use,
-        prompt_user_for_rerun=cli_prompt_for_rerun
+        prompt_user_for_rerun=cli_prompt_for_rerun,
     )
     log_map_server(
         f"--- {config.SYMBOLS['info']} Core Conflict Removal Group Finished "
@@ -632,12 +654,18 @@ def prereqs_install_group(current_logger: logging.Logger) -> bool:
 
     overall_success = True
     steps_in_group = [
-        ("BOOT_VERBOSITY", "Improve Boot Verbosity & Core Utils",
-         boot_verbosity),
+        (
+            "BOOT_VERBOSITY",
+            "Improve Boot Verbosity & Core Utils",
+            boot_verbosity,
+        ),
         ("CORE_INSTALL", "Install Core System Packages", core_install),
         ("DOCKER_INSTALL", "Install Docker Engine", docker_install),
-        ("NODEJS_INSTALL", "Install Node.js (LTS from NodeSource)",
-         node_js_lts_install),
+        (
+            "NODEJS_INSTALL",
+            "Install Node.js (LTS from NodeSource)",
+            node_js_lts_install,
+        ),
     ]
 
     for tag, desc, func in steps_in_group:
@@ -646,7 +674,7 @@ def prereqs_install_group(current_logger: logging.Logger) -> bool:
             step_description=desc,
             step_function=func,
             current_logger_instance=logger_to_use,
-            prompt_user_for_rerun=cli_prompt_for_rerun
+            prompt_user_for_rerun=cli_prompt_for_rerun,
         ):
             overall_success = False
             log_map_server(

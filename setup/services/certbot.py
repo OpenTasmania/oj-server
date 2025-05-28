@@ -53,10 +53,12 @@ def certbot_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     # Validate VM_IP_OR_DOMAIN before proceeding.
     domain_to_certify = config.VM_IP_OR_DOMAIN
-    is_default_domain = (domain_to_certify == config.VM_IP_OR_DOMAIN_DEFAULT)
+    is_default_domain = domain_to_certify == config.VM_IP_OR_DOMAIN_DEFAULT
     # Regex to check if it's likely an IP address (IPv4).
     is_ip_address = bool(
-        re.fullmatch(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", domain_to_certify)
+        re.fullmatch(
+            r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", domain_to_certify
+        )
     )
     is_localhost = domain_to_certify.lower() == "localhost"
     # Basic FQDN check: must contain at least one dot and not be an IP.
@@ -105,7 +107,7 @@ def certbot_setup(current_logger: Optional[logging.Logger] = None) -> None:
     # Generate a plausible admin email based on the domain.
     # Assumes the domain has at least one part before the TLD, e.g., example.com
     # For very short domains like `co.uk` this might not be ideal, but generally works.
-    domain_parts = domain_to_certify.split('.')
+    domain_parts = domain_to_certify.split(".")
     if len(domain_parts) >= 2:
         # Use the last two parts for a generic email, e.g., admin@example.com
         email_domain_part = f"{domain_parts[-2]}.{domain_parts[-1]}"
@@ -124,10 +126,12 @@ def certbot_setup(current_logger: Optional[logging.Logger] = None) -> None:
     certbot_cmd = [
         "certbot",
         "--nginx",  # Use the Nginx plugin.
-        "-d", domain_to_certify,  # Domain to certify.
+        "-d",
+        domain_to_certify,  # Domain to certify.
         "--non-interactive",  # Run without interactive prompts.
         "--agree-tos",  # Agree to Let's Encrypt Terms of Service.
-        "--email", admin_email,  # Email for registration and renewal notices.
+        "--email",
+        admin_email,  # Email for registration and renewal notices.
         "--redirect",  # Automatically redirect HTTP to HTTPS.
         # Consider these for enhanced security if appropriate for your setup:
         # "--hsts", # HTTP Strict Transport Security

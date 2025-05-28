@@ -74,16 +74,35 @@ def ufw_setup(current_logger: Optional[logging.Logger] = None) -> None:
         # Allow specific services
         run_elevated_command(
             [
-                "ufw", "allow", "from", config.ADMIN_GROUP_IP, "to", "any",
-                "port", "22", "proto", "tcp", "comment", "SSH from Admin",
+                "ufw",
+                "allow",
+                "from",
+                config.ADMIN_GROUP_IP,
+                "to",
+                "any",
+                "port",
+                "22",
+                "proto",
+                "tcp",
+                "comment",
+                "SSH from Admin",
             ],
             current_logger=logger_to_use,
         )
         run_elevated_command(
             [
-                "ufw", "allow", "from", config.ADMIN_GROUP_IP, "to", "any",
-                "port", "5432", "proto", "tcp",
-                "comment", "PostgreSQL from Admin",
+                "ufw",
+                "allow",
+                "from",
+                config.ADMIN_GROUP_IP,
+                "to",
+                "any",
+                "port",
+                "5432",
+                "proto",
+                "tcp",
+                "comment",
+                "PostgreSQL from Admin",
             ],
             current_logger=logger_to_use,
         )
@@ -110,8 +129,10 @@ def ufw_setup(current_logger: Optional[logging.Logger] = None) -> None:
             check=False,  # Don't fail if status command itself has issues
             current_logger=logger_to_use,
         )
-        if status_result.stdout and \
-           "inactive" in status_result.stdout.lower():
+        if (
+            status_result.stdout
+            and "inactive" in status_result.stdout.lower()
+        ):
             run_elevated_command(
                 ["ufw", "enable"],
                 cmd_input="y\n",  # Auto-confirm the enabling prompt
@@ -124,7 +145,11 @@ def ufw_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 logger_to_use,
             )
         else:
-            status_output = status_result.stdout.strip() if status_result.stdout else "N/A"
+            status_output = (
+                status_result.stdout.strip()
+                if status_result.stdout
+                else "N/A"
+            )
             log_map_server(
                 f"{config.SYMBOLS['info']} UFW is already active or status "
                 f"not 'inactive'. Status: {status_output}",
@@ -211,7 +236,11 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         # The command itself uses `sudo -u postgres psql ...`
         run_elevated_command(
             [
-                "sudo", "-u", "postgres", "psql", "-c",
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-c",
                 f"CREATE USER {config.PGUSER} WITH PASSWORD '{config.PGPASSWORD}';",
             ],
             current_logger=logger_to_use,
@@ -226,7 +255,11 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
             )
             run_elevated_command(
                 [
-                    "sudo", "-u", "postgres", "psql", "-c",
+                    "sudo",
+                    "-u",
+                    "postgres",
+                    "psql",
+                    "-c",
                     f"ALTER USER {config.PGUSER} WITH PASSWORD '{config.PGPASSWORD}';",
                 ],
                 current_logger=logger_to_use,
@@ -250,7 +283,11 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         run_elevated_command(
             [
-                "sudo", "-u", "postgres", "psql", "-c",
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-c",
                 f"CREATE DATABASE {config.PGDATABASE} WITH OWNER {config.PGUSER} "
                 f"ENCODING 'UTF8' LC_COLLATE='en_AU.UTF-8' "
                 f"LC_CTYPE='en_AU.UTF-8' TEMPLATE template0;",
@@ -285,8 +322,14 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         run_elevated_command(
             [
-                "sudo", "-u", "postgres", "psql", "-d", config.PGDATABASE,
-                "-c", f"CREATE EXTENSION IF NOT EXISTS {ext};",
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-d",
+                config.PGDATABASE,
+                "-c",
+                f"CREATE EXTENSION IF NOT EXISTS {ext};",
             ],
             current_logger=logger_to_use,
         )
@@ -307,7 +350,16 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
     ]
     for cmd_sql in db_permission_commands:
         run_elevated_command(
-            ["sudo", "-u", "postgres", "psql", "-d", config.PGDATABASE, "-c", cmd_sql],
+            [
+                "sudo",
+                "-u",
+                "postgres",
+                "psql",
+                "-d",
+                config.PGDATABASE,
+                "-c",
+                cmd_sql,
+            ],
             current_logger=logger_to_use,
         )
     log_map_server(
@@ -325,7 +377,9 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
         # Check if customizations already exist
         grep_result = run_elevated_command(
             ["grep", "-qF", customisation_marker, pg_conf_file],
-            check=False, capture_output=True, current_logger=logger_to_use,
+            check=False,
+            capture_output=True,
+            current_logger=logger_to_use,
         )
         if grep_result.returncode != 0:  # Marker not found, append settings
             # Define postgresql_custom_conf_content based on your requirements
@@ -353,23 +407,28 @@ log_min_duration_statement = 250ms
             )
             log_map_server(
                 f"{config.SYMBOLS['success']} Appended custom settings to {pg_conf_file}",
-                "success", logger_to_use
+                "success",
+                logger_to_use,
             )
         else:
             log_map_server(
                 f"{config.SYMBOLS['info']} Customizations marker already found "
                 f"in {pg_conf_file}. Assuming settings are applied or "
                 "managed manually.",
-                "info", logger_to_use
+                "info",
+                logger_to_use,
             )
 
     # Customize pg_hba.conf
     if backup_file(pg_hba_file, current_logger=logger_to_use):
-        if not validate_cidr(config.ADMIN_GROUP_IP, current_logger=logger_to_use):
+        if not validate_cidr(
+            config.ADMIN_GROUP_IP, current_logger=logger_to_use
+        ):
             log_map_server(
                 f"{config.SYMBOLS['error']} Invalid ADMIN_GROUP_IP "
                 f"'{config.ADMIN_GROUP_IP}' for pg_hba.conf. Skipping HBA update.",
-                "error", logger_to_use
+                "error",
+                logger_to_use,
             )
         else:
             # Define pg_hba_content based on your security requirements
@@ -391,13 +450,15 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
             )
             log_map_server(
                 f"{config.SYMBOLS['success']} Overwrote {pg_hba_file} with new rules.",
-                "success", logger_to_use
+                "success",
+                logger_to_use,
             )
 
     # Restart PostgreSQL service
     log_map_server(
         f"{config.SYMBOLS['gear']} Restarting and enabling PostgreSQL service...",
-        "info", logger_to_use
+        "info",
+        logger_to_use,
     )
     run_elevated_command(
         ["systemctl", "restart", "postgresql"], current_logger=logger_to_use
@@ -406,7 +467,9 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
         ["systemctl", "enable", "postgresql"], current_logger=logger_to_use
     )
     log_map_server(
-        f"{config.SYMBOLS['info']} PostgreSQL service status:", "info", logger_to_use
+        f"{config.SYMBOLS['info']} PostgreSQL service status:",
+        "info",
+        logger_to_use,
     )
     run_elevated_command(
         ["systemctl", "status", "postgresql", "--no-pager", "-l"],
@@ -414,12 +477,13 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
     )
     log_map_server(
         f"{config.SYMBOLS['success']} PostgreSQL setup completed.",
-        "success", logger_to_use
+        "success",
+        logger_to_use,
     )
 
 
 def pg_tileserv_setup(
-    current_logger: Optional[logging.Logger] = None
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Placeholder for pg_tileserv setup.
@@ -461,6 +525,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
 # nginx_setup, certbot_setup.
 # These should be defined similarly, taking current_logger as an argument.
 
+
 def services_setup_group(current_logger: logging.Logger) -> bool:
     """
     Run all service setup steps as a group.
@@ -483,7 +548,11 @@ def services_setup_group(current_logger: logging.Logger) -> bool:
     # Ensure function references are correct and they expect `current_logger`.
     step_definitions_in_group: List[Tuple[str, str, Callable]] = [
         ("UFW_SETUP", "Setup UFW Firewall", ufw_setup),
-        ("POSTGRES_SETUP", "Setup PostgreSQL Database & User", postgres_setup),
+        (
+            "POSTGRES_SETUP",
+            "Setup PostgreSQL Database & User",
+            postgres_setup,
+        ),
         ("PGTILESERV_SETUP", "Setup pg_tileserv", pg_tileserv_setup),
         ("CARTO_SETUP", "Setup CartoCSS Compiler & OSM Style", carto_setup),
         # TODO: Add other service setup functions here when implemented.
@@ -496,7 +565,7 @@ def services_setup_group(current_logger: logging.Logger) -> bool:
             step_description=desc,
             step_function=func,  # type: ignore
             current_logger_instance=logger_to_use,
-            prompt_user_for_rerun=cli_prompt_for_rerun
+            prompt_user_for_rerun=cli_prompt_for_rerun,
         ):
             overall_success = False
             log_map_server(

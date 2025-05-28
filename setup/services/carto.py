@@ -91,8 +91,8 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         carto_version = (
             carto_version_result.stdout.strip()
-            if carto_version_result.returncode == 0 and
-               carto_version_result.stdout
+            if carto_version_result.returncode == 0
+            and carto_version_result.stdout
             else "Not found or error determining version"
         )
         log_map_server(
@@ -133,7 +133,10 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         )
         run_elevated_command(
             [
-                "git", "clone", "--depth", "1",  # Shallow clone for speed
+                "git",
+                "clone",
+                "--depth",
+                "1",  # Shallow clone for speed
                 "https://github.com/gravitystorm/openstreetmap-carto.git",
                 osm_carto_base_dir,
             ],
@@ -164,8 +167,12 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         logger_to_use,
     )
     run_elevated_command(
-        ["chown", "-R", f"{current_user}:{current_group_name}",
-         osm_carto_base_dir],
+        [
+            "chown",
+            "-R",
+            f"{current_user}:{current_group_name}",
+            osm_carto_base_dir,
+        ],
         current_logger=logger_to_use,
     )
 
@@ -246,8 +253,10 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
         if mapnik_xml_created_successfully:
             mapnik_xml_path = os.path.join(os.getcwd(), "mapnik.xml")
-            if os.path.isfile(mapnik_xml_path) and \
-               os.path.getsize(mapnik_xml_path) > 0:
+            if (
+                os.path.isfile(mapnik_xml_path)
+                and os.path.getsize(mapnik_xml_path) > 0
+            ):
                 mapnik_style_target_dir = (
                     "/usr/local/share/maps/style/openstreetmap-carto"
                 )
@@ -256,8 +265,11 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                     current_logger=logger_to_use,
                 )
                 run_elevated_command(
-                    ["cp", "mapnik.xml",
-                     os.path.join(mapnik_style_target_dir, "mapnik.xml")],
+                    [
+                        "cp",
+                        "mapnik.xml",
+                        os.path.join(mapnik_style_target_dir, "mapnik.xml"),
+                    ],
                     current_logger=logger_to_use,
                 )
                 log_map_server(

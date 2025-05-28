@@ -241,9 +241,9 @@ def setup_pgpass(
     if pg_password and pg_password != pg_password_default:
         can_create_pgpass = True
     elif (
-        pg_password and
-        pg_password == pg_password_default and
-        allow_default_for_dev
+        pg_password
+        and pg_password == pg_password_default
+        and allow_default_for_dev
     ):
         log_map_server(
             f"{config.SYMBOLS['warning']} DEV OVERRIDE: Proceeding with "
@@ -322,7 +322,8 @@ def setup_pgpass(
             f"{str(pg_user)}:"
         )
         updated_pgpass_content_lines = [
-            line for line in current_pgpass_lines
+            line
+            for line in current_pgpass_lines
             if not line.startswith(prefix_to_filter)
         ]
         # Add the new or updated entry.
@@ -434,12 +435,12 @@ def calculate_project_hash(
                 f"{config.SYMBOLS['error']} Project root directory "
                 f"'{project_root}' not found for hashing.",
                 "error",
-                logger_to_use
+                logger_to_use,
             )
             return None
 
         # Recursively find all .py files.
-        for path_object in project_root.rglob('*.py'):
+        for path_object in project_root.rglob("*.py"):
             if path_object.is_file():
                 py_files_found.append(path_object)
 
@@ -448,7 +449,7 @@ def calculate_project_hash(
                 f"{config.SYMBOLS['warning']} No .py files found under "
                 f"'{project_root}' for hashing.",
                 "warning",
-                logger_to_use
+                logger_to_use,
             )
             # Return a default hash for an empty set of files.
             return hasher.hexdigest()
@@ -457,7 +458,7 @@ def calculate_project_hash(
         # Convert to relative paths from project_root for hashing filenames.
         sorted_files = sorted(
             py_files_found,
-            key=lambda p: p.relative_to(project_root).as_posix()
+            key=lambda p: p.relative_to(project_root).as_posix(),
         )
 
         for file_path in sorted_files:
@@ -466,7 +467,7 @@ def calculate_project_hash(
                 relative_path_str = file_path.relative_to(
                     project_root
                 ).as_posix()
-                hasher.update(relative_path_str.encode('utf-8'))
+                hasher.update(relative_path_str.encode("utf-8"))
 
                 # Add file content to the hash.
                 file_content = file_path.read_bytes()
@@ -476,7 +477,7 @@ def calculate_project_hash(
                     f"{config.SYMBOLS['error']} Error reading file "
                     f"{file_path} for hashing: {e_file}",
                     "error",
-                    logger_to_use
+                    logger_to_use,
                 )
                 return None  # Error during hashing a specific file.
 
@@ -485,7 +486,7 @@ def calculate_project_hash(
             f"{config.SYMBOLS['debug']} Calculated SCRIPT_HASH: {final_hash} "
             f"from {len(sorted_files)} .py files.",
             "debug",  # Changed to debug as this is verbose for normal runs
-            logger_to_use
+            logger_to_use,
         )
         return final_hash
 
@@ -494,6 +495,6 @@ def calculate_project_hash(
             f"{config.SYMBOLS['error']} Critical error during project "
             f"hashing: {e_hash}",
             "error",
-            logger_to_use
+            logger_to_use,
         )
         return None

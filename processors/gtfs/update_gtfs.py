@@ -86,7 +86,11 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "agency.txt": {
         "table_name": "gtfs_agency",
         "columns": [
-            ("agency_id", "TEXT", "PRIMARY KEY"),  # Conditionally optional in spec
+            (
+                "agency_id",
+                "TEXT",
+                "PRIMARY KEY",
+            ),  # Conditionally optional in spec
             ("agency_name", "TEXT", "NOT NULL"),
             ("agency_url", "TEXT", "NOT NULL"),
             ("agency_timezone", "TEXT", "NOT NULL"),
@@ -96,7 +100,9 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             ("agency_email", "TEXT", ""),
         ],
         "required_fields_in_file": [  # Fields that must be present in the CSV header
-            "agency_name", "agency_url", "agency_timezone",
+            "agency_name",
+            "agency_url",
+            "agency_timezone",
         ],
     },
     "stops.txt": {
@@ -106,25 +112,47 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             ("stop_code", "TEXT", ""),
             ("stop_name", "TEXT", ""),  # Conditionally required by spec
             ("stop_desc", "TEXT", ""),
-            ("stop_lat", "DOUBLE PRECISION", ""),  # Required if location_type is 0 or 1
-            ("stop_lon", "DOUBLE PRECISION", ""),  # Required if location_type is 0 or 1
+            (
+                "stop_lat",
+                "DOUBLE PRECISION",
+                "",
+            ),  # Required if location_type is 0 or 1
+            (
+                "stop_lon",
+                "DOUBLE PRECISION",
+                "",
+            ),  # Required if location_type is 0 or 1
             ("zone_id", "TEXT", ""),
             ("stop_url", "TEXT", ""),
             ("location_type", "INTEGER", ""),  # 0-4
             ("parent_station", "TEXT", ""),  # FK to stops.stop_id
             ("stop_timezone", "TEXT", ""),
             ("wheelchair_boarding", "INTEGER", ""),  # 0, 1, or 2
-            ("geom", "GEOMETRY(Point, 4326)", ""),  # Derived from stop_lat, stop_lon
+            (
+                "geom",
+                "GEOMETRY(Point, 4326)",
+                "",
+            ),  # Derived from stop_lat, stop_lon
         ],
-        "required_fields_in_file": ["stop_id"],  # stop_lat, stop_lon are also key
+        "required_fields_in_file": [
+            "stop_id"
+        ],  # stop_lat, stop_lon are also key
     },
     "routes.txt": {
         "table_name": "gtfs_routes",
         "columns": [
             ("route_id", "TEXT", "PRIMARY KEY"),
-            ("agency_id", "TEXT", ""),  # FK to agency.agency_id, cond. required
+            (
+                "agency_id",
+                "TEXT",
+                "",
+            ),  # FK to agency.agency_id, cond. required
             ("route_short_name", "TEXT", "DEFAULT ''"),
-            ("route_long_name", "TEXT", "DEFAULT ''"),  # One of short/long must be provided
+            (
+                "route_long_name",
+                "TEXT",
+                "DEFAULT ''",
+            ),  # One of short/long must be provided
             ("route_desc", "TEXT", ""),
             ("route_type", "INTEGER", "NOT NULL"),  # Defined set of integers
             ("route_url", "TEXT", ""),
@@ -138,13 +166,21 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "table_name": "gtfs_trips",
         "columns": [
             ("route_id", "TEXT", "NOT NULL"),  # FK to routes.route_id
-            ("service_id", "TEXT", "NOT NULL"),  # FK to calendar.service_id or calendar_dates.service_id
+            (
+                "service_id",
+                "TEXT",
+                "NOT NULL",
+            ),  # FK to calendar.service_id or calendar_dates.service_id
             ("trip_id", "TEXT", "PRIMARY KEY"),
             ("trip_headsign", "TEXT", ""),
             ("trip_short_name", "TEXT", ""),
             ("direction_id", "INTEGER", ""),  # 0 or 1
             ("block_id", "TEXT", ""),
-            ("shape_id", "TEXT", ""),  # FK to shapes.shape_id (from shapes.txt)
+            (
+                "shape_id",
+                "TEXT",
+                "",
+            ),  # FK to shapes.shape_id (from shapes.txt)
             ("wheelchair_accessible", "INTEGER", ""),  # 0, 1, or 2
             ("bikes_allowed", "INTEGER", ""),  # 0, 1, or 2
         ],
@@ -157,7 +193,11 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             ("arrival_time", "TEXT", ""),  # HH:MM:SS format
             ("departure_time", "TEXT", ""),  # HH:MM:SS format
             ("stop_id", "TEXT", "NOT NULL"),  # FK to stops.stop_id
-            ("stop_sequence", "INTEGER", "NOT NULL"),  # Non-negative, increasing
+            (
+                "stop_sequence",
+                "INTEGER",
+                "NOT NULL",
+            ),  # Non-negative, increasing
             ("stop_headsign", "TEXT", ""),
             ("pickup_type", "INTEGER", ""),  # 0-3
             ("drop_off_type", "INTEGER", ""),  # 0-3
@@ -183,8 +223,16 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             ("end_date", "TEXT", "NOT NULL"),  # YYYYMMDD
         ],
         "required_fields_in_file": [
-            "service_id", "monday", "tuesday", "wednesday", "thursday",
-            "friday", "saturday", "sunday", "start_date", "end_date",
+            "service_id",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+            "start_date",
+            "end_date",
         ],
     },
     "calendar_dates.txt": {  # Conditionally required file
@@ -203,12 +251,19 @@ GTFS_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             ("shape_id", "TEXT", "NOT NULL"),
             ("shape_pt_lat", "DOUBLE PRECISION", "NOT NULL"),
             ("shape_pt_lon", "DOUBLE PRECISION", "NOT NULL"),
-            ("shape_pt_sequence", "INTEGER", "NOT NULL"),  # Non-negative, increasing
+            (
+                "shape_pt_sequence",
+                "INTEGER",
+                "NOT NULL",
+            ),  # Non-negative, increasing
             ("shape_dist_traveled", "DOUBLE PRECISION", ""),  # Non-negative
         ],
         "composite_pk": ["shape_id", "shape_pt_sequence"],
         "required_fields_in_file": [
-            "shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence",
+            "shape_id",
+            "shape_pt_lat",
+            "shape_pt_lon",
+            "shape_pt_sequence",
         ],
     },
     # Other optional files like fare_attributes.txt, fare_rules.txt,
@@ -221,9 +276,9 @@ GTFS_LOAD_ORDER: List[str] = [
     "agency.txt",
     "stops.txt",
     "routes.txt",
-    "calendar.txt",       # Must be loaded before trips if trips reference its service_ids
+    "calendar.txt",  # Must be loaded before trips if trips reference its service_ids
     "calendar_dates.txt",  # Must be loaded before trips for same reason
-    "shapes.txt",         # For shape points, lines aggregated later
+    "shapes.txt",  # For shape points, lines aggregated later
     "trips.txt",
     "stop_times.txt",
     # Add other files like frequencies.txt, transfers.txt here if supported.
@@ -232,13 +287,49 @@ GTFS_LOAD_ORDER: List[str] = [
 # Defines foreign key relationships between GTFS tables.
 # Format: (from_table, [from_columns], to_table, [to_columns], fk_name)
 GTFS_FOREIGN_KEYS: List[Tuple[str, List[str], str, List[str], str]] = [
-    ("gtfs_routes", ["agency_id"], "gtfs_agency", ["agency_id"], "fk_routes_agency_id"),
-    ("gtfs_trips", ["route_id"], "gtfs_routes", ["route_id"], "fk_trips_route_id"),
+    (
+        "gtfs_routes",
+        ["agency_id"],
+        "gtfs_agency",
+        ["agency_id"],
+        "fk_routes_agency_id",
+    ),
+    (
+        "gtfs_trips",
+        ["route_id"],
+        "gtfs_routes",
+        ["route_id"],
+        "fk_trips_route_id",
+    ),
     # Assuming gtfs_shapes_lines table is created from gtfs_shapes_points
-    ("gtfs_trips", ["shape_id"], "gtfs_shapes_lines", ["shape_id"], "fk_trips_shape_id_lines"),
-    ("gtfs_stop_times", ["trip_id"], "gtfs_trips", ["trip_id"], "fk_stop_times_trip_id"),
-    ("gtfs_stop_times", ["stop_id"], "gtfs_stops", ["stop_id"], "fk_stop_times_stop_id"),
-    ("gtfs_stops", ["parent_station"], "gtfs_stops", ["stop_id"], "fk_stops_parent_station"),
+    (
+        "gtfs_trips",
+        ["shape_id"],
+        "gtfs_shapes_lines",
+        ["shape_id"],
+        "fk_trips_shape_id_lines",
+    ),
+    (
+        "gtfs_stop_times",
+        ["trip_id"],
+        "gtfs_trips",
+        ["trip_id"],
+        "fk_stop_times_trip_id",
+    ),
+    (
+        "gtfs_stop_times",
+        ["stop_id"],
+        "gtfs_stops",
+        ["stop_id"],
+        "fk_stop_times_stop_id",
+    ),
+    (
+        "gtfs_stops",
+        ["parent_station"],
+        "gtfs_stops",
+        ["stop_id"],
+        "fk_stops_parent_station",
+    ),
     # calendar_dates.service_id could FK to calendar.service_id, but GTFS allows
     # service_ids to exist only in calendar_dates.txt.
 ]
@@ -259,11 +350,15 @@ def create_tables_from_schema(conn: PgConnection) -> None:
     Args:
         conn: Active psycopg2 database connection.
     """
-    module_logger.info("Setting up database schema based on GTFS_DEFINITIONS...")
+    module_logger.info(
+        "Setting up database schema based on GTFS_DEFINITIONS..."
+    )
     with conn.cursor() as cursor:
         for filename in GTFS_LOAD_ORDER:
             if filename not in GTFS_DEFINITIONS:
-                module_logger.debug(f"No definition for '{filename}', skipping table creation.")
+                module_logger.debug(
+                    f"No definition for '{filename}', skipping table creation."
+                )
                 continue
 
             details = GTFS_DEFINITIONS[filename]
@@ -274,17 +369,26 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                     f"{sanitize_identifier(col_name)} {col_type} {col_constraints}"
                 )
 
-            cols_sql_segment = sql.SQL(", ").join(map(sql.SQL, cols_defs_str_list))
+            cols_sql_segment = sql.SQL(", ").join(
+                map(sql.SQL, cols_defs_str_list)
+            )
             pk_def_sql_segment = sql.SQL("")
 
             if "composite_pk" in details and details["composite_pk"]:
-                quoted_pks = [sql.Identifier(pk_col) for pk_col in details["composite_pk"]]
+                quoted_pks = [
+                    sql.Identifier(pk_col)
+                    for pk_col in details["composite_pk"]
+                ]
                 pk_def_sql_segment = sql.SQL(", PRIMARY KEY ({})").format(
                     sql.SQL(", ").join(quoted_pks)
                 )
 
-            create_sql = sql.SQL("CREATE TABLE IF NOT EXISTS {} ({}{});").format(
-                sql.Identifier(table_name), cols_sql_segment, pk_def_sql_segment
+            create_sql = sql.SQL(
+                "CREATE TABLE IF NOT EXISTS {} ({}{});"
+            ).format(
+                sql.Identifier(table_name),
+                cols_sql_segment,
+                pk_def_sql_segment,
             )
             try:
                 module_logger.debug(
@@ -307,7 +411,9 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             )
             module_logger.info("Table 'gtfs_shapes_lines' ensured.")
         except psycopg2.Error as e:
-            module_logger.error(f"Error creating table gtfs_shapes_lines: {e}")
+            module_logger.error(
+                f"Error creating table gtfs_shapes_lines: {e}"
+            )
             raise
 
         # Create Dead-Letter Queue (DLQ) table for logging problematic data.
@@ -342,12 +448,16 @@ def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None:
     Args:
         conn: Active psycopg2 database connection.
     """
-    module_logger.info("Dropping existing GTFS foreign keys before data load...")
+    module_logger.info(
+        "Dropping existing GTFS foreign keys before data load..."
+    )
     with conn.cursor() as cursor:
         # Iterate in reverse to handle dependencies.
         for from_table, _, _, _, fk_name in reversed(GTFS_FOREIGN_KEYS):
             # Check if the 'from_table' exists before trying to alter it.
-            cursor.execute("SELECT to_regclass(%s);", (f"public.{from_table}",))
+            cursor.execute(
+                "SELECT to_regclass(%s);", (f"public.{from_table}",)
+            )
             if not cursor.fetchone()[0]:
                 module_logger.debug(
                     f"Table {from_table} for FK {fk_name} does not exist. "
@@ -371,8 +481,11 @@ def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None:
                         f"Dropping foreign key {fk_name} from {from_table}."
                     )
                     cursor.execute(
-                        sql.SQL("ALTER TABLE {} DROP CONSTRAINT IF EXISTS {};").format(
-                            sql.Identifier(from_table), sql.Identifier(fk_name)
+                        sql.SQL(
+                            "ALTER TABLE {} DROP CONSTRAINT IF EXISTS {};"
+                        ).format(
+                            sql.Identifier(from_table),
+                            sql.Identifier(fk_name),
                         )
                     )
                 except psycopg2.Error as e:
@@ -402,10 +515,17 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None:
     """
     module_logger.info("Attempting to add foreign keys post-data load...")
     with conn.cursor() as cursor:
-        for from_table, from_cols_list, to_table, to_cols_list, fk_name \
-                in GTFS_FOREIGN_KEYS:
+        for (
+            from_table,
+            from_cols_list,
+            to_table,
+            to_cols_list,
+            fk_name,
+        ) in GTFS_FOREIGN_KEYS:
             # Check if source and target tables exist.
-            cursor.execute("SELECT to_regclass(%s);", (f"public.{from_table}",))
+            cursor.execute(
+                "SELECT to_regclass(%s);", (f"public.{from_table}",)
+            )
             if not cursor.fetchone()[0]:
                 module_logger.warning(
                     f"Source Table {from_table} for FK {fk_name} does not exist. "
@@ -420,15 +540,22 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None:
                 )
                 continue
 
-            from_cols_sql = sql.SQL(", ").join(map(sql.Identifier, from_cols_list))
-            to_cols_sql = sql.SQL(", ").join(map(sql.Identifier, to_cols_list))
+            from_cols_sql = sql.SQL(", ").join(
+                map(sql.Identifier, from_cols_list)
+            )
+            to_cols_sql = sql.SQL(", ").join(
+                map(sql.Identifier, to_cols_list)
+            )
 
             alter_sql = sql.SQL(
                 "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) "
                 "REFERENCES {} ({}) DEFERRABLE INITIALLY DEFERRED;"
             ).format(
-                sql.Identifier(from_table), sql.Identifier(fk_name),
-                from_cols_sql, sql.Identifier(to_table), to_cols_sql,
+                sql.Identifier(from_table),
+                sql.Identifier(fk_name),
+                from_cols_sql,
+                sql.Identifier(to_table),
+                to_cols_sql,
             )
             try:
                 module_logger.info(
@@ -447,14 +574,19 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None:
                         dlq_cursor.execute(
                             "INSERT INTO gtfs_dlq (gtfs_filename, error_reason, notes) "
                             "VALUES (%s, %s, %s);",
-                            ("SCHEMA_FK_ERROR", str(e)[:1000],  # Truncate error if too long
-                             f"Failed to add FK: {fk_name}")
+                            (
+                                "SCHEMA_FK_ERROR",
+                                str(e)[:1000],  # Truncate error if too long
+                                f"Failed to add FK: {fk_name}",
+                            ),
                         )
                     # Committing DLQ log separately can be risky if main transaction
                     # needs to rollback. Consider if this commit is appropriate.
                     # conn.commit()
                 except Exception as dlq_e:
-                    module_logger.error(f"Failed to log FK error to DLQ: {dlq_e}")
+                    module_logger.error(
+                        f"Failed to log FK error to DLQ: {dlq_e}"
+                    )
     module_logger.info("Foreign key application process finished.")
 
 
@@ -502,9 +634,14 @@ def download_and_extract_gtfs(feed_url: str) -> bool:
     except requests.exceptions.RequestException as re:
         module_logger.error(f"Download Error: {re}", exc_info=True)
     except zipfile.BadZipFile as bze:
-        module_logger.error(f"Unzip Error: Bad Zip File from {DOWNLOAD_PATH}. {bze}", exc_info=True)
+        module_logger.error(
+            f"Unzip Error: Bad Zip File from {DOWNLOAD_PATH}. {bze}",
+            exc_info=True,
+        )
     except Exception as e:
-        module_logger.error(f"Unexpected error in download/extract: {e}", exc_info=True)
+        module_logger.error(
+            f"Unexpected error in download/extract: {e}", exc_info=True
+        )
     return False
 
 
@@ -538,13 +675,17 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
             actual_file_to_load = None
             # Find the actual filename in the directory (case-insensitive match)
             for f_in_dir in os.listdir(EXTRACT_PATH):
-                if (f_in_dir.lower() == gtfs_filename_key.lower() and
-                        f_in_dir.endswith(".txt")):
+                if (
+                    f_in_dir.lower() == gtfs_filename_key.lower()
+                    and f_in_dir.endswith(".txt")
+                ):
                     actual_file_to_load = f_in_dir
                     break
 
             if not actual_file_to_load:
-                if gtfs_filename_key in GTFS_DEFINITIONS:  # Check if it's a defined file
+                if (
+                    gtfs_filename_key in GTFS_DEFINITIONS
+                ):  # Check if it's a defined file
                     module_logger.warning(
                         f"Expected GTFS file '{gtfs_filename_key}' not found in "
                         "archive. Skipping."
@@ -559,7 +700,9 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
             module_logger.info(
                 f"--- Processing {actual_file_to_load} for table {table_name} ---"
             )
-            actual_load_cols: List[str] = []  # Columns that will be in the COPY statement
+            actual_load_cols: List[
+                str
+            ] = []  # Columns that will be in the COPY statement
 
             try:
                 df = pd.read_csv(
@@ -585,8 +728,10 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
 
                 # Get DB column names from schema, excluding 'geom' if it's derived.
                 table_db_columns_from_schema = [
-                    col_def[0] for col_def in schema_info["columns"]
-                    if col_def[0] != "geom"  # 'geom' is handled separately if derived
+                    col_def[0]
+                    for col_def in schema_info["columns"]
+                    if col_def[0]
+                    != "geom"  # 'geom' is handled separately if derived
                 ]
 
                 for db_col_name in table_db_columns_from_schema:
@@ -599,9 +744,10 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                             "required_fields_in_file", []
                         )
                         is_not_null_in_db = any(
-                            c[0] == db_col_name and
-                            "NOT NULL" in c[2].upper() and
-                            "DEFAULT" not in c[2].upper()  # Consider DEFAULT if present
+                            c[0] == db_col_name
+                            and "NOT NULL" in c[2].upper()
+                            and "DEFAULT"
+                            not in c[2].upper()  # Consider DEFAULT if present
                             for c in schema_info["columns"]
                         )
                         if is_required_by_spec or is_not_null_in_db:
@@ -614,13 +760,20 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                             cursor.execute(
                                 "INSERT INTO gtfs_dlq (gtfs_filename, error_reason, notes) "
                                 "VALUES (%s, %s, %s);",
-                                (actual_file_to_load, err_msg,
-                                 "Whole file load skipped due to missing required column.")
+                                (
+                                    actual_file_to_load,
+                                    err_msg,
+                                    "Whole file load skipped due to missing required column.",
+                                ),
                             )
-                            raise ValueError(err_msg)  # Fail fast for this file
+                            raise ValueError(
+                                err_msg
+                            )  # Fail fast for this file
                         else:
                             # Optional column missing in CSV, add as series of Nones.
-                            df_for_copy[db_col_name] = pd.Series([None] * len(df), dtype=object)
+                            df_for_copy[db_col_name] = pd.Series(
+                                [None] * len(df), dtype=object
+                            )
                             actual_load_cols.append(db_col_name)
 
                 if not actual_load_cols:
@@ -642,8 +795,13 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                 sio = io.StringIO()
                 # Select only 'actual_load_cols' for to_csv and ensure order.
                 df_for_copy[actual_load_cols].to_csv(
-                    sio, index=False, header=True, sep=",",
-                    quotechar='"', escapechar="\\", na_rep=""  # Empty string for NULLs in COPY
+                    sio,
+                    index=False,
+                    header=True,
+                    sep=",",
+                    quotechar='"',
+                    escapechar="\\",
+                    na_rep="",  # Empty string for NULLs in COPY
                 )
                 sio.seek(0)
 
@@ -661,14 +819,27 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                     f"records. Columns: {actual_load_cols}"
                 )
                 cursor.copy_expert(copy_sql_stmt, sio)
-                loaded_count = cursor.rowcount if cursor.rowcount is not None else len(df_for_copy)
-                module_logger.info(f"{loaded_count} records loaded into {table_name}.")
+                loaded_count = (
+                    cursor.rowcount
+                    if cursor.rowcount is not None
+                    else len(df_for_copy)
+                )
+                module_logger.info(
+                    f"{loaded_count} records loaded into {table_name}."
+                )
 
                 # Post-load processing: Geometry update for gtfs_stops.
                 if table_name == "gtfs_stops":
-                    lat_col, lon_col, geom_col = "stop_lat", "stop_lon", "geom"
+                    lat_col, lon_col, geom_col = (
+                        "stop_lat",
+                        "stop_lon",
+                        "geom",
+                    )
                     # Ensure lat/lon columns were actually loaded.
-                    if lat_col in actual_load_cols and lon_col in actual_load_cols:
+                    if (
+                        lat_col in actual_load_cols
+                        and lon_col in actual_load_cols
+                    ):
                         # SQL to update geometry from lat/lon columns.
                         # Handles empty strings or non-numeric values gracefully using NULLIF and CAST.
                         update_geom_sql = sql.SQL(
@@ -680,9 +851,14 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                             "   NULLIF(TRIM(CAST({} AS TEXT)), '') IS NOT NULL AND "
                             "   NULLIF(TRIM(CAST({} AS TEXT)), '') IS NOT NULL;"
                         ).format(
-                            sql.Identifier(table_name), sql.Identifier(geom_col),
-                            sql.Identifier(lon_col), sql.Identifier(lat_col),  # Lon, Lat order for ST_MakePoint
-                            sql.Identifier(lon_col), sql.Identifier(lat_col),
+                            sql.Identifier(table_name),
+                            sql.Identifier(geom_col),
+                            sql.Identifier(lon_col),
+                            sql.Identifier(
+                                lat_col
+                            ),  # Lon, Lat order for ST_MakePoint
+                            sql.Identifier(lon_col),
+                            sql.Identifier(lat_col),
                         )
                         try:
                             cursor.execute(update_geom_sql)
@@ -708,38 +884,52 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                     f"{table_name}: {ve}. File processing aborted for this file."
                 )
                 raise  # Propagate to rollback transaction for this file's load
-            except psycopg2.Error as db_err:  # Catch DB errors from TRUNCATE, COPY, GEOM_UPDATE
+            except (
+                psycopg2.Error
+            ) as db_err:  # Catch DB errors from TRUNCATE, COPY, GEOM_UPDATE
                 module_logger.error(
                     f"Database error processing {actual_file_to_load} for "
-                    f"{table_name}: {db_err}", exc_info=True
+                    f"{table_name}: {db_err}",
+                    exc_info=True,
                 )
                 # Log to DLQ
-                with conn.cursor() as dlq_cursor_err:  # Use a new cursor for DLQ logging
+                with (
+                    conn.cursor() as dlq_cursor_err
+                ):  # Use a new cursor for DLQ logging
                     dlq_cursor_err.execute(
                         "INSERT INTO gtfs_dlq (gtfs_filename, error_reason, notes) "
                         "VALUES (%s, %s, %s);",
-                        (actual_file_to_load, str(db_err)[:1000],
-                         f"DB error during COPY/TRUNCATE/GEOM_UPDATE for table {table_name}")
+                        (
+                            actual_file_to_load,
+                            str(db_err)[:1000],
+                            f"DB error during COPY/TRUNCATE/GEOM_UPDATE for table {table_name}",
+                        ),
                     )
                 # conn.commit() # Consider if DLQ entries should be committed independently
                 raise  # Propagate to rollback main transaction
             except Exception as e:  # Catch any other unexpected errors
                 module_logger.error(
                     f"Unexpected error processing file {actual_file_to_load} "
-                    f"for table {table_name}: {e}", exc_info=True
+                    f"for table {table_name}: {e}",
+                    exc_info=True,
                 )
                 with conn.cursor() as dlq_cursor_unexp:
                     dlq_cursor_unexp.execute(
                         "INSERT INTO gtfs_dlq (gtfs_filename, error_reason, notes) "
                         "VALUES (%s, %s, %s);",
-                        (actual_file_to_load, str(e)[:1000],
-                         f"Unexpected error for table {table_name}")
+                        (
+                            actual_file_to_load,
+                            str(e)[:1000],
+                            f"Unexpected error for table {table_name}",
+                        ),
                     )
                 raise
 
         # Post-load processing: Aggregate shapes.txt points into linestrings.
-        if ("shapes.txt" in GTFS_DEFINITIONS and
-                "shapes.txt".lower() in available_files_in_feed):
+        if (
+            "shapes.txt" in GTFS_DEFINITIONS
+            and "shapes.txt".lower() in available_files_in_feed
+        ):
             try:
                 module_logger.info(
                     "Aggregating shape points into linestrings (gtfs_shapes_lines)..."
@@ -773,20 +963,26 @@ def load_data_to_db_with_dlq(conn: PgConnection) -> None:
                 )
             except Exception as e_shape:
                 module_logger.error(
-                    f"Error aggregating shape linestrings: {e_shape}", exc_info=True
+                    f"Error aggregating shape linestrings: {e_shape}",
+                    exc_info=True,
                 )
                 with conn.cursor() as dlq_cursor_shape:
                     dlq_cursor_shape.execute(
                         "INSERT INTO gtfs_dlq (gtfs_filename, error_reason, notes) "
                         "VALUES (%s, %s, %s);",
-                        ("shapes.txt", f"Aggregation to lines failed: {str(e_shape)[:1000]}",
-                         "gtfs_shapes_lines might be incomplete")
+                        (
+                            "shapes.txt",
+                            f"Aggregation to lines failed: {str(e_shape)[:1000]}",
+                            "gtfs_shapes_lines might be incomplete",
+                        ),
                     )
                 raise  # Let main transaction fail if shape aggregation is critical.
     module_logger.info("Data loading process completed.")
 
 
-def run_full_gtfs_etl_pipeline(feed_url_override: Optional[str] = None) -> bool:
+def run_full_gtfs_etl_pipeline(
+    feed_url_override: Optional[str] = None,
+) -> bool:
     """
     Orchestrate the full GTFS ETL (Extract, Transform, Load) pipeline.
 
@@ -810,16 +1006,26 @@ def run_full_gtfs_etl_pipeline(feed_url_override: Optional[str] = None) -> bool:
 
     try:
         # Validate configurations.
-        if effective_feed_url == "https://example.com/path/to/your/gtfs-feed.zip":
-            msg = ("CRITICAL: GTFS_URL is a placeholder. Set GTFS_FEED_URL "
-                   "environment variable or use --gtfs-url CLI argument.")
+        if (
+            effective_feed_url
+            == "https://example.com/path/to/your/gtfs-feed.zip"
+        ):
+            msg = (
+                "CRITICAL: GTFS_URL is a placeholder. Set GTFS_FEED_URL "
+                "environment variable or use --gtfs-url CLI argument."
+            )
             module_logger.critical(msg)
             raise ValueError(msg)
 
-        if DB_PARAMS["password"] == "yourStrongPasswordHere" and \
-           not os.environ.get("PG_OSM_PASSWORD"):  # Check env var too
-            msg = ("CRITICAL: Database password is the default placeholder and "
-                   "PG_OSM_PASSWORD env var is not set. Update DB_PARAMS or set env var.")
+        if DB_PARAMS[
+            "password"
+        ] == "yourStrongPasswordHere" and not os.environ.get(
+            "PG_OSM_PASSWORD"
+        ):  # Check env var too
+            msg = (
+                "CRITICAL: Database password is the default placeholder and "
+                "PG_OSM_PASSWORD env var is not set. Update DB_PARAMS or set env var."
+            )
             module_logger.critical(msg)
             raise ValueError(msg)
 
@@ -831,7 +1037,9 @@ def run_full_gtfs_etl_pipeline(feed_url_override: Optional[str] = None) -> bool:
         # 2. Connect to Database.
         conn = psycopg2.connect(**DB_PARAMS)
         conn.autocommit = False  # Manage transactions explicitly.
-        module_logger.info("Database connection successful. Transaction started.")
+        module_logger.info(
+            "Database connection successful. Transaction started."
+        )
 
         # 3. Setup Database Schema (Create tables if not exist).
         create_tables_from_schema(conn)
@@ -874,7 +1082,9 @@ def run_full_gtfs_etl_pipeline(feed_url_override: Optional[str] = None) -> bool:
         if os.path.exists(DOWNLOAD_PATH):
             try:
                 os.remove(DOWNLOAD_PATH)
-                module_logger.info(f"Cleaned up download file: {DOWNLOAD_PATH}")
+                module_logger.info(
+                    f"Cleaned up download file: {DOWNLOAD_PATH}"
+                )
             except OSError as e_clean_dl:
                 module_logger.error(
                     f"Error removing download file '{DOWNLOAD_PATH}': {e_clean_dl}"
@@ -882,7 +1092,9 @@ def run_full_gtfs_etl_pipeline(feed_url_override: Optional[str] = None) -> bool:
         if os.path.exists(EXTRACT_PATH):
             try:
                 shutil.rmtree(EXTRACT_PATH)
-                module_logger.info(f"Cleaned up extract directory: {EXTRACT_PATH}")
+                module_logger.info(
+                    f"Cleaned up extract directory: {EXTRACT_PATH}"
+                )
             except OSError as e_clean_ext:
                 module_logger.error(
                     f"Error removing extract directory '{EXTRACT_PATH}': {e_clean_ext}"
@@ -908,7 +1120,7 @@ def run_full_gtfs_etl_pipeline(feed_url_override: Optional[str] = None) -> bool:
 def setup_logging(
     log_level_str: str = "INFO",  # Changed to string for argparse
     log_file_path: Optional[str] = LOG_FILE,  # Use constant
-    log_to_console: bool = True
+    log_to_console: bool = True,
 ) -> None:
     """
     Set up logging configuration for the script.
@@ -920,7 +1132,10 @@ def setup_logging(
     """
     log_level = getattr(logging, log_level_str.upper(), logging.INFO)
     if not isinstance(log_level, int):  # Fallback if string is invalid
-        print(f"Warning: Invalid log level string '{log_level_str}'. Defaulting to INFO.", file=sys.stderr)
+        print(
+            f"Warning: Invalid log level string '{log_level_str}'. Defaulting to INFO.",
+            file=sys.stderr,
+        )
         log_level = logging.INFO
 
     # Clear existing handlers from the root logger to avoid duplicate logs
@@ -934,18 +1149,27 @@ def setup_logging(
         try:
             # Ensure log directory exists
             Path(log_file_path).parent.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(log_file_path, mode="a")  # Append mode
+            file_handler = logging.FileHandler(
+                log_file_path, mode="a"
+            )  # Append mode
             handlers.append(file_handler)
         except Exception as e_fh:
-            print(f"Error setting up file logger for {log_file_path}: {e_fh}", file=sys.stderr)
+            print(
+                f"Error setting up file logger for {log_file_path}: {e_fh}",
+                file=sys.stderr,
+            )
 
     if log_to_console:
         console_handler = logging.StreamHandler(sys.stdout)
         handlers.append(console_handler)
 
-    if not handlers:  # Ensure at least console output if others fail or are off
+    if (
+        not handlers
+    ):  # Ensure at least console output if others fail or are off
         handlers.append(logging.StreamHandler(sys.stdout))
-        if log_level > logging.INFO:  # Ensure some output if level was too high
+        if (
+            log_level > logging.INFO
+        ):  # Ensure some output if level was too high
             log_level = logging.INFO
 
     logging.basicConfig(
@@ -960,7 +1184,9 @@ def setup_logging(
     # Ensure the root logger's level is also set.
     logging.getLogger().setLevel(log_level)
 
-    module_logger.info(f"Logging configured at level {logging.getLevelName(log_level)}.")
+    module_logger.info(
+        f"Logging configured at level {logging.getLevelName(log_level)}."
+    )
 
 
 def main_cli() -> None:
@@ -972,7 +1198,7 @@ def main_cli() -> None:
     """
     parser = argparse.ArgumentParser(
         description="Run the GTFS ETL pipeline to download, process, and "
-                    "load GTFS data into a PostgreSQL database."
+        "load GTFS data into a PostgreSQL database."
     )
     parser.add_argument(
         "--gtfs-url",
@@ -1008,12 +1234,14 @@ def main_cli() -> None:
     setup_logging(
         log_level_str=args.log_level_str,
         log_file_path=args.log_file_path,
-        log_to_console=args.log_to_console
+        log_to_console=args.log_to_console,
     )
 
     # Determine the GTFS feed URL to use.
     # Priority: CLI arg > Environment var GTFS_FEED_URL > Internal DEFAULT_GTFS_URL
-    feed_url_to_use = args.gtfs_url or os.environ.get("GTFS_FEED_URL") or DEFAULT_GTFS_URL
+    feed_url_to_use = (
+        args.gtfs_url or os.environ.get("GTFS_FEED_URL") or DEFAULT_GTFS_URL
+    )
 
     module_logger.info(f"GTFS Feed URL to be processed: {feed_url_to_use}")
     module_logger.info(
@@ -1028,7 +1256,9 @@ def main_cli() -> None:
         os.environ["GTFS_FEED_URL"] = feed_url_to_use
 
         if main_pipeline:
-            module_logger.info("Using main_pipeline from processors.gtfs package.")
+            module_logger.info(
+                "Using main_pipeline from processors.gtfs package."
+            )
             # This assumes main_pipeline.run_full_gtfs_etl_pipeline() uses
             # environment variables or a shared config for DB params etc.
             success = main_pipeline.run_full_gtfs_etl_pipeline()
@@ -1037,7 +1267,9 @@ def main_cli() -> None:
                 "main_pipeline not available. Using standalone ETL logic "
                 "from update_gtfs.py."
             )
-            success = run_full_gtfs_etl_pipeline(feed_url_override=feed_url_to_use)
+            success = run_full_gtfs_etl_pipeline(
+                feed_url_override=feed_url_to_use
+            )
 
         sys.exit(0 if success else 1)  # Exit with appropriate status code.
 

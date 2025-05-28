@@ -24,7 +24,7 @@ def execute_step(
     step_description: str,
     step_function: Callable[[Optional[logging.Logger]], None],
     current_logger_instance: Optional[logging.Logger],
-    prompt_user_for_rerun: Callable[[str], bool]
+    prompt_user_for_rerun: Callable[[str], bool],
 ) -> bool:
     """
     Execute a single setup step.
@@ -51,8 +51,9 @@ def execute_step(
         because it was already completed and the user chose not to re-run.
         False if the step execution failed.
     """
-    logger_to_use = current_logger_instance if current_logger_instance \
-        else module_logger
+    logger_to_use = (
+        current_logger_instance if current_logger_instance else module_logger
+    )
     run_this_step = True
 
     if is_step_completed(step_tag, current_logger=logger_to_use):
@@ -60,7 +61,7 @@ def execute_step(
             f"{config.SYMBOLS['info']} Step '{step_description}' ({step_tag}) "
             "is already marked as completed.",
             "info",
-            logger_to_use
+            logger_to_use,
         )
         # Use the callback for the prompt.
         prompt = (
@@ -71,14 +72,16 @@ def execute_step(
             log_map_server(
                 f"{config.SYMBOLS['info']} User chose to re-run step: "
                 f"{step_tag}",
-                "info", logger_to_use
+                "info",
+                logger_to_use,
             )
             # run_this_step remains True.
         else:
             log_map_server(
                 f"{config.SYMBOLS['info']} Skipping re-run of step: "
                 f"{step_tag}",
-                "info", logger_to_use
+                "info",
+                logger_to_use,
             )
             run_this_step = False
 
@@ -87,7 +90,7 @@ def execute_step(
             f"--- {config.SYMBOLS['step']} Executing: {step_description} "
             f"({step_tag}) ---",
             "info",
-            logger_to_use
+            logger_to_use,
         )
         try:
             # Pass the logger to the actual step function.
@@ -97,7 +100,7 @@ def execute_step(
                 f"--- {config.SYMBOLS['success']} Successfully completed: "
                 f"{step_description} ({step_tag}) ---",
                 "success",
-                logger_to_use
+                logger_to_use,
             )
             return True
         except Exception as e:
@@ -105,9 +108,11 @@ def execute_step(
                 f"{config.SYMBOLS['error']} FAILED: {step_description} "
                 f"({step_tag})",
                 "error",
-                logger_to_use
+                logger_to_use,
             )
-            log_map_server(f"   Error details: {str(e)}", "error", logger_to_use)
+            log_map_server(
+                f"   Error details: {str(e)}", "error", logger_to_use
+            )
             # Include traceback for debugging if desired, e.g.,
             # logger_to_use.exception("Detailed error information:")
             return False
