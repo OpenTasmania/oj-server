@@ -177,6 +177,102 @@ def get_debian_codename_prereq() -> Optional[str]:
         )
         return None
 
+def ensure_pip_installed_prereq() -> bool:
+    """
+    Ensure 'pip' (Python package installer) is available.
+    If not found, attempts to install 'python3-pip' using apt.
+
+    Returns:
+        True if 'pip' is available or successfully installed, False otherwise.
+    """
+    log_prereq(
+        f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python','🐍')} "
+        "Checking for 'pip' command...",
+        "info"
+    )
+    if command_exists_prereq("pip"):
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('success', 'OK')} 'pip' command is "
+            "already available.",
+            "info"
+        )
+        return True
+
+    log_prereq(
+        f"{SYMBOLS_OUTER.get('warning', '!!')} 'pip' command not found. "
+        "Attempting to install 'python3-pip'...",
+        "warning"
+    )
+
+    if not command_exists_prereq("apt"):
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command not found. "
+            "Cannot attempt to install 'python3-pip'. "
+            "Please install pip manually for your system.",
+            "error"
+        )
+        return False
+
+    apt_prefix = _get_elevated_prefix_prereq()
+    try:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('gear', '>>')} Updating apt cache (this may "
+            "take a moment)...",
+            "info"
+        )
+        _run_cmd_prereq(apt_prefix + ["apt", "update"], capture_output=True)
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('package', '>>')} Attempting to install "
+            "'python3-pip' using apt...",
+            "info"
+        )
+        _run_cmd_prereq(
+            apt_prefix + ["apt", "install", "-y", "python3-pip"],
+            capture_output=True
+        )
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('success', 'OK')} 'python3-pip' installation "
+            "via apt initiated.",
+            "info"
+        )
+        if command_exists_prereq("pip"):
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('success', 'OK')} 'pip' command is now "
+                "available after installation.",
+                "info"
+            )
+            return True
+        else:
+
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('warning', '!!')} 'python3-pip' was "
+                "reportedly installed by apt, but 'pip' command is still not "
+                "immediately found in PATH. This might be okay if 'pip3' is "
+                "available or PATH updates, or if tools adapt.",
+                "warning"
+            )
+            return True
+    except subprocess.CalledProcessError as e:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install "
+            f"'python3-pip' via apt: {e}. Error: {e.stderr or e.stdout or str(e)}",
+            "error"
+        )
+        return False
+    except FileNotFoundError:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command was not found "
+            "during execution. Cannot install 'python3-pip'.",
+            "error"
+        )
+        return False
+    except Exception as e:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} An unexpected error "
+            f"occurred while trying to install 'python3-pip': {e}",
+            "error"
+        )
+        return False
 
 # --- UV Installation Logic ---
 def _install_uv_with_pipx_prereq() -> bool:
@@ -464,6 +560,23 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
         )
         print(f"Run '{script_name} --help' for more details.")
         return 1
+
+    if not ensure_pip_installed_prereq():
+        if not command_exists_prereq("pip") and not command_exists_prereq("pip3"):
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to ensure 'pip' "
+                "is available. 'pip' is a critical prerequisite for potentially "
+                "installing other tools like 'pipx'. Aborting.",
+                "critical"
+            )
+            return 1
+        else:
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('warning', '!!')} 'ensure_pip_installed_prereq' "
+                "returned False, but a pip command ('pip' or 'pip3') was found. "
+                "Proceeding with caution.",
+                "warning"
+            )
 
     log_prereq(
         f"{SYMBOLS_OUTER.get('step', '->')} Ensuring 'uv' (Python "
