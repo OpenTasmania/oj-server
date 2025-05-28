@@ -38,6 +38,7 @@ cache:
     - pipx --version
     - echo "--- Installing uv using pipx ---"
     - pipx install uv
+    - export PATH="/root/.local/bin:$PATH"
     - echo "--- uv version ---"
     - uv --version
     - echo "--- Creating virtual environment with uv ---"
