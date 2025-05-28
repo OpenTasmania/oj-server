@@ -40,8 +40,12 @@ Linting:
   <<: *uv_setup
   stage: lint
   script:
+    - echo "Running Ruff linter (ruff check)..."
     - uv run -- ruff check .
-    - uv run -- black --line-length 78 .
+    - echo "Checking Ruff formatting (ruff format --check)..."
+    - uv run -- ruff format --check .
+    - echo "Checking Black formatting (black --check)..."
+    - uv run -- black --check .
 
 Type checking:
   <<: *uv_setup
