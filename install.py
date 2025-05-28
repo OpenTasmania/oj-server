@@ -22,9 +22,17 @@ VENV_DIR = ".venv"  # Using .venv for default uv detection.
 
 # --- Basic Configuration & Symbols ---
 SYMBOLS_OUTER = {
-    "success": "✅", "error": "❌", "warning": "⚠️", "info": "ℹ️",
-    "step": "➡️", "gear": "⚙️", "package": "📦", "rocket": "🚀",
-    "sparkles": "✨", "critical": "🔥", "link": "🔗"
+    "success": "✅",
+    "error": "❌",
+    "warning": "⚠️",
+    "info": "ℹ️",
+    "step": "➡️",
+    "gear": "⚙️",
+    "package": "📦",
+    "rocket": "🚀",
+    "sparkles": "✨",
+    "critical": "🔥",
+    "link": "🔗",
 }
 
 # --- Logger for this prerequisite installer script ---
@@ -65,7 +73,7 @@ def _run_cmd_prereq(
     capture_output: bool = False,
     text: bool = True,
     cmd_input: Optional[str] = None,
-    cwd: Optional[str] = None
+    cwd: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     """
     Run a command and log its execution.
@@ -90,7 +98,7 @@ def _run_cmd_prereq(
     log_prereq(
         f"{SYMBOLS_OUTER.get('gear', '>>')} Executing: {' '.join(command)} "
         f"{f'(in {cwd})' if cwd else ''}",
-        "info"
+        "info",
     )
     try:
         result = subprocess.run(
@@ -99,48 +107,47 @@ def _run_cmd_prereq(
             capture_output=capture_output,
             text=text,
             input=cmd_input,
-            cwd=cwd
+            cwd=cwd,
         )
         if (
-            capture_output and
-            result.stdout and
-            result.stdout.strip() and
-            result.returncode == 0
+            capture_output
+            and result.stdout
+            and result.stdout.strip()
+            and result.returncode == 0
         ):
             log_prereq(f"   stdout: {result.stdout.strip()}", "info")
         if (
-            capture_output and
-            result.stderr and
-            result.stderr.strip() and
-            result.returncode == 0  # Only log non-failing stderr as info.
+            capture_output
+            and result.stderr
+            and result.stderr.strip()
+            and result.returncode == 0  # Only log non-failing stderr as info.
         ):
-            log_prereq(
-                f"   stderr: {result.stderr.strip()}", "info"
-            )
+            log_prereq(f"   stderr: {result.stderr.strip()}", "info")
         return result
     except subprocess.CalledProcessError as e:
         err_msg = (
-            e.stderr.strip() if e.stderr else
-            (e.stdout.strip() if e.stdout else str(e))
+            e.stderr.strip()
+            if e.stderr
+            else (e.stdout.strip() if e.stdout else str(e))
         )
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} Command `{' '.join(e.cmd)}` "
             f"failed (rc {e.returncode}). Error: {err_msg}",
-            "error"
+            "error",
         )
         raise
     except FileNotFoundError as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} Command not found: "
             f"{e.filename}. Is it installed and in PATH?",
-            "error"
+            "error",
         )
         raise
     except Exception as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} Unexpected error running "
             f"command `{' '.join(command)}`: {e}",
-            "error"
+            "error",
         )
         raise
 
@@ -161,7 +168,7 @@ def get_debian_codename_prereq() -> Optional[str]:
         log_prereq(
             f"{SYMBOLS_OUTER.get('warning', '!!')} lsb_release command not "
             "found. Cannot determine Debian codename.",
-            "warning"
+            "warning",
         )
         return None
     try:
@@ -173,7 +180,7 @@ def get_debian_codename_prereq() -> Optional[str]:
         log_prereq(
             f"{SYMBOLS_OUTER.get('warning', '!!')} Could not determine Debian "
             f"codename: {e}",
-            "warning"
+            "warning",
         )
         return None
 
@@ -189,20 +196,20 @@ def ensure_pip_installed_prereq() -> bool:
     log_prereq(
         f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python', '🐍')} "
         "Checking for 'pip' command...",
-        "info"
+        "info",
     )
     if command_exists_prereq("pip"):
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} 'pip' command is "
             "already available.",
-            "info"
+            "info",
         )
         return True
 
     log_prereq(
         f"{SYMBOLS_OUTER.get('warning', '!!')} 'pip' command not found. "
         "Attempting to install 'python3-pip'...",
-        "warning"
+        "warning",
     )
 
     if not command_exists_prereq("apt"):
@@ -210,7 +217,7 @@ def ensure_pip_installed_prereq() -> bool:
             f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command not found. "
             "Cannot attempt to install 'python3-pip'. "
             "Please install pip manually for your system.",
-            "error"
+            "error",
         )
         return False
 
@@ -219,59 +226,58 @@ def ensure_pip_installed_prereq() -> bool:
         log_prereq(
             f"{SYMBOLS_OUTER.get('gear', '>>')} Updating apt cache (this may "
             "take a moment)...",
-            "info"
+            "info",
         )
         _run_cmd_prereq(apt_prefix + ["apt", "update"], capture_output=True)
         log_prereq(
             f"{SYMBOLS_OUTER.get('package', '>>')} Attempting to install "
             "'python3-pip' using apt...",
-            "info"
+            "info",
         )
         _run_cmd_prereq(
             apt_prefix + ["apt", "install", "-y", "python3-pip"],
-            capture_output=True
+            capture_output=True,
         )
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} 'python3-pip' installation "
             "via apt initiated.",
-            "info"
+            "info",
         )
         if command_exists_prereq("pip"):
             log_prereq(
                 f"{SYMBOLS_OUTER.get('success', 'OK')} 'pip' command is now "
                 "available after installation.",
-                "info"
+                "info",
             )
             return True
         else:
-
             log_prereq(
                 f"{SYMBOLS_OUTER.get('warning', '!!')} 'python3-pip' was "
                 "reportedly installed by apt, but 'pip' command is still not "
                 "immediately found in PATH. This might be okay if 'pip3' is "
                 "available or PATH updates, or if tools adapt.",
-                "warning"
+                "warning",
             )
             return True
     except subprocess.CalledProcessError as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install "
             f"'python3-pip' via apt: {e}. Error: {e.stderr or e.stdout or str(e)}",
-            "error"
+            "error",
         )
         return False
     except FileNotFoundError:
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command was not found "
             "during execution. Cannot install 'python3-pip'.",
-            "error"
+            "error",
         )
         return False
     except Exception as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} An unexpected error "
             f"occurred while trying to install 'python3-pip': {e}",
-            "error"
+            "error",
         )
         return False
 
@@ -287,7 +293,7 @@ def _install_uv_with_pipx_prereq() -> bool:
     log_prereq(
         f"{SYMBOLS_OUTER.get('info', '>>')} Attempting uv installation "
         "using pipx...",
-        "info"
+        "info",
     )
     pipx_installed_by_this_script = False
     apt_prefix = _get_elevated_prefix_prereq()
@@ -296,7 +302,7 @@ def _install_uv_with_pipx_prereq() -> bool:
         log_prereq(
             f"{SYMBOLS_OUTER.get('warning', '!!')} pipx not found. "
             "Attempting to install pipx via apt...",
-            "warning"
+            "warning",
         )
         try:
             _run_cmd_prereq(apt_prefix + ["apt", "update"])
@@ -304,14 +310,14 @@ def _install_uv_with_pipx_prereq() -> bool:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('success', 'OK')} pipx installed "
                 "successfully via apt.",
-                "info"
+                "info",
             )
             pipx_installed_by_this_script = True
         except Exception as e:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install pipx: "
                 f"{e}",
-                "error"
+                "error",
             )
             return False
 
@@ -319,7 +325,7 @@ def _install_uv_with_pipx_prereq() -> bool:
         log_prereq(
             f"{SYMBOLS_OUTER.get('info', '>>')} pipx was just installed. "
             "Running 'pipx ensurepath' to update PATH for future shells...",
-            "info"
+            "info",
         )
         try:
             _run_cmd_prereq(
@@ -329,27 +335,27 @@ def _install_uv_with_pipx_prereq() -> bool:
                 f"{SYMBOLS_OUTER.get('success', 'OK')} 'pipx ensurepath' "
                 "executed. You may need to open a new terminal or source "
                 "your shell profile.",
-                "info"
+                "info",
             )
         except Exception as e:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('warning', '!!')} 'pipx ensurepath' "
                 f"encountered an issue: {e}. This might be okay if PATH is "
                 "already configured.",
-                "warning"
+                "warning",
             )
 
     log_prereq(
         f"{SYMBOLS_OUTER.get('rocket', '>>')} Attempting to install/upgrade "
         f"'uv' with pipx (as user '{getpass.getuser()}')...",
-        "info"
+        "info",
     )
     try:
         _run_cmd_prereq(["pipx", "install", "uv"], capture_output=True)
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} 'uv' installed/upgraded "
             "successfully using pipx.",
-            "info"
+            "info",
         )
 
         pipx_bin_dir = os.path.expanduser("~/.local/bin")
@@ -358,16 +364,16 @@ def _install_uv_with_pipx_prereq() -> bool:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('gear', '>>')} Adding '{pipx_bin_dir}' "
                 "to PATH for current script session...",
-                "info"
+                "info",
             )
-            os.environ['PATH'] = f"{pipx_bin_dir}{os.pathsep}{current_path}"
+            os.environ["PATH"] = f"{pipx_bin_dir}{os.pathsep}{current_path}"
             log_prereq(f"   New temporary PATH: {os.environ['PATH']}", "info")
         return True
     except Exception as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install 'uv' "
             f"using pipx: {e}",
-            "error"
+            "error",
         )
         return False
 
@@ -385,12 +391,12 @@ def install_uv_prereq() -> bool:
     log_prereq(
         f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'uv' "
         "installation...",
-        "info"
+        "info",
     )
     if command_exists_prereq("uv"):
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} 'uv' is already installed.",
-            "info"
+            "info",
         )
         try:
             uv_version_result = _run_cmd_prereq(
@@ -407,7 +413,7 @@ def install_uv_prereq() -> bool:
     log_prereq(
         f"{SYMBOLS_OUTER.get('info', '>>')} 'uv' not found in PATH. "
         "Attempting installation...",
-        "info"
+        "info",
     )
     codename = get_debian_codename_prereq()
     apt_prefix = _get_elevated_prefix_prereq()
@@ -417,7 +423,7 @@ def install_uv_prereq() -> bool:
         log_prereq(
             f"{SYMBOLS_OUTER.get('package', '>>')} Debian '{codename}' "
             "detected. Attempting 'apt install uv'...",
-            "info"
+            "info",
         )
         try:
             _run_cmd_prereq(apt_prefix + ["apt", "update"])
@@ -425,14 +431,14 @@ def install_uv_prereq() -> bool:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('success', 'OK')} 'uv' installed "
                 "successfully via apt.",
-                "info"
+                "info",
             )
             return True
         except Exception as e:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('warning', '!!')} Failed to install 'uv' "
                 f"via apt on '{codename}': {e}. Falling back to pipx.",
-                "warning"
+                "warning",
             )
             return _install_uv_with_pipx_prereq()
     else:
@@ -440,20 +446,18 @@ def install_uv_prereq() -> bool:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('package', '>>')} Debian '{codename}' "
                 "detected (or other). Using pipx to install 'uv'.",
-                "info"
+                "info",
             )
         else:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('package', '>>')} OS not detected as "
                 "Trixie/Sid, or detection failed. Using pipx for 'uv'.",
-                "info"
+                "info",
             )
         return _install_uv_with_pipx_prereq()
 
 
-def get_venv_python_executable(
-    project_root: str, venv_dir_name: str
-) -> str:
+def get_venv_python_executable(project_root: str, venv_dir_name: str) -> str:
     """Return the path to the Python executable in the virtual environment."""
     return os.path.join(project_root, venv_dir_name, "bin", "python")
 
@@ -517,7 +521,10 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             # This might fail if deps are missing, but should show its own
             # argparse help.
             help_cmd_args = [
-                sys.executable, "-m", MAP_SERVER_MODULE_NAME, "--help"
+                sys.executable,
+                "-m",
+                MAP_SERVER_MODULE_NAME,
+                "--help",
             ]
             # Let it handle its own SystemExit for help.
             subprocess.run(help_cmd_args, check=False)
@@ -526,7 +533,7 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             log_prereq(
                 f"{SYMBOLS_OUTER.get('error', '!!')} Error trying to display "
                 f"help from {MAP_SERVER_MODULE_NAME}: {e_main_help}",
-                "error"
+                "error",
             )
             print(
                 f"Could not display help from {MAP_SERVER_MODULE_NAME}. "
@@ -564,12 +571,14 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
         return 1
 
     if not ensure_pip_installed_prereq():
-        if not command_exists_prereq("pip") and not command_exists_prereq("pip3"):
+        if not command_exists_prereq("pip") and not command_exists_prereq(
+            "pip3"
+        ):
             log_prereq(
                 f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to ensure 'pip' "
                 "is available. 'pip' is a critical prerequisite for potentially "
                 "installing other tools like 'pipx'. Aborting.",
-                "critical"
+                "critical",
             )
             return 1
         else:
@@ -577,19 +586,19 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
                 f"{SYMBOLS_OUTER.get('warning', '!!')} 'ensure_pip_installed_prereq' "
                 "returned False, but a pip command ('pip' or 'pip3') was found. "
                 "Proceeding with caution.",
-                "warning"
+                "warning",
             )
 
     log_prereq(
         f"{SYMBOLS_OUTER.get('step', '->')} Ensuring 'uv' (Python "
         "environment manager) is installed...",
-        "info"
+        "info",
     )
     if not install_uv_prereq():
         log_prereq(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to install 'uv'. "
             "This is a critical prerequisite. Aborting.",
-            "critical"
+            "critical",
         )
         return 1
 
@@ -597,18 +606,18 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
         log_prereq(
             f"{SYMBOLS_OUTER.get('critical', '!!')} 'uv' command not found "
             "in PATH even after installation attempt. Aborting.",
-            "critical"
+            "critical",
         )
         log_prereq(
             "   You may need to open a new terminal or source your shell "
             "profile (`~/.bashrc`, `~/.zshrc`, etc.).",
-            "critical"
+            "critical",
         )
         return 1
     log_prereq(
         f"{SYMBOLS_OUTER.get('success', 'OK')} 'uv' command is available "
         "in PATH.",
-        "info"
+        "info",
     )
 
     venv_path = os.path.join(project_root, VENV_DIR)
@@ -619,44 +628,44 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
     log_prereq(
         f"{SYMBOLS_OUTER.get('step', '->')} Setting up virtual environment "
         f"in '{venv_path}' using 'uv'...",
-        "info"
+        "info",
     )
     try:
         _run_cmd_prereq(
             ["uv", "venv", VENV_DIR, "--python", sys.executable],
-            cwd=project_root
+            cwd=project_root,
         )
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} Virtual environment "
             f"created at '{venv_path}'.",
-            "info"
+            "info",
         )
 
         log_prereq(
             f"{SYMBOLS_OUTER.get('package', '>>')} Installing project "
             f"dependencies from 'pyproject.toml' into '{VENV_DIR}'...",
-            "info"
+            "info",
         )
         # uv should detect .venv in cwd.
         _run_cmd_prereq(["uv", "pip", "install", "."], cwd=project_root)
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} Project dependencies "
             f"installed into '{VENV_DIR}'.",
-            "info"
+            "info",
         )
 
     except subprocess.CalledProcessError as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to set up virtual "
             f"environment or install dependencies: {e}",
-            "critical"
+            "critical",
         )
         return 1
     except Exception as e:
         log_prereq(
             f"{SYMBOLS_OUTER.get('critical', '!!')} An unexpected error "
             f"occurred during venv setup: {e}",
-            "critical"
+            "critical",
         )
         return 1
 
@@ -677,20 +686,26 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             "info",
         )
         args_for_map_server_setup = [
-            arg for arg in sys.argv[1:]
-            if arg not in [
-                "--continue-install", "--exit-on-complete", "--help", "-h"
+            arg
+            for arg in sys.argv[1:]
+            if arg
+            not in [
+                "--continue-install",
+                "--exit-on-complete",
+                "--help",
+                "-h",
             ]
         ]
-        cmd_to_run_main_installer = (
-            [venv_python_executable, "-m", MAP_SERVER_MODULE_NAME] +
-            args_for_map_server_setup
-        )
+        cmd_to_run_main_installer = [
+            venv_python_executable,
+            "-m",
+            MAP_SERVER_MODULE_NAME,
+        ] + args_for_map_server_setup
 
         log_prereq(
             f"{SYMBOLS_OUTER.get('link', '>>')} Launching: "
             f"{' '.join(cmd_to_run_main_installer)}",
-            "info"
+            "info",
         )
 
         try:
@@ -721,14 +736,14 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             log_prereq(
                 f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to execute "
                 f"main map server setup: {e}",
-                "critical"
+                "critical",
             )
             return 1
         except Exception as e:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('critical', '!!')} Unexpected error "
                 f"launching main map server setup: {e}",
-                "critical"
+                "critical",
             )
             return 1
 
@@ -752,7 +767,7 @@ if __name__ == "__main__":
         log_prereq(
             f"\n{SYMBOLS_OUTER.get('warning', '!!')} Prerequisite "
             "installation process interrupted by user (Ctrl+C). Exiting.",
-            "warning"
+            "warning",
         )
         sys.exit(130)
     except SystemExit as e:  # Allow planned exits (e.g. from help).
@@ -762,7 +777,7 @@ if __name__ == "__main__":
             _handler_ex = logging.StreamHandler(sys.stdout)
             _formatter_ex = logging.Formatter(
                 "[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S"
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
             _handler_ex.setFormatter(_formatter_ex)
             outer_logger.addHandler(_handler_ex)
@@ -770,8 +785,9 @@ if __name__ == "__main__":
         log_prereq(
             f"{SYMBOLS_OUTER.get('critical', '!!')} A critical unhandled "
             f"error occurred in prerequisite installer: {e_global}",
-            "critical"
+            "critical",
         )
         import traceback
+
         outer_logger.error(traceback.format_exc())
         sys.exit(1)
