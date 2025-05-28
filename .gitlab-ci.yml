@@ -1,4 +1,5 @@
 image: debian:bookworm
+
 stages:
   - ".pre"
   - lint
@@ -7,6 +8,7 @@ stages:
   - docs
   - commit_docs
   - ".post"
+
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
@@ -22,96 +24,96 @@ cache:
     - ".pytest_cache"
     - ".ruff_cache"
     - ".venv"
-".uv_setup":
+    - "$HOME/.local/pipx"
+
+.uv_setup:
   before_script:
+    - echo "Setting up Python environment with uv..."
     - apt-get update -y
     - apt-get install -y curl git python3-full python3-pip
+    - echo "--- System Python and Pip versions ---"
     - python3 -V
-    - python3 -m pip install --upgrade pip
-    - pip install uv
+    - python3 -m pip --version
+    - echo "--- Upgrading pip and installing pipx ---"
+    - python3 -m pip install --user --upgrade pip
+    - python3 -m pip install --user pipx
+    - export PATH="$HOME/.local/bin:$PATH"
+    - echo "--- Pipx version ---"
+    - pipx --version
+    - echo "--- Installing uv using pipx ---"
+    - pipx install uv
+    - echo "--- uv version ---"
     - uv --version
+    - echo "--- Creating virtual environment with uv ---"
     - uv venv --python $(which python3)
+    - echo "--- Installing project dependencies with uv ---"
     - uv pip install .[dev]
+
 Linting:
-  before_script:
-    - apt-get update -y
-    - apt-get install -y curl git python3-full python3-pip
-    - python3 -V
-    - python3 -m pip install --upgrade pip
-    - pip install uv
-    - uv --version
-    - uv venv --python $(which python3)
-    - uv pip install .[dev]
+  extends: .uv_setup
   stage: lint
   script:
     - echo "Running Ruff linter (ruff check)..."
-    - uv run -- ruff check .
+    - uv run ruff check .
     - echo "Checking Ruff formatting (ruff format --check)..."
-    - uv run -- ruff format --check .
+    - uv run ruff format --check .
     - echo "Checking Black formatting (black --check)..."
-    - uv run -- black --check .
+    - uv run black --check .
+
 Type checking:
-  before_script:
-    - apt-get update -y
-    - apt-get install -y curl git python3-full python3-pip
-    - python3 -V
-    - python3 -m pip install --upgrade pip
-    - pip install uv
-    - uv --version
-    - uv venv --python $(which python3)
-    - uv pip install .[dev]
+  extends: .uv_setup #
   stage: type
   script:
-    - uv run -- mypy .
+    - echo "Running Mypy type checker..."
+    - uv run mypy .
+
 Testing:
   rules:
     - when: manual
-  before_script:
-    - apt-get update -y
-    - apt-get install -y curl git python3-full python3-pip
-    - python3 -V
-    - python3 -m pip install --upgrade pip
-    - pip install uv
-    - uv --version
-    - uv venv --python $(which python3)
-    - uv pip install .[dev]
+  extends: .uv_setup
   stage: test
   script:
-    - uv run -- pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
+    - echo "Running Pytest tests..."
+    - uv run pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
   coverage: "/TOTAL.*\\s+(\\d+%)$/"
   artifacts:
     expire_in: 1 week
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: cover/
+        path: coverage.xml
   interruptible: true
+
 generate_documentation:
   stage: docs
-  image: debian:bookworm
+  image: debian:bookworm # Stays on debian:bookworm
   before_script:
     - echo "Starting documentation generation for tag $CI_COMMIT_TAG"
     - apt-get update -y
     - apt-get install -y git curl python3-pip wget
-    - pip3 install todocheck
-    - |
-      LATEST_CLIFF_VERSION=$(curl -s "https://api.github.com/repos/orhun/git-cliff/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-      if [ -z "$LATEST_CLIFF_VERSION" ]; then echo "Failed to fetch latest git-cliff version"; exit 1; fi
-      CLIFF_URL="https://github.com/orhun/git-cliff/releases/download/${LATEST_CLIFF_VERSION}/git-cliff-${LATEST_CLIFF_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-      echo "Downloading git-cliff from $CLIFF_URL"
-      wget -q "$CLIFF_URL" -O git-cliff.tar.gz
-      tar -xzf git-cliff.tar.gz
-      mv git-cliff-*/git-cliff /usr/local/bin/
-      rm -rf git-cliff.tar.gz git-cliff-*
-      git-cliff --version
+    - echo "--- System Python and Pip versions ---"
+    - python3 -V
+    - python3 -m pip --version
+    - echo "--- Upgrading pip and installing pipx ---"
+    - python3 -m pip install --user --upgrade pip
+    - python3 -m pip install --user pipx
+    - export PATH="$HOME/.local/bin:$PATH"
+    - echo "--- Pipx version ---"
+    - pipx --version
+    - echo "--- Installing todocheck and git-cliff using pipx ---"
+    - pipx install todocheck
+    - pipx install git-cliff
+    - echo "--- todocheck version ---"
+    - todocheck --version
+    - echo "--- git-cliff version ---"
+    - git-cliff --version
   script:
     - echo "Generating CHANGELOG.md..."
     - git fetch --tags --depth=200
     - |
       TEMP_CHANGELOG_ENTRY="temp_changelog_entry.md"
-      # Get the previous tag. If no previous tag, it means this is the first tag.
       PREVIOUS_TAG=$(git describe --tags --abbrev=0 "HEAD^" 2>/dev/null)
-  
+
       echo "## [$CI_COMMIT_TAG] - $(date +'%Y-%m-%d')" > $TEMP_CHANGELOG_ENTRY
       if [ -n "$PREVIOUS_TAG" ]; then
         echo "Generating changelog from $PREVIOUS_TAG to $CI_COMMIT_TAG"
@@ -120,15 +122,15 @@ generate_documentation:
         echo "Generating changelog for the first tag $CI_COMMIT_TAG"
         git-cliff --tag "$CI_COMMIT_TAG" --output current_tag_changes.md
       fi
-  
-      # Remove the title generated by git-cliff if you want your own (optional)
-      # Check if current_tag_changes.md has more than 1 line (to avoid error with empty changelog)
+
       if [ -s current_tag_changes.md ] && [ $(wc -l < current_tag_changes.md) -gt 1 ]; then
-        sed -i '1d' current_tag_changes.md # Removes the "## [tag]..." line from git-cliff output if present
+        if grep -qE "^## \[[0-9]+\.[0-9]+\.[0-9]+[^]]*\]" current_tag_changes.md; then
+            sed -i '1d' current_tag_changes.md
+        fi
       fi
       cat current_tag_changes.md >> $TEMP_CHANGELOG_ENTRY
       rm -f current_tag_changes.md
-  
+
       if [ -f CHANGELOG.md ]; then
         cat CHANGELOG.md >> temp_full_changelog.md
         mv $TEMP_CHANGELOG_ENTRY CHANGELOG.md
@@ -151,6 +153,7 @@ generate_documentation:
   rules:
     - if: "$CI_COMMIT_TAG"
     - when: manual
+
 commit_documentation:
   stage: commit_docs
   image: debian:bookworm
@@ -177,4 +180,3 @@ commit_documentation:
       fi
   rules:
     - if: "$CI_COMMIT_TAG"
-    - when: manual
