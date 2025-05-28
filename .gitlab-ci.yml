@@ -3,9 +3,9 @@ image: debian:bookworm
 stages:
   - lint
   - type
-# - test
-  - docs
-  - commit_docs
+#  - test
+#  - docs
+#  - commit_docs
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -53,19 +53,19 @@ Type checking:
   script:
     - uv run -- mypy .
 
-# Testing:
-#   <<: *uv_setup
-#   stage: test
-#   script:
-#     - uv run -- pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
-#   coverage: '/TOTAL.*\s+(\d+%)$/'
-#   artifacts:
-#     expire_in: 1 week
-#     reports:
-#       coverage_report:
-#         coverage_format: cobertura
-#         path: cover/ # Make sure this path matches where cobertura.xml is generated
-#   interruptible: true
+Testing:
+  <<: *uv_setup
+  stage: test
+  script:
+    - uv run -- pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    expire_in: 1 week
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: cover/ # Make sure this path matches where cobertura.xml is generated
+  interruptible: true
 
 generate_documentation:
   stage: docs
