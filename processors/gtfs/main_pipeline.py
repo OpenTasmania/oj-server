@@ -213,17 +213,16 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
             # Read raw data (e.g., using pandas).
             try:
-                # Read all as string initially to preserve original values for validation.
+                # Pandas 2+: Use dtype_backend for nullable dtypes and pd.NA.
                 raw_df = pd.read_csv(
                     file_path_on_disk,
-                    dtype="str",
-                    keep_default_na=False,  # Keep empty strings as is
-                    na_values=[
-                        ""
-                    ],  # Treat empty strings as NA for some ops if needed later
+                    dtype_backend="numpy_nullable", # Use Pandas 2 nullable dtypes
+                    keep_default_na=False, # Interpret only na_values as NA
+                    na_values=[""], # Treat only empty strings as NA
                 )
                 module_logger.info(
-                    f"Read {len(raw_df)} raw records from {gtfs_filename}."
+                    f"Read {len(raw_df)} raw records from {gtfs_filename} "
+                    f"using Pandas 2 nullable dtypes."
                 )
                 total_records_processed += len(raw_df)
             except pd.errors.EmptyDataError:
@@ -241,7 +240,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
                 continue
 
             # --- Conceptual Validation and Transformation Steps ---
-            # These steps would use functions from `validate.py` and `transform.py`.
+            # These steps would use functions from `utils.py` (was validate.py) and `transform.py`.
             #
             # 1. Validate `raw_df` against Pydantic model from `file_schema_definition`.
             #    pydantic_model = file_schema_definition.get('model')
