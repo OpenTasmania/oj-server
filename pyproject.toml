@@ -31,17 +31,18 @@ keywords = ["osm", "osrm", "gtfs", "gis", "map server", "routing", "postgis", "p
 requires-python = ">=3.13,<4.0"
 
 dependencies = [
+    "Cython>=3,<4",
     "requests>=2.25.0,<3.0.0", # For downloading GTFS zip files
-    # TODO: Move to psycopg. The latest generation, also referred to as psycopg3, is recommended over psycopg2
-    "psycopg2-binary>=2.9,<3.0.0", # For PostgreSQL interaction
     "pandas>=2.0.0,<3.0.0", # For data manipulation
+    'psycopg[c]>=3.2.9,<4', # Recommended: Psycopg 3 with C optimizations. Adjust version as needed.
     "gtfparse>=1.1.0,<2.0.0", # For parsing GTFS files
     # gtfsparse > 2.0.0 currently presents build issues due to pyarrow
     # TODO: Switch to 'gtfs-kit' for more advanced validation if gtfparse is limiting.
     "pydantic>=2.0.0,<3.0.0", # For data validation and schema definitions
     "python-dotenv>=0.19.0,<1.0.0", # For managing environment variables (e.g., .env file for DB creds)
     "PyYAML>=6.0.0,<7.0.0", # For any YAML configurations, or if a dependency needs it
-    "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git",
+    "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git@5.0.2",
+    "yafc @ git+https://gitlab.com/opentasmania/yafconfigurator.git@3.0.1",
     "urwid>=3.0.0,<4.0.0",
 ]
 
@@ -63,7 +64,6 @@ dev = [
     "pytest-cov>=5.0,<6.0",
     "pytest-mock>=3.0,<4.0",
     "pytest-subprocess>=1.0,<2.0",
-    "types-psycopg2>=2.9.21.20250516",
 ]
 test = [
     "pytest>=8.0,<9.0",

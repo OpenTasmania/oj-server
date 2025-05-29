@@ -1,4 +1,4 @@
-# setup/services/carto.py
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Handles the setup of the CartoCSS compiler and OpenStreetMap-Carto stylesheet.
@@ -13,7 +13,8 @@ import getpass
 import grp
 import logging
 import os
-import shutil  # For shutil.which to find executables
+import shutil
+import sys # Changed: Imported sys to use sys.executable for venv Python
 from typing import Optional
 
 from setup import config
@@ -24,8 +25,6 @@ from setup.command_utils import (
     run_elevated_command,
 )
 
-# No specific helpers needed from helpers.py for this function directly,
-# but systemd_reload might be used by an orchestrator after many services.
 
 module_logger = logging.getLogger(__name__)
 
@@ -66,8 +65,6 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             "error",
             logger_to_use,
         )
-        # Not raising an error, as Carto might be optional or handled
-        # differently if Node isn't managed by this script.
         return
 
     log_map_server(
@@ -77,16 +74,13 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         logger_to_use,
     )
     try:
-        # Global npm installs typically require sudo privileges.
         run_elevated_command(
             ["npm", "install", "-g", "carto"], current_logger=logger_to_use
         )
-        # Verify installation by checking version.
-        # This should be run as the user, assuming 'carto' is now in PATH.
         carto_version_result = run_command(
             ["carto", "-v"],
             capture_output=True,
-            check=False,  # Don't fail the script if version check has an issue
+            check=False,
             current_logger=logger_to_use,
         )
         carto_version = (
@@ -108,7 +102,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             "error",
             logger_to_use,
         )
-        return  # Don't proceed if carto isn't installed.
+        return
 
     log_map_server(
         f"{config.SYMBOLS['gear']} Setting up OpenStreetMap-Carto stylesheet...",
@@ -117,11 +111,10 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
     )
     osm_carto_base_dir = "/opt/openstreetmap-carto"
 
-    # Check if the directory exists using an elevated command.
     dir_exists_check = run_elevated_command(
         ["test", "-d", osm_carto_base_dir],
-        check=False,  # `test -d` returns 0 if exists, 1 if not.
-        capture_output=True,  # Suppress output of 'test' command.
+        check=False,
+        capture_output=True,
         current_logger=logger_to_use,
     )
     if dir_exists_check.returncode != 0:
@@ -136,7 +129,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 "git",
                 "clone",
                 "--depth",
-                "1",  # Shallow clone for speed
+                "1",
                 "https://github.com/gravitystorm/openstreetmap-carto.git",
                 osm_carto_base_dir,
             ],
@@ -156,7 +149,6 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         current_group_info = grp.getgrgid(os.getgid())
         current_group_name = current_group_info.gr_name
     except KeyError:
-        # Fallback to GID if group name cannot be found.
         current_group_name = str(os.getgid())
 
     log_map_server(
@@ -187,17 +179,17 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             logger_to_use,
         )
 
-        # Find python3 or python executable.
-        python_exe_path = shutil.which("python3") or shutil.which("python")
+        python_exe_path = sys.executable # Changed: Use sys.executable to ensure Python from the active virtual environment is used.
         if python_exe_path:
-            run_command(  # Run as current user due to chown.
+            run_command(
                 [python_exe_path, "scripts/get-external-data.py"],
                 current_logger=logger_to_use,
             )
         else:
             log_map_server(
-                f"{config.SYMBOLS['warning']} Python executable not found. "
-                "Cannot run get-external-data.py. Shapefiles might be missing.",
+                f"{config.SYMBOLS['warning']} Python executable (sys.executable) " # Changed: Updated log message to reflect use of sys.executable.
+                "was unexpectedly not found. Cannot run get-external-data.py. "
+                "Shapefiles might be missing.",
                 "warning",
                 logger_to_use,
             )
@@ -208,20 +200,16 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             "info",
             logger_to_use,
         )
-        # Log compilation output to a file in the carto directory.
         compile_log_filename = "carto_compile_log.txt"
 
-        # Assumes 'carto' is in PATH for the current user.
         carto_cmd = ["carto", "project.mml"]
-        carto_result = run_command(  # Run as current user.
+        carto_result = run_command(
             carto_cmd,
             capture_output=True,
-            check=False,  # Check return code manually.
+            check=False,
             current_logger=logger_to_use,
         )
 
-        # Always write log, regardless of success.
-        # Written as current user due to chown.
         with open(compile_log_filename, "w", encoding="utf-8") as log_f:
             if carto_result.stdout:
                 log_f.write(f"stdout from carto:\n{carto_result.stdout}\n")
@@ -229,9 +217,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 log_f.write(f"stderr from carto:\n{carto_result.stderr}\n")
             log_f.write(f"Return code: {carto_result.returncode}\n")
 
-        # 'carto' outputs XML to stdout on success.
         if carto_result.returncode == 0 and carto_result.stdout:
-            # Write as current user.
             with open("mapnik.xml", "w", encoding="utf-8") as mapnik_f:
                 mapnik_f.write(carto_result.stdout)
             log_map_server(
@@ -249,7 +235,6 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 "error",
                 logger_to_use,
             )
-            # Continue to finally block to revert ownership.
 
         if mapnik_xml_created_successfully:
             mapnik_xml_path = os.path.join(os.getcwd(), "mapnik.xml")
@@ -278,7 +263,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                     "success",
                     logger_to_use,
                 )
-            else:  # File exists but is empty or other issue.
+            else:
                 log_map_server(
                     f"{config.SYMBOLS['error']} mapnik.xml was created but "
                     "is empty or invalid. Check "
@@ -286,7 +271,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
                     "error",
                     logger_to_use,
                 )
-                mapnik_xml_created_successfully = False  # Mark as failure.
+                mapnik_xml_created_successfully = False
     except Exception as e_carto_processing:
         log_map_server(
             f"{config.SYMBOLS['error']} Error during OpenStreetMap-Carto "
@@ -294,9 +279,9 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             "error",
             logger_to_use,
         )
-        mapnik_xml_created_successfully = False  # Ensure failure status.
+        mapnik_xml_created_successfully = False
     finally:
-        os.chdir(original_cwd)  # Always change back to original directory.
+        os.chdir(original_cwd)
         log_map_server(
             f"{config.SYMBOLS['info']} Reverting ownership of "
             f"{osm_carto_base_dir} to root:root.",

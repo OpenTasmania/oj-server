@@ -36,12 +36,13 @@ PGPASSWORD_DEFAULT: str = "yourStrongPasswordHere"
 STATE_FILE_DIR: str = "/var/lib/map-server-setup-script"
 STATE_FILE_PATH: Path = Path(STATE_FILE_DIR) / "progress_state.txt"
 # Represents the version of the setup script logic.
-SCRIPT_VERSION: str = "1.3.1"
+SCRIPT_VERSION: str = "1.4"
 
 # Define the root directory of the 'osm' project for hashing.
 # This assumes config.py is in osm/setup/
 OSM_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
+# TODO: Trim the package lists
 
 # --- Package Lists (for apt installation) ---
 CORE_PREREQ_PACKAGES: list[str] = [
@@ -49,7 +50,10 @@ CORE_PREREQ_PACKAGES: list[str] = [
     "unzip",
     "vim",
     "build-essential",
-    "software-properties-common",
+    "gir1.2-packagekitglib-1.0",
+    "gir1.2-glib-2.0",
+    "packagekit",
+    "python-apt-common",
     "dirmngr",
     "gnupg",
     "apt-transport-https",
@@ -70,21 +74,18 @@ PYTHON_SYSTEM_PACKAGES: list[str] = [
     "python3-pip",
     "python3-venv",
     "python3-dev",
-    "python3-yaml",
-    "python3-pandas",
-    "python3-psycopg2",
-    "python3-psycopg",  # General purpose PostgreSQL adapter
-    "python3-pydantic",
 ]
 
 POSTGRES_PACKAGES: list[str] = [
     "postgresql",
     "postgresql-contrib",
+    "libpq-dev",
+    "postgresql-common",
     "postgis",
     # The versioned packages ensure correct PostGIS scripts for the default
     # PG version on Debian. Adjust if targeting a different PostgreSQL version.
-    "postgresql-15-postgis-3",  # For PostgreSQL 15 (Debian 12 default)
-    "postgresql-15-postgis-3-scripts",
+    "postgresql-17-postgis-3",  # For PostgreSQL Trixie (Debian 13 default)
+    "postgresql-17-postgis-3-scripts",
 ]
 
 FONT_PACKAGES: list[str] = [

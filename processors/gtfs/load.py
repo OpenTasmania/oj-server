@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 Handles loading GTFS (General Transit Feed Specification) data into a
-PostgreSQL database.
+PostgreSQL database using Psycopg 3.
 
 This module provides functions to load Pandas DataFrames, transformed from GTFS
 files, into corresponding database tables. It includes functionality for
-batch inserts, handling potential geometry data (WKT format), and logging
-failed records to a Dead-Letter Queue (DLQ) table.
+batch inserts (using executemany), handling potential geometry data (WKT format),
+and logging failed records to a Dead-Letter Queue (DLQ) table.
 """
 
 import json
@@ -16,25 +16,23 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extensions import connection as PgConnection
-from psycopg2.extensions import cursor as PgCursor
-from psycopg2.extras import execute_values
+import psycopg  # Psycopg 3: Replaces psycopg2
+from psycopg import sql  # Psycopg 3: Replaces psycopg2.sql
+from psycopg import Connection as PgConnection, Cursor as PgCursor  # Psycopg 3: Type hints
 
 module_logger = logging.getLogger(__name__)
 
 
 def get_table_columns(
-    cursor: PgCursor,
-    table_name: str,
-    schema: str = "public",
+        cursor: PgCursor,  # Psycopg 3: Type hint updated
+        table_name: str,
+        schema: str = "public",
 ) -> Optional[List[str]]:
     """
     Fetch column names for a given table from the information_schema.
 
     Args:
-        cursor: Active psycopg2 cursor object.
+        cursor: Active Psycopg 3 cursor object.
         table_name: Name of the table.
         schema: Name of the schema the table belongs to. Defaults to "public".
 
@@ -63,7 +61,7 @@ def get_table_columns(
             )
             return None
         return columns
-    except psycopg2.Error as e:
+    except psycopg.Error as e:  # Psycopg 3: Error class changed
         module_logger.error(
             f"Error fetching columns for table {schema}.{table_name}: {e}"
         )
@@ -71,40 +69,29 @@ def get_table_columns(
 
 
 def load_dataframe_to_db(
-    conn: PgConnection,
-    df: pd.DataFrame,
-    table_name: str,
-    schema_definition: Dict[str, Any],
-    dlq_table_name: Optional[str] = None,
+        conn: PgConnection,  # Psycopg 3: Type hint updated
+        df: pd.DataFrame,
+        table_name: str,
+        schema_definition: Dict[str, Any],
+        dlq_table_name: Optional[str] = None,
 ) -> Tuple[int, int]:
     """
-    Load a Pandas DataFrame into a specified PostgreSQL table.
+    Load a Pandas DataFrame into a specified PostgreSQL table using Psycopg 3.
 
-    This function assumes the input DataFrame has been validated and transformed
-    according to the `schema_definition`. It truncates the target table before
-    loading new data. It uses `execute_values` for efficient batch inserts.
-    Geometry data, if present, is expected as WKT strings and will be
-    converted using `ST_SetSRID(ST_GeomFromText(...))`.
+    This function assumes the input DataFrame has been validated and transformed.
+    It truncates the target table before loading new data using `cursor.executemany()`.
+    Geometry data, if present in a column as WKT strings, is inserted as text,
+    relying on PostgreSQL to cast it to the GEOMETRY type if the column is defined as such.
 
     Args:
-        conn: Active psycopg2 connection object.
-        df: Pandas DataFrame to load. Its columns should align with the
-            keys in `schema_definition['columns']` plus any geometry column
-            defined in `schema_definition['geom_config']`.
+        conn: Active Psycopg 3 connection object.
+        df: Pandas DataFrame to load.
         table_name: Name of the target database table.
-        schema_definition: Schema details for the table (e.g., from
-                           `schema_definitions.GTFS_FILE_SCHEMAS`). Expected
-                           to contain 'columns' (a dict) and optionally
-                           'geom_config'.
-        dlq_table_name: Optional name of the Dead-Letter Queue (DLQ) table
-                        for logging records that fail during this load process.
-                        Currently, DLQ logging here is basic for batch failures.
+        schema_definition: Schema details for the table.
+        dlq_table_name: Optional name of the Dead-Letter Queue (DLQ) table.
 
     Returns:
-        A tuple (successful_loads, dlq_inserts):
-            - successful_loads: Number of records successfully loaded.
-            - dlq_inserts: Number of records sent to DLQ (currently basic,
-                           primarily for indicating batch failures).
+        A tuple (successful_loads, dlq_inserts).
     """
     if df.empty:
         module_logger.info(
@@ -113,7 +100,7 @@ def load_dataframe_to_db(
         return 0, 0
 
     successful_loads = 0
-    dlq_inserts = 0  # Currently minimal DLQ usage in this batch function.
+    dlq_inserts = 0
 
     target_db_cols_from_schema = list(
         schema_definition.get("columns", {}).keys()
@@ -143,7 +130,7 @@ def load_dataframe_to_db(
         data_tuples = [
             tuple(x)
             for x in df_to_load_final.replace({
-                pd.NA: None, # Pandas 2+: Ensures pd.NA is converted to None for DB
+                pd.NA: None,  # Pandas 2+: Ensures pd.NA is converted to None for DB
                 float("nan"): None,
                 float("inf"): None,
                 float("-inf"): None,
@@ -156,146 +143,113 @@ def load_dataframe_to_db(
         )
         return 0, 0
 
-    with conn.cursor() as cursor:
-        try:
-            module_logger.info(f"Truncating table: {table_name}...")
-            cursor.execute(
-                sql.SQL("TRUNCATE TABLE {} CASCADE;").format(
-                    sql.Identifier(table_name)
+    try:
+        # Psycopg 3: Use 'with conn.transaction():' for managing transactions
+        with conn.transaction():
+            with conn.cursor() as cursor:
+                module_logger.info(f"Truncating table: {table_name}...")
+                cursor.execute(
+                    sql.SQL("TRUNCATE TABLE {} CASCADE;").format(
+                        sql.Identifier(table_name)
+                    )
                 )
-            )
-            module_logger.info(f"Table {table_name} truncated.")
-        except psycopg2.Error as e:
-            module_logger.error(
-                f"Error truncating table {table_name}: {e}", exc_info=True
-            )
-            conn.rollback()
-            return 0, 0
+                module_logger.info(f"Table {table_name} truncated.")
 
-        quoted_db_cols = [
-            sql.Identifier(col) for col in df_cols_for_db_insert
-        ]
-        cols_sql_segment = sql.SQL(", ").join(quoted_db_cols)
-        placeholders_list = [sql.Placeholder()] * len(df_cols_for_db_insert)
+                if not data_tuples:
+                    module_logger.info(f"No data to load into {table_name} after processing.")
+                    return 0, 0
 
-        if (
-            geom_col_name
-            and geom_col_name in df_cols_for_db_insert
-            and geom_config
-        ):
-            srid = geom_config.get(
-                "srid", 4326
-            )
-            try:
-                geom_col_idx = df_cols_for_db_insert.index(geom_col_name)
-                placeholders_list[geom_col_idx] = sql.SQL(
-                    "ST_SetSRID(ST_GeomFromText({}), {})"
-                ).format(sql.Placeholder(), sql.Literal(srid))
-            except ValueError: # Should not happen if logic above is correct
-                module_logger.error(
-                    f"Geometry column '{geom_col_name}' defined in schema but "
-                    f"not found in DataFrame columns being loaded for "
-                    f"'{table_name}'. This should not happen if transform step is correct."
+                quoted_db_cols = [
+                    sql.Identifier(col) for col in df_cols_for_db_insert
+                ]
+                cols_sql_segment = sql.SQL(", ").join(quoted_db_cols)
+
+                placeholders_sql_segment = sql.SQL(", ").join(
+                    [sql.Placeholder()] * len(df_cols_for_db_insert)  # Psycopg 3: Placeholders for executemany
                 )
-                conn.rollback()
-                return 0, 0
 
-        placeholders_sql_segment = sql.SQL(", ").join(placeholders_list)
-        insert_stmt = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-            sql.Identifier(table_name),
-            cols_sql_segment,
-            placeholders_sql_segment,
-        )
-        module_logger.debug(
-            f"Insert statement for {table_name}: {insert_stmt.as_string(conn)}"
-        )
+                insert_stmt_template = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                    sql.Identifier(table_name),
+                    cols_sql_segment,
+                    placeholders_sql_segment,
+                )
 
-        module_logger.info(
-            f"Attempting to load {len(data_tuples)} records into {table_name}..."
-        )
-        try:
-            execute_values(
-                cursor,
-                insert_stmt.as_string(
-                    conn
-                ),
-                data_tuples,
-                page_size=1000,
-            )
-            successful_loads = (
-                cursor.rowcount
-                if cursor.rowcount is not None
-                else len(data_tuples)
-            )
-            conn.commit()
+                insert_query_string = insert_stmt_template.as_string(conn)
+                module_logger.debug(
+                    f"Insert statement for {table_name} (using executemany): {insert_query_string}"
+                )
+                module_logger.info(
+                    f"Attempting to load {len(data_tuples)} records into {table_name} using executemany..."
+                )
+
+                # Psycopg 3: Use cursor.executemany
+                cursor.executemany(insert_query_string, data_tuples)
+
+                successful_loads = (
+                    cursor.rowcount
+                    if cursor.rowcount != -1
+                    else len(data_tuples)
+                )
+
             module_logger.info(
                 f"Successfully loaded {successful_loads} records into {table_name}."
             )
-        except psycopg2.Error as e_db_insert:
-            conn.rollback()
+    except psycopg.Error as e_db_insert:  # Psycopg 3: Error class changed
+        module_logger.error(
+            f"Error during bulk insert into {table_name} using Psycopg 3: {e_db_insert}. "
+            "Transaction rolled back. No records loaded for this batch.",
+            exc_info=True,
+        )
+        if dlq_table_name:
             module_logger.error(
-                f"Error during bulk insert into {table_name}: {e_db_insert}. "
-                "No records loaded into production table for this batch.",
-                exc_info=True,
+                f"Batch insert failed for {table_name}. Logging failure info "
+                f"to DLQ table '{dlq_table_name}' if possible."
             )
-            if dlq_table_name:
-                module_logger.error(
-                    f"Batch insert failed for {table_name}. Logging failure info "
-                    f"to DLQ table '{dlq_table_name}' if possible."
+            try:
+                log_to_dlq(
+                    conn,
+                    dlq_table_name,
+                    {
+                        "batch_summary": f"Failed to insert {len(data_tuples)} records.",
+                        "first_record_example": data_tuples[0]
+                        if data_tuples
+                        else None,
+                        "column_names": df_cols_for_db_insert,
+                    },
+                    str(e_db_insert),
+                    f"Batch insert failure for table: {table_name}",
                 )
-                try:
-                    log_to_dlq(
-                        conn,
-                        dlq_table_name,
-                        {
-                            "batch_summary": f"Failed to insert {len(data_tuples)} records.",
-                            "first_record_example": data_tuples[0]
-                            if data_tuples
-                            else None,
-                            "column_names": df_cols_for_db_insert,
-                        },
-                        str(e_db_insert),
-                        f"Batch insert failure for table: {table_name}",
-                    )
-                    dlq_inserts = 1
-                except Exception as e_dlq_log:
-                    module_logger.error(
-                        f"Failed to log batch failure to DLQ: {e_dlq_log}"
-                    )
-        except Exception as e_unexpected:
-            conn.rollback()
-            module_logger.error(
-                f"Unexpected error during data load for {table_name}: {e_unexpected}",
-                exc_info=True,
-            )
+                dlq_inserts = 1
+            except Exception as e_dlq_log:
+                module_logger.error(
+                    f"Failed to log batch failure to DLQ: {e_dlq_log}"
+                )
+    except Exception as e_unexpected:
+        module_logger.error(
+            f"Unexpected error during data load for {table_name}: {e_unexpected}",
+            exc_info=True,
+        )
 
     return successful_loads, dlq_inserts
 
 
 def log_to_dlq(
-    conn: PgConnection,
-    dlq_table_name: str,
-    failed_record_data: Dict,
-    error_reason: str,
-    source_info: str,
+        conn: PgConnection,  # Psycopg 3: Type hint updated
+        dlq_table_name: str,
+        failed_record_data: Dict,
+        error_reason: str,
+        source_info: str,
 ) -> None:
     """
-    Log a failed record or batch failure information to a Dead-Letter Queue (DLQ) table.
-
-    Assumes the DLQ table has at least the following columns:
-    - `original_data` (TEXT or JSONB): Stores the problematic data.
-    - `error_reason` (TEXT): Description of why the record failed.
-    - `source_info` (TEXT): Context about the source of the data (e.g., filename).
-    - `processed_at` (TIMESTAMP WITH TIME ZONE): Timestamp of logging.
+    Log a failed record or batch failure information to a Dead-Letter Queue (DLQ) table
+    using Psycopg 3.
 
     Args:
-        conn: Active psycopg2 connection object.
+        conn: Active Psycopg 3 connection object.
         dlq_table_name: Name of the DLQ table.
-        failed_record_data: Dictionary containing the data of the failed record
-                            or a summary if it's a batch failure.
+        failed_record_data: Dictionary containing the data of the failed record.
         error_reason: String describing the reason for failure.
-        source_info: String providing context about the data's origin or the
-                     nature of the failure (e.g., "stops.txt", "Batch insert error").
+        source_info: String providing context about the data's origin.
     """
     dlq_insert_stmt = sql.SQL(
         """
@@ -308,27 +262,26 @@ def log_to_dlq(
         record_json = json.dumps(failed_record_data, default=str)
         timestamp_now = datetime.now()
 
+        # Psycopg 3: Operations are typically autocommitted unless inside an explicit transaction.
+        # For a single DLQ write, autocommit is usually desired.
         with conn.cursor() as cursor:
             cursor.execute(
                 dlq_insert_stmt,
                 (record_json, error_reason, source_info, timestamp_now),
             )
-        conn.commit()
         module_logger.debug(
             f"Record/Info logged to DLQ table '{dlq_table_name}' "
             f"for source: {source_info}"
         )
-    except psycopg2.Error as e_db_dlq:
-        conn.rollback()
+    except psycopg.Error as e_db_dlq:  # Psycopg 3: Error class changed
         module_logger.error(
             f"Database error inserting record into DLQ table "
-            f"'{dlq_table_name}': {e_db_dlq}",
+            f"'{dlq_table_name}' using Psycopg 3: {e_db_dlq}",
             exc_info=True,
         )
     except Exception as e_unexpected_dlq:
-        conn.rollback()
         module_logger.error(
-            f"Unexpected error logging to DLQ table '{dlq_table_name}': "
+            f"Unexpected error logging to DLQ table '{dlq_table_name}' using Psycopg 3: "
             f"{e_unexpected_dlq}",
             exc_info=True,
         )

@@ -38,7 +38,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     Raises:
         FileNotFoundError: If the PostgreSQL configuration directory
-                           (e.g., /etc/postgresql/15/main) is not found,
+                           (e.g., /etc/postgresql/17/main) is not found,
                            indicating PostgreSQL might not be installed or
                            the version is different.
         subprocess.CalledProcessError: If any critical `psql` or `systemctl`
@@ -57,7 +57,7 @@ def postgres_setup(current_logger: Optional[logging.Logger] = None) -> None:
     )
 
     # TODO: Make pg_version dynamically detectable or a central config.
-    pg_version = "15"
+    pg_version = "17"
     pg_conf_dir = f"/etc/postgresql/{pg_version}/main"
     pg_conf_file = os.path.join(pg_conf_dir, "postgresql.conf")
     pg_hba_file = os.path.join(pg_conf_dir, "pg_hba.conf")

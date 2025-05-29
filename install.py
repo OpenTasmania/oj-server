@@ -16,11 +16,9 @@ import subprocess
 import sys
 from typing import List, Optional
 
-# Define the name of the main installer module to be executed.
 MAP_SERVER_MODULE_NAME = "setup.main_installer"
-VENV_DIR = ".venv"  # Using .venv for default uv detection.
+VENV_DIR = ".venv"
 
-# --- Basic Configuration & Symbols ---
 SYMBOLS_OUTER = {
     "success": "✅",
     "error": "❌",
@@ -35,7 +33,6 @@ SYMBOLS_OUTER = {
     "link": "🔗",
 }
 
-# --- Logger for this prerequisite installer script ---
 outer_logger = logging.getLogger("PrereqInstaller")
 outer_logger.setLevel(logging.INFO)
 _handler = logging.StreamHandler(sys.stdout)
@@ -61,7 +58,6 @@ def log_prereq(message: str, level: str = "info") -> None:
         outer_logger.info(message)
 
 
-# --- Command Execution Utilities (Simplified for this script) ---
 def _get_elevated_prefix_prereq() -> List[str]:
     """Return ['sudo'] if not root, otherwise an empty list."""
     return [] if os.geteuid() == 0 else ["sudo"]
@@ -120,7 +116,7 @@ def _run_cmd_prereq(
             capture_output
             and result.stderr
             and result.stderr.strip()
-            and result.returncode == 0  # Only log non-failing stderr as info.
+            and result.returncode == 0
         ):
             log_prereq(f"   stderr: {result.stderr.strip()}", "info")
         return result
@@ -282,7 +278,6 @@ def ensure_pip_installed_prereq() -> bool:
         return False
 
 
-# --- UV Installation Logic ---
 def _install_uv_with_pipx_prereq() -> bool:
     """
     Install 'uv' using pipx, including pipx itself if needed.
@@ -406,7 +401,6 @@ def install_uv_prereq() -> bool:
                 f"   uv version: {uv_version_result.stdout.strip()}", "info"
             )
         except Exception:
-            # If version check fails, it's not critical, 'uv' command exists.
             pass
         return True
 
@@ -418,7 +412,6 @@ def install_uv_prereq() -> bool:
     codename = get_debian_codename_prereq()
     apt_prefix = _get_elevated_prefix_prereq()
 
-    # Debian versions where 'uv' might be in apt.
     if codename in ["trixie", "forky", "sid"]:
         log_prereq(
             f"{SYMBOLS_OUTER.get('package', '>>')} Debian '{codename}' "
@@ -457,6 +450,103 @@ def install_uv_prereq() -> bool:
         return _install_uv_with_pipx_prereq()
 
 
+def ensure_pg_config_or_libpq_dev_installed_prereq() -> bool: # Changed: New function to ensure pg_config (via libpq-dev) is installed
+    """
+    Ensure 'pg_config' command is available, installing 'libpq-dev' if not.
+
+    Returns:
+        True if 'pg_config' is available or 'libpq-dev' installed successfully.
+        False otherwise.
+    """
+    log_prereq(
+        f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'pg_config' command "
+        "(for psycopg compilation)...",
+        "info",
+    )
+    if command_exists_prereq("pg_config"):
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('success', 'OK')} 'pg_config' command is "
+            "already available.",
+            "info",
+        )
+        return True
+
+    log_prereq(
+        f"{SYMBOLS_OUTER.get('warning', '!!')} 'pg_config' command not found. "
+        "This is needed to build some Python PostgreSQL adapters (like psycopg-c). "
+        "Attempting to install 'libpq-dev' which provides it...",
+        "warning",
+    )
+
+    if not command_exists_prereq("apt"):
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command not found. "
+            "Cannot attempt to install 'libpq-dev'. "
+            "Please install it manually for your system.",
+            "error",
+        )
+        return False
+
+    apt_prefix = _get_elevated_prefix_prereq()
+    try:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('gear', '>>')} Updating apt cache before "
+            "installing 'libpq-dev'...",
+            "info",
+        )
+        _run_cmd_prereq(apt_prefix + ["apt", "update"], capture_output=True)
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('package', '>>')} Attempting to install "
+            "'libpq-dev' using apt...",
+            "info",
+        )
+        _run_cmd_prereq(
+            apt_prefix + ["apt", "install", "-y", "libpq-dev"],
+            capture_output=True,
+        )
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('success', 'OK')} 'libpq-dev' installation "
+            "via apt initiated.",
+            "info",
+        )
+        if command_exists_prereq("pg_config"):
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('success', 'OK')} 'pg_config' command is "
+                "now available after 'libpq-dev' installation.",
+                "info",
+            )
+            return True
+        else:
+            log_prereq(
+                f"{SYMBOLS_OUTER.get('error', '!!')} 'libpq-dev' was "
+                "reportedly installed by apt, but 'pg_config' command is "
+                "still not found. This is unexpected.",
+                "error",
+            )
+            return False
+    except subprocess.CalledProcessError as e:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install "
+            f"'libpq-dev' via apt: {e}. Error: {e.stderr or e.stdout or str(e)}",
+            "error",
+        )
+        return False
+    except FileNotFoundError:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command was not found "
+            "during execution. Cannot install 'libpq-dev'.",
+            "error",
+        )
+        return False
+    except Exception as e:
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('error', '!!')} An unexpected error "
+            f"occurred while trying to install 'libpq-dev': {e}",
+            "error",
+        )
+        return False
+
+
 def get_venv_python_executable(project_root: str, venv_dir_name: str) -> str:
     """Return the path to the Python executable in the virtual environment."""
     return os.path.join(project_root, venv_dir_name, "bin", "python")
@@ -473,8 +563,6 @@ def main() -> int:
         0 on success, 1 on failure.
     """
     script_name = os.path.basename(sys.argv[0])
-    # Assumes install.py is in the project root, and pyproject.toml is also
-    # there.
     project_root = os.path.dirname(os.path.abspath(__file__))
 
     install_py_help_text = f"""
@@ -484,10 +572,11 @@ Usage: {script_name} [--help] <action_flag> \
 Prerequisite installer for the Map Server Setup.
 This script performs the following actions:
 1. Ensures 'uv' (Python packager and virtual environment manager) is installed.
-2. Creates a virtual environment in '{VENV_DIR}' using 'uv venv'.
-3. Installs project dependencies from 'pyproject.toml' (expected in the same
+2. Ensures 'libpq-dev' (for 'pg_config') is installed for building Python packages.
+3. Creates a virtual environment in '{VENV_DIR}' using 'uv venv'.
+4. Installs project dependencies from 'pyproject.toml' (expected in the same
    directory as this script) into the venv using 'uv pip install .'.
-4. Based on the <action_flag> provided, it either continues to the main
+5. Based on the <action_flag> provided, it either continues to the main
    setup or exits.
 
 Action Flags (mutually exclusive, one is required):
@@ -517,16 +606,12 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
         )
         print("=" * 80)
         try:
-            # Attempt to run the main installer with --help using current python
-            # This might fail if deps are missing, but should show its own
-            # argparse help.
             help_cmd_args = [
                 sys.executable,
                 "-m",
                 MAP_SERVER_MODULE_NAME,
                 "--help",
             ]
-            # Let it handle its own SystemExit for help.
             subprocess.run(help_cmd_args, check=False)
             return 0
         except Exception as e_main_help:
@@ -550,10 +635,7 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             "either --continue-install or --exit-on-complete.",
             "critical",
         )
-        print(
-            f"\nUsage: {script_name} [--help] (--continue-install | "
-            "--exit-on-complete) [options_for_main_setup...]"
-        )
+        print(f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [options_for_main_setup...]")
         print(f"Run '{script_name} --help' for full details.")
         return 1
 
@@ -563,29 +645,22 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             "and --exit-on-complete are mutually exclusive.",
             "critical",
         )
-        print(
-            f"\nUsage: {script_name} [--help] (--continue-install | "
-            "--exit-on-complete) [options_for_main_setup...]"
-        )
+        print(f"\nUsage: {script_name} [--help] (--continue-install | --exit-on-complete) [options_for_main_setup...]")
         print(f"Run '{script_name} --help' for more details.")
         return 1
 
     if not ensure_pip_installed_prereq():
-        if not command_exists_prereq("pip") and not command_exists_prereq(
-            "pip3"
-        ):
+        if not command_exists_prereq("pip") and not command_exists_prereq("pip3"):
             log_prereq(
                 f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to ensure 'pip' "
-                "is available. 'pip' is a critical prerequisite for potentially "
-                "installing other tools like 'pipx'. Aborting.",
+                "is available. 'pip' is a critical prerequisite. Aborting.",
                 "critical",
             )
             return 1
         else:
             log_prereq(
                 f"{SYMBOLS_OUTER.get('warning', '!!')} 'ensure_pip_installed_prereq' "
-                "returned False, but a pip command ('pip' or 'pip3') was found. "
-                "Proceeding with caution.",
+                "returned False, but a pip command was found. Proceeding cautiously.",
                 "warning",
             )
 
@@ -620,10 +695,17 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
         "info",
     )
 
+    if not ensure_pg_config_or_libpq_dev_installed_prereq(): # Changed: Call to ensure pg_config/libpq-dev is present before venv setup for dependencies.
+        log_prereq(
+            f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to ensure 'pg_config' "
+            "(via 'libpq-dev') is available. Python dependencies requiring it "
+            "will likely fail to build. Aborting.",
+            "critical",
+        )
+        return 1
+
     venv_path = os.path.join(project_root, VENV_DIR)
-    venv_python_executable = get_venv_python_executable(
-        project_root, VENV_DIR
-    )
+    venv_python_executable = get_venv_python_executable(project_root, VENV_DIR)
 
     log_prereq(
         f"{SYMBOLS_OUTER.get('step', '->')} Setting up virtual environment "
@@ -646,7 +728,6 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             f"dependencies from 'pyproject.toml' into '{VENV_DIR}'...",
             "info",
         )
-        # uv should detect .venv in cwd.
         _run_cmd_prereq(["uv", "pip", "install", "."], cwd=project_root)
         log_prereq(
             f"{SYMBOLS_OUTER.get('success', 'OK')} Project dependencies "
@@ -686,15 +767,8 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             "info",
         )
         args_for_map_server_setup = [
-            arg
-            for arg in sys.argv[1:]
-            if arg
-            not in [
-                "--continue-install",
-                "--exit-on-complete",
-                "--help",
-                "-h",
-            ]
+            arg for arg in sys.argv[1:]
+            if arg not in ["--continue-install", "--exit-on-complete", "--help", "-h"]
         ]
         cmd_to_run_main_installer = [
             venv_python_executable,
@@ -747,19 +821,18 @@ Arguments for {MAP_SERVER_MODULE_NAME} \
             )
             return 1
 
-    return 1  # Should not be reached.
+    return 1
 
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
     except KeyboardInterrupt:
-        # Basic logger setup if not done before interruption.
         if not outer_logger.handlers:
             _handler_kb = logging.StreamHandler(sys.stdout)
             _formatter_kb = logging.Formatter(
-                "[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
+                 "[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S"
             )
             _handler_kb.setFormatter(_formatter_kb)
             outer_logger.addHandler(_handler_kb)
@@ -770,14 +843,14 @@ if __name__ == "__main__":
             "warning",
         )
         sys.exit(130)
-    except SystemExit as e:  # Allow planned exits (e.g. from help).
+    except SystemExit as e:
         sys.exit(e.code)
-    except Exception as e_global:  # Catch-all for truly unexpected errors.
-        if not outer_logger.handlers:  # Basic logger setup if not done.
+    except Exception as e_global:
+        if not outer_logger.handlers:
             _handler_ex = logging.StreamHandler(sys.stdout)
             _formatter_ex = logging.Formatter(
                 "[PREREQ-INSTALL] %(asctime)s - %(levelname)s - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
+                datefmt="%Y-%m-%d %H:%M:%S"
             )
             _handler_ex.setFormatter(_formatter_ex)
             outer_logger.addHandler(_handler_ex)
@@ -788,6 +861,5 @@ if __name__ == "__main__":
             "critical",
         )
         import traceback
-
         outer_logger.error(traceback.format_exc())
         sys.exit(1)

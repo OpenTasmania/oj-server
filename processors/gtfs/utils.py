@@ -5,7 +5,7 @@ Utilities for the GTFS (General Transit Feed Specification) processing package.
 
 This module provides helper functions for:
 - Logging setup.
-- Establishing database connections (PostgreSQL).
+- Establishing database connections (PostgreSQL using Psycopg 3).
 - Cleaning up directories.
 - Validating Pandas DataFrames against Pydantic models.
 
@@ -20,7 +20,7 @@ from sys import stderr, stdout
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import pandas as pd
-import psycopg2  # For get_db_connection, though not used by validate_dataframe
+import psycopg # Psycopg 3: Replaces psycopg2
 from pydantic import BaseModel, ValidationError
 
 # Import schema definitions from the local package.
@@ -102,9 +102,9 @@ def setup_logging(
 
 def get_db_connection(
     db_params: Optional[Dict[str, str]] = None,
-) -> Optional[psycopg2.extensions.connection]:
+) -> Optional[psycopg.Connection]: # Psycopg 3: Type hint changed from psycopg2.extensions.connection
     """
-    Establish and return a PostgreSQL database connection.
+    Establish and return a PostgreSQL database connection using Psycopg 3.
 
     Uses provided `db_params` or falls back to `DEFAULT_DB_PARAMS`.
 
@@ -113,7 +113,7 @@ def get_db_connection(
                    (dbname, user, password, host, port).
 
     Returns:
-        A psycopg2 connection object if successful, None otherwise.
+        A psycopg.Connection object if successful, None otherwise.
     """
     params_to_use = DEFAULT_DB_PARAMS.copy()
     if db_params:
@@ -131,25 +131,36 @@ def get_db_connection(
         )
         # Depending on policy, might raise an exception or allow connection for dev.
 
+    conn_kwargs = {
+        "dbname": params_to_use.get("dbname"),
+        "user": params_to_use.get("user"),
+        "password": params_to_use.get("password"),
+        "host": params_to_use.get("host"),
+        "port": params_to_use.get("port"),
+    }
+    conn_kwargs_filtered = {k: v for k, v in conn_kwargs.items() if v is not None}
+
+
     try:
         module_logger.debug(
-            f"Attempting to connect to database: "
-            f"dbname='{params_to_use.get('dbname')}', "
-            f"user='{params_to_use.get('user')}', "
-            f"host='{params_to_use.get('host')}', "
-            f"port='{params_to_use.get('port')}'"
+            f"Attempting to connect to database using Psycopg 3: "
+            f"dbname='{conn_kwargs_filtered.get('dbname')}', "
+            f"user='{conn_kwargs_filtered.get('user')}', "
+            f"host='{conn_kwargs_filtered.get('host')}', "
+            f"port='{conn_kwargs_filtered.get('port')}'"
         )
-        conn = psycopg2.connect(**params_to_use)
+        # Psycopg 3: Use psycopg.connect instead of psycopg2.connect
+        conn = psycopg.connect(**conn_kwargs_filtered)
         module_logger.info(
-            f"Connected to database {params_to_use.get('dbname')} on "
-            f"{params_to_use.get('host')}:{params_to_use.get('port')}"
+            f"Connected to database {conn_kwargs_filtered.get('dbname')} on "
+            f"{conn_kwargs_filtered.get('host')}:{conn_kwargs_filtered.get('port')} using Psycopg 3."
         )
         return conn
-    except psycopg2.Error as e:
-        module_logger.error(f"Database connection failed: {e}", exc_info=True)
+    except psycopg.Error as e: # Psycopg 3: Error base class changed from psycopg2.Error
+        module_logger.error(f"Psycopg 3 database connection failed: {e}", exc_info=True)
     except Exception as e:
         module_logger.error(
-            f"An unexpected error occurred while connecting to the database: {e}",
+            f"An unexpected error occurred while connecting to the database using Psycopg 3: {e}",
             exc_info=True,
         )
     return None
@@ -162,15 +173,13 @@ def cleanup_directory(directory_path: Path) -> None:
     Args:
         directory_path: Path object representing the directory to clean up.
     """
-    import shutil  # Import here to keep it local to this function's use
+    import shutil
 
     if directory_path.exists():
         if directory_path.is_dir():
             try:
                 shutil.rmtree(directory_path)
                 module_logger.info(f"Cleaned up directory: {directory_path}")
-                # Recreate the directory after cleaning if needed by caller.
-                # directory_path.mkdir(parents=True, exist_ok=True)
             except Exception as e:
                 module_logger.error(
                     f"Failed to clean up directory {directory_path}: {e}",
@@ -216,8 +225,6 @@ def validate_dataframe_with_pydantic(
         module_logger.info(
             f"DataFrame for validating with {pydantic_model.__name__} is empty."
         )
-        # Return empty DataFrame with Pydantic model fields as columns
-        # for schema consistency if no valid records are found.
         model_field_names = list(pydantic_model.model_fields.keys())
         return pd.DataFrame(columns=model_field_names), []
 
@@ -231,26 +238,16 @@ def validate_dataframe_with_pydantic(
 
     for index, row in df.iterrows():
         try:
-            # Convert row to dict. Handle potential NaN/NaT by converting to None.
-            # Pydantic models should handle Optional fields gracefully.
-            # String stripping is handled by GTFSBaseModel's Config.
             record_dict_for_pydantic: Dict[str, Any] = {}
             for col, val in row.items():
-                # Pydantic expects None for missing optional fields, not empty strings,
-                # if the field type is not str (e.g., Optional[int]).
                 if pd.isna(val) or (isinstance(val, str) and not val.strip()):
                     record_dict_for_pydantic[col] = None
                 else:
                     record_dict_for_pydantic[col] = val
 
-            # Attempt to parse and validate the record.
             validated_model_instance = pydantic_model(
                 **record_dict_for_pydantic
             )
-
-            # If successful, add the model's dictionary representation.
-            # exclude_none=False ensures that fields explicitly set to None
-            # are included in the dumped dictionary.
             valid_records_list.append(
                 validated_model_instance.model_dump(exclude_none=False)
             )
@@ -267,7 +264,7 @@ def validate_dataframe_with_pydantic(
                 f"Validation failed for record at index {index} from "
                 f"{gtfs_filename}: {e_val.errors()}"
             )
-        except Exception as ex_other:  # Catch other unexpected errors
+        except Exception as ex_other:
             invalid_record_info = {
                 "original_record": row.to_dict(),
                 "errors": [
@@ -287,17 +284,11 @@ def validate_dataframe_with_pydantic(
                 exc_info=True,
             )
 
-    # Create DataFrames from the lists.
     valid_df: pd.DataFrame
     if valid_records_list:
-        # Preserve original column order from model fields.
         valid_df_columns = list(pydantic_model.model_fields.keys())
-        # Filter valid_records_list to only include keys present in the model
-        # to prevent errors if model_dump included extra data (though unlikely with exclude_none=False)
         valid_df = pd.DataFrame(valid_records_list, columns=valid_df_columns)
     else:
-        # If all records failed, create an empty DataFrame with columns
-        # from the Pydantic model for schema consistency.
         valid_df = pd.DataFrame(
             columns=list(pydantic_model.model_fields.keys())
         )
@@ -311,16 +302,10 @@ def validate_dataframe_with_pydantic(
     return valid_df, invalid_records_info_list
 
 
-# Example Usage (for testing this module directly)
 if __name__ == "__main__":
-    # Setup basic logging for direct script execution test.
-    # In a real pipeline, main_pipeline.py or run_gtfs_update.py
-    # would set up logging.
-    setup_logging(log_level=logging.DEBUG)  # Use our own setup for testing.
+    setup_logging(log_level=logging.DEBUG)
     module_logger.info("--- Testing osm.processors.gtfs.utils.py ---")
 
-    # --- Test with Stop Model ---
-    # Get the Stop Pydantic model from schema_definitions.
     stop_model_definition = schemas.GTFS_FILE_SCHEMAS.get("stops.txt")
     if not stop_model_definition or "model" not in stop_model_definition:
         module_logger.error(
@@ -328,64 +313,28 @@ if __name__ == "__main__":
         )
     else:
         stop_pydantic_model_class = stop_model_definition["model"]
-
-        # Sample raw DataFrame for stops.txt
         raw_stop_data = {
             "stop_id": ["s1", "s2", "s3", "s4", "s5", "s6"],
             "stop_code": ["c1", "", None, "c4", "c5", "c6"],
             "stop_name": [
-                " Stop One ",
-                "Stop Two (Good LatLon)",
-                "  ",
-                "Stop Four (Bad Lat)",
-                "Stop Five (Missing Lon)",
-                "Stop Six (Good)",
+                " Stop One ", "Stop Two (Good LatLon)", "  ",
+                "Stop Four (Bad Lat)", "Stop Five (Missing Lon)", "Stop Six (Good)",
             ],
-            "stop_desc": [
-                "Desc 1",
-                None,
-                "Desc 3",
-                "Desc 4",
-                "Desc 5",
-                "Desc 6",
-            ],
-            "stop_lat": [
-                "40.7128 ",
-                "40.7321",
-                "40.777",
-                "95.0",
-                "40.123",
-                "34.0522",
-            ],
-            "stop_lon": [
-                " -74.0060",
-                "-74.0001",
-                "-74.111",
-                "-74.0020",
-                "",
-                "-118.2437",
-            ],
+            "stop_desc": ["Desc 1", None, "Desc 3", "Desc 4", "Desc 5", "Desc 6"],
+            "stop_lat": ["40.7128 ", "40.7321", "40.777", "95.0", "40.123", "34.0522"],
+            "stop_lon": [" -74.0060", "-74.0001", "-74.111", "-74.0020", "", "-118.2437"],
             "zone_id": ["z1", "z2", "z1", None, "z3", "z4"],
             "location_type": ["0", "1", "", "0", "2", None],
             "parent_station": [None, None, "s2", "s1", None, ""],
-            "extra_column_not_in_model": [
-                "ex1",
-                "ex2",
-                "ex3",
-                "ex4",
-                "ex5",
-                "ex6",
-            ],
+            "extra_column_not_in_model": ["ex1", "ex2", "ex3", "ex4", "ex5", "ex6"],
         }
         raw_stops_df = pd.DataFrame(raw_stop_data)
         module_logger.info(
             f"\nRaw stops DataFrame for validation:\n{raw_stops_df}"
         )
-
         valid_stops_df, invalid_stops_info = validate_dataframe_with_pydantic(
             raw_stops_df, stop_pydantic_model_class, "stops.txt"
         )
-
         module_logger.info(
             f"\nValidated Stops DataFrame ({len(valid_stops_df)} records):\n"
             f"{valid_stops_df.head().to_string()}"
@@ -399,7 +348,6 @@ if __name__ == "__main__":
                 "Validation returned empty valid DataFrame and no invalid "
                 "records - check logic if input was not empty."
             )
-
         module_logger.info(
             f"\nInvalid Stops Records/Info ({len(invalid_stops_info)} records):"
         )
@@ -408,12 +356,7 @@ if __name__ == "__main__":
                 f"  Original: {invalid_info['original_record']}"
             )
             module_logger.info(f"  Errors: {invalid_info['errors']}")
-            # In a real pipeline, these invalid_stops_info would be passed
-            # to a DLQ logging function.
 
-    # --- Test DB Connection (if configured and desired) ---
-    # Note: This requires a running PostgreSQL instance and correct DB_PARAMS.
-    # By default, uses placeholder password.
     if (
         DEFAULT_DB_PARAMS["password"] == "yourStrongPasswordHere"
         and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
@@ -424,11 +367,11 @@ if __name__ == "__main__":
         )
     else:
         module_logger.info("\n--- Testing Database Connection ---")
-        test_conn = get_db_connection()  # Uses DEFAULT_DB_PARAMS or env vars
+        test_conn = get_db_connection()
         if test_conn:
-            module_logger.info("Test DB connection successful.")
+            module_logger.info("Test DB connection successful (Psycopg 3).")
             try:
-                with test_conn.cursor() as cur:
+                with test_conn.cursor() as cur: # Psycopg 3: Cursor from connection
                     cur.execute("SELECT version();")
                     pg_version = cur.fetchone()
                     if pg_version:
@@ -437,12 +380,14 @@ if __name__ == "__main__":
                         )
             except Exception as e_db_test:
                 module_logger.error(
-                    f"Error executing test query: {e_db_test}"
+                    f"Error executing test query with Psycopg 3: {e_db_test}"
                 )
             finally:
-                test_conn.close()
-                module_logger.info("Test DB connection closed.")
+                # Psycopg 3: Connection should be explicitly closed if not using a 'with psycopg.connect(...)' block.
+                if test_conn and not test_conn.closed:
+                     test_conn.close()
+            module_logger.info("Test DB connection closed (Psycopg 3).")
         else:
-            module_logger.error("Test DB connection FAILED.")
+            module_logger.error("Test DB connection FAILED (Psycopg 3).")
 
     module_logger.info("--- osm.processors.gtfs.utils.py test finished ---")
