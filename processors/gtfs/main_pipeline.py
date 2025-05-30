@@ -165,15 +165,21 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
                 df_transformed: pd.DataFrame
                 if table_base_name == 'stops':
-                    stops_gdf = gtfs_kit.geometrize_stops(feed)
-                    if stops_gdf is not None:
-                        df_transformed = stops_gdf.copy()
+                    if feed.stops is not None and not feed.stops.empty:
+                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops)
+                        if stops_gdf is not None:
+                            df_transformed = stops_gdf.copy()
+                        else:
+                            module_logger.warning(
+                                "Failed to compute stop geometries even with feed.stops. Using original stops data.")
+                            df_transformed = df_for_processing.copy()
                     else:
-                        module_logger.warning("Failed to compute stop geometries. Using original stops data.")
+                        module_logger.warning(
+                            "feed.stops is missing or empty. Cannot compute stop geometries. Using original stops data.")
                         df_transformed = df_for_processing.copy()
                 elif table_base_name == 'shapes':
                     if feed.shapes is not None and not feed.shapes.empty:
-                        shapes_lines_gdf = gtfs_kit.geometrize_shapes(feed)
+                        shapes_lines_gdf = gtfs_kit.geometrize_shapes(feed.shapes)  # CORRECTED: Pass feed.shapes
                         if shapes_lines_gdf is not None and not shapes_lines_gdf.empty:
                             module_logger.info(
                                 f"Processing {len(shapes_lines_gdf)} shape geometries into 'gtfs_shapes_lines'.")
@@ -204,7 +210,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
                             module_logger.info("No shape geometries computed or result is empty.")
                     else:
                         module_logger.info("No shapes data in feed to process for lines.")
-                    continue
+
+                    df_transformed = df_for_processing.copy()
+
                 else:
                     df_transformed = df_for_processing.copy()
 
