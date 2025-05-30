@@ -1,8 +1,9 @@
+# setup/data_processing.py
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Functions for data preparation, including GTFS processing and placeholders
-for tile rendering and website setup. This module now imports shared utilities
+for tile rendering. This module now imports shared utilities
 from core_utils.
 """
 
@@ -24,9 +25,10 @@ from setup.command_utils import (
     run_elevated_command,
 )
 from setup.step_executor import execute_step
+# Removed: from setup.services import website as services_website
 
 try:
-    from processors.gtfs import (  # Relative import for processors package
+    from processors.gtfs import (
         main_pipeline as gtfs_main_pipeline,
     )
 
@@ -43,17 +45,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
-    """
-    Prepare GTFS data: set up logging, environment variables,
-    run the ETL pipeline, and configure a cron job for updates.
-
-    Args:
-        current_logger: The logger instance to use. Defaults to module_logger.
-
-    Raises:
-        ImportError: If the `gtfs_processor.main_pipeline` cannot be imported.
-        RuntimeError: If the GTFS ETL pipeline fails.
-    """
+    # ... (gtfs_data_prep content remains the same)
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
         f"{config.SYMBOLS['step']} Preparing GTFS data...",
@@ -119,12 +111,10 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             "info",
             logger_to_use,
         )
-        # MODIFIED: Call setup_logging from core_utils
-        # This configures logging globally; the GTFS processor modules will use this configuration.
         core_utils.setup_logging(
             log_level=INFO,
-            log_file=gtfs_log_file,  # GTFS operations will log here
-            log_to_console=True,  # GTFS operations will also log to console
+            log_file=gtfs_log_file,
+            log_to_console=True,
         )
 
         log_map_server(
@@ -201,7 +191,7 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             )
             raise RuntimeError("GTFS ETL Pipeline Failed.")
 
-    except ImportError as e:  # Should be caught by the check above, but defensive
+    except ImportError as e:
         log_map_server(
             f"{config.SYMBOLS['error']} Critical error importing/using "
             f"`processors.gtfs.main_pipeline`: {e}",
@@ -251,13 +241,7 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         actual_cron_user = "root"
         use_user_flag_for_crontab = False
 
-    # The command should point to the entrypoint in processors.gtfs, often update_gtfs.py if it's the CLI
-    # Assuming your project structure allows running `python -m processors.gtfs.update_gtfs`
-    # Path to the python executable in your virtual environment might be more robust if not using system python for cron
-    # For simplicity, using the found python_executable.
-    # The `update_gtfs.py` script is now a CLI wrapper for main_pipeline.py
-    update_script_module_path = "processors.gtfs.update_gtfs"  # Using the module path
-
+    update_script_module_path = "processors.gtfs.update_gtfs"
     update_script_command = (
         f"{python_executable} -m {update_script_module_path}"
     )
@@ -296,7 +280,7 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         new_crontab_lines = [
             line
             for line in existing_crontab_content.splitlines()
-            if update_script_module_path not in line  # Check against module path
+            if update_script_module_path not in line
         ]
         new_crontab_content = "\n".join(new_crontab_lines)
         if new_crontab_content and not new_crontab_content.endswith("\n"):
@@ -335,13 +319,9 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         if temp_cron_path and exists(temp_cron_path):
             unlink(temp_cron_path)
 
-
 def raster_tile_prep(current_logger: logging.Logger = None) -> None:
     """
     Placeholder for Raster Tile Preparation.
-
-    Args:
-        current_logger: The logger instance to use. Defaults to module_logger.
     """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -350,31 +330,11 @@ def raster_tile_prep(current_logger: logging.Logger = None) -> None:
         logger_to_use,
     )
 
-
-def website_prep(current_logger: logging.Logger = None) -> None:
-    """
-    Placeholder for Website Preparation.
-
-    Args:
-        current_logger: The logger instance to use. Defaults to module_logger.
-    """
-    logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(
-        f"{config.SYMBOLS['step']} Placeholder for Website Prep",
-        "info",
-        logger_to_use,
-    )
-
+# Removed website_prep function from here
 
 def data_prep_group(current_logger: logging.Logger) -> bool:
     """
     Run all data preparation steps as a group.
-
-    Args:
-        current_logger: The logger instance to use.
-
-    Returns:
-        True if all steps in the group succeed, False otherwise.
     """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -390,7 +350,9 @@ def data_prep_group(current_logger: logging.Logger) -> bool:
             "Prepare GTFS Data (Download & Import)",
             gtfs_data_prep,
         ),
-        ("WEBSITE_PREP", "Prepare Test Website", website_prep),
+        # Raster prep is still a placeholder
+        ("RASTER_PREP", "Prepare Raster Tiles (Placeholder)", raster_tile_prep),
+        # WEBSITE_PREP step removed from this group
     ]
     for tag, desc, func in step_definitions_in_group:
         if not execute_step(
