@@ -15,7 +15,7 @@ from typing import Optional
 
 from setup import config
 from setup.command_utils import (
-    command_exists,
+    elevated_command_exists,
     log_map_server,
     run_elevated_command,
 )
@@ -61,14 +61,14 @@ def apache_modtile_setup(
     )
 
     # Check for apache2ctl as a proxy for Apache2 installation.
-    if not command_exists("apache2ctl"):
+    if not elevated_command_exists("apache2ctl"):
         log_map_server(
-            f"{config.SYMBOLS['warning']} Apache2 (apache2ctl) not found. "
+            f"{config.SYMBOLS['critical']} Apache2 (apache2ctl) not found. "
             "Skipping Apache/mod_tile setup.",
-            "warning",
+            "critical",
             logger_to_use,
         )
-        return
+        exit(1)
 
     # Modify Apache's listening port (typically to avoid conflict with Nginx).
     ports_conf_path = "/etc/apache2/ports.conf"
@@ -100,6 +100,13 @@ def apache_modtile_setup(
             "success",
             logger_to_use,
         )
+    else:
+        log_map_server(
+            f"{config.SYMBOLS['critical']} Apache file {ports_conf_path} "
+            "not found.",
+            "critical",
+            logger_to_use,
+        )
 
     # Create mod_tile configuration file.
     mod_tile_conf_available_path = "/etc/apache2/conf-available/mod_tile.conf"
@@ -114,7 +121,6 @@ ModTileRenderdSocketName /var/run/renderd/renderd.sock
 
 # Enable statistics for mod_tile (optional).
 ModTileEnableStats On
-ModTileStatsFile /var/log/apache2/mod_tile_stats.txt
 
 # Configuration for tile rendering load management.
 ModTileBulkMode Off
@@ -176,7 +182,7 @@ ModTileMaxLoadMissing 5
     # strictly used by renderd locally for path generation if XML defines paths.
     AddTileConfig /hot/ tile.openstreetmap.org
 
-    ErrorLog $${{APACHE_LOG_DIR}}/tiles_error.log
+    ErrorLog ${{APACHE_LOG_DIR}}/tiles_error.log
     CustomLog ${{APACHE_LOG_DIR}}/tiles_access.log combined
 </VirtualHost>
 """

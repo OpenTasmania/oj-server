@@ -4,22 +4,18 @@
 GTFS Update Module for Standalone Execution.
 
 This module provides a command-line interface for running the main GTFS ETL
-pipeline. It retains database schema creation and foreign key management logic
-that might be used by the main pipeline.
+pipeline.
 """
 
 import argparse
 import logging
 import os
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
-import psycopg
-from psycopg import sql
-from psycopg import Connection as PgConnection
-
+# Relative import for the main pipeline function
 from . import main_pipeline as core_gtfs_pipeline
-from setup import core_utils
+from setup import core_utils  # For logging setup utility
 
 module_logger = logging.getLogger(__name__)
 
@@ -33,233 +29,46 @@ DB_PARAMS: Dict[str, str] = {
 
 LOG_FILE = "/var/log/update_gtfs_cli.log"
 try:
+    # Attempt to get the default URL from a central config, fallback if not found
     from setup.config import GTFS_FEED_URL as DEFAULT_GTFS_URL_CONFIG
 except ImportError:
     DEFAULT_GTFS_URL_CONFIG = "https://example.com/default_gtfs_feed.zip"
+
+# Effective default URL considering environment override first, then config, then hardcoded.
 DEFAULT_GTFS_URL = os.environ.get("GTFS_FEED_URL", DEFAULT_GTFS_URL_CONFIG)
-
-GTFS_LOAD_ORDER: List[str] = [
-    "agency.txt", "stops.txt", "routes.txt", "calendar.txt",
-    "calendar_dates.txt", "shapes.txt",
-    "trips.txt", "stop_times.txt",
-    "frequencies.txt", "transfers.txt", "feed_info.txt",
-    "gtfs_shapes_lines.txt"
-]
-
-GTFS_FOREIGN_KEYS: List[Tuple[str, List[str], str, List[str], str]] = [
-    ("gtfs_routes", ["agency_id"], "gtfs_agency", ["agency_id"], "fk_routes_agency_id"),
-    ("gtfs_trips", ["route_id"], "gtfs_routes", ["route_id"], "fk_trips_route_id"),
-    ("gtfs_trips", ["shape_id"], "gtfs_shapes_lines", ["shape_id"], "fk_trips_shape_id_lines"),
-    ("gtfs_stop_times", ["trip_id"], "gtfs_trips", ["trip_id"], "fk_stop_times_trip_id"),
-    ("gtfs_stop_times", ["stop_id"], "gtfs_stops", ["stop_id"], "fk_stop_times_stop_id"),
-    ("gtfs_stops", ["parent_station"], "gtfs_stops", ["stop_id"], "fk_stops_parent_station"),
-]
-
-
-def sanitize_identifier(name: str) -> str:
-    """Sanitize SQL identifiers (table/column names) by quoting them."""
-    return '"' + name.replace('"', '""').strip() + '"'
-
-
-def create_tables_from_schema(conn: PgConnection) -> None:
-    """
-    Create database tables based on schema_definitions.GTFS_FILE_SCHEMAS.
-    This function is imported and used by main_pipeline.py.
-    """
-    from . import schema_definitions
-
-    module_logger.info("Setting up database schema based on schema_definitions.GTFS_FILE_SCHEMAS...")
-    with conn.cursor() as cursor:
-        for filename_key in GTFS_LOAD_ORDER:
-            details = schema_definitions.GTFS_FILE_SCHEMAS.get(filename_key)
-            if not details:
-                if filename_key not in ["shapes.txt", "gtfs_shapes_lines.txt"]:
-                    module_logger.debug(f"No schema definition for '{filename_key}', skipping table creation.")
-                continue
-
-            table_name = details["db_table_name"]
-            cols_defs_str_list: List[str] = []
-
-            db_columns_def = details.get("columns", {})
-            if not isinstance(db_columns_def, dict):
-                module_logger.error(f"Columns definition for {table_name} is not a dictionary. Skipping.")
-                continue
-
-            for col_name, col_props in db_columns_def.items():
-                col_type = col_props.get("type", "TEXT")
-                col_constraints = ""
-                if col_props.get("pk"):
-                    col_constraints += " PRIMARY KEY"
-                cols_defs_str_list.append(
-                    f"{sanitize_identifier(col_name)} {col_type} {col_constraints}".strip()
-                )
-
-            if not cols_defs_str_list:
-                module_logger.warning(f"No columns to define for table {table_name}. Skipping.")
-                continue
-
-            cols_sql_segment = sql.SQL(", ").join(map(sql.SQL, cols_defs_str_list))
-
-            create_sql = sql.SQL("CREATE TABLE IF NOT EXISTS {} ({});").format(
-                sql.Identifier(table_name),
-                cols_sql_segment,
-            )
-            try:
-                module_logger.debug(f"Executing SQL for table {table_name}: {create_sql.as_string(conn)}")
-                cursor.execute(create_sql)
-            except psycopg.Error as e:
-                module_logger.error(f"Error creating table {table_name}: {e}")
-                raise
-
-        try:
-            cursor.execute(
-                sql.SQL("""
-                        CREATE TABLE IF NOT EXISTS gtfs_shapes_lines
-                        (
-                            shape_id
-                            TEXT
-                            PRIMARY
-                            KEY,
-                            geom
-                            GEOMETRY
-                        (
-                            LineString,
-                            4326
-                        )
-                            );
-                        """)
-            )
-            module_logger.info("Table 'gtfs_shapes_lines' ensured.")
-        except psycopg.Error as e:
-            module_logger.error(f"Error creating table gtfs_shapes_lines: {e}")
-            raise
-
-        try:
-            cursor.execute(sql.SQL("""
-                                   CREATE TABLE IF NOT EXISTS gtfs_dlq
-                                   (
-                                       id
-                                       SERIAL
-                                       PRIMARY
-                                       KEY,
-                                       gtfs_filename
-                                       TEXT,
-                                       original_row_data
-                                       TEXT,
-                                       error_timestamp
-                                       TIMESTAMP
-                                       WITH
-                                       TIME
-                                       ZONE
-                                       DEFAULT
-                                       CURRENT_TIMESTAMP,
-                                       error_reason
-                                       TEXT,
-                                       notes
-                                       TEXT
-                                   );
-                                   """))
-            module_logger.info("Generic DLQ table 'gtfs_dlq' ensured.")
-        except psycopg.Error as e:
-            module_logger.error(f"Error creating generic DLQ table gtfs_dlq: {e}")
-
-    module_logger.info("Database schema setup/verification based on schema_definitions.py complete.")
-
-
-def add_foreign_keys_from_schema(conn: PgConnection) -> None:
-    """
-    Add foreign keys based on GTFS_FOREIGN_KEYS definitions.
-    This function is imported and used by main_pipeline.py.
-    """
-    module_logger.info("Attempting to add foreign keys post-data load...")
-    with conn.cursor() as cursor:
-        for (
-                from_table,
-                from_cols_list,
-                to_table,
-                to_cols_list,
-                fk_name,
-        ) in GTFS_FOREIGN_KEYS:
-            try:
-                cursor.execute("SELECT to_regclass(%s);", (f"public.{from_table}",))
-                if not cursor.fetchone()[0]:
-                    module_logger.warning(
-                        f"Source Table {from_table} for FK {fk_name} does not exist. Skipping FK creation.")
-                    continue
-                cursor.execute("SELECT to_regclass(%s);", (f"public.{to_table}",))
-                if not cursor.fetchone()[0]:
-                    module_logger.warning(
-                        f"Target Table {to_table} for FK {fk_name} does not exist. Skipping FK creation.")
-                    continue
-
-                from_cols_sql = sql.SQL(", ").join(map(sql.Identifier, from_cols_list))
-                to_cols_sql = sql.SQL(", ").join(map(sql.Identifier, to_cols_list))
-
-                alter_sql = sql.SQL(
-                    "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) "
-                    "REFERENCES {} ({}) DEFERRABLE INITIALLY DEFERRED;"
-                ).format(
-                    sql.Identifier(from_table),
-                    sql.Identifier(fk_name),
-                    from_cols_sql,
-                    sql.Identifier(to_table),
-                    to_cols_sql,
-                )
-
-                module_logger.info(
-                    f"Adding FK {fk_name} on {from_table}({', '.join(from_cols_list)})"
-                    f" -> {to_table}({', '.join(to_cols_list)})"
-                )
-                cursor.execute(alter_sql)
-            except psycopg.Error as e:
-                module_logger.error(f"Could not add foreign key {fk_name}: {e}", exc_info=True)
-            except Exception as ex:
-                module_logger.error(f"Unexpected error adding foreign key {fk_name}: {ex}", exc_info=True)
-    module_logger.info("Foreign key application process finished.")
-
-
-def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None:
-    """
-    Drop all defined GTFS foreign keys using Psycopg 3.
-    """
-    module_logger.info("Dropping existing GTFS foreign keys...")
-    with conn.cursor() as cursor:
-        for from_table, _, _, _, fk_name in reversed(GTFS_FOREIGN_KEYS):
-            try:
-                cursor.execute("SELECT to_regclass(%s);", (f"public.{from_table}",))
-                if not cursor.fetchone()[0]:
-                    module_logger.debug(f"Table {from_table} for FK {fk_name} does not exist. Skipping FK drop.")
-                    continue
-
-                cursor.execute(
-                    sql.SQL("ALTER TABLE {} DROP CONSTRAINT IF EXISTS {};").format(
-                        sql.Identifier(from_table), sql.Identifier(fk_name)
-                    )
-                )
-                module_logger.info(f"Dropped foreign key {fk_name} from {from_table} (if existed).")
-            except psycopg.Error as e:
-                module_logger.warning(f"Could not drop foreign key {fk_name} from {from_table}: {e}.")
-    module_logger.info("Finished attempting to drop GTFS foreign keys.")
 
 
 def run_gtfs_etl_via_core_pipeline(feed_url_override: Optional[str] = None) -> bool:
     """
-    Sets the GTFS_FEED_URL environment variable if overridden and runs the main ETL pipeline.
+    Sets GTFS_FEED_URL and DB environment variables then runs the main ETL pipeline.
 
     Args:
         feed_url_override: Optional URL to override the default GTFS feed URL.
     Returns:
         True if the pipeline completed successfully, False otherwise.
     """
-    if feed_url_override:
-        os.environ["GTFS_FEED_URL"] = feed_url_override
-        module_logger.info(f"GTFS_FEED_URL overridden for core pipeline by CLI: {feed_url_override}")
+    # Determine the feed URL to use for this run
+    effective_feed_url = feed_url_override or DEFAULT_GTFS_URL
 
+    os.environ["GTFS_FEED_URL"] = effective_feed_url
+    module_logger.info(f"GTFS_FEED_URL set for core pipeline: {effective_feed_url}")
+
+    # Ensure DB_PARAMS are reflected in environment variables for the core pipeline
     os.environ["PG_GIS_DB"] = DB_PARAMS["dbname"]
     os.environ["PG_OSM_USER"] = DB_PARAMS["user"]
     os.environ["PG_OSM_PASSWORD"] = DB_PARAMS["password"]
     os.environ["PG_HOST"] = DB_PARAMS["host"]
     os.environ["PG_PORT"] = DB_PARAMS["port"]
+
+    # If the core_gtfs_pipeline module directly uses a global GTFS_FEED_URL variable from setup.config,
+    # and that module was already imported, its GTFS_FEED_URL might not reflect the override.
+    # The most robust way is for the pipeline itself to read from os.environ['GTFS_FEED_URL']
+    # or be passed the URL directly.
+    # Here, we assume core_gtfs_pipeline.run_full_gtfs_etl_pipeline() will pick up the
+    # environment variable or has its own mechanism to get the feed URL.
+    # If direct patching of an imported global is needed (less ideal):
+    if hasattr(core_gtfs_pipeline, 'GTFS_FEED_URL_MODULE_LEVEL_VAR'):  # Example if it had such a var
+        core_gtfs_pipeline.GTFS_FEED_URL_MODULE_LEVEL_VAR = effective_feed_url
 
     return core_gtfs_pipeline.run_full_gtfs_etl_pipeline()
 
@@ -271,6 +80,7 @@ def setup_update_gtfs_logging(
 ) -> None:
     """Set up logging configuration for the update_gtfs CLI script."""
     log_level = getattr(logging, log_level_str.upper(), logging.INFO)
+    # Uses a shared logging setup utility
     core_utils.setup_logging(
         log_level=log_level,
         log_file=log_file_path,
@@ -287,7 +97,8 @@ def main_cli() -> None:
     parser.add_argument(
         "--gtfs-url", dest="gtfs_url", default=None,
         help=(
-            "URL of the GTFS feed zip file. Overrides GTFS_FEED_URL environment variable and the script's internal default."),
+            "URL of the GTFS feed zip file. Overrides GTFS_FEED_URL environment "
+            "variable and the script's internal default."),
     )
     parser.add_argument(
         "--log-level", dest="log_level_str",
@@ -310,11 +121,14 @@ def main_cli() -> None:
         log_to_console=args.log_to_console,
     )
 
-    effective_feed_url = args.gtfs_url or os.environ.get("GTFS_FEED_URL") or DEFAULT_GTFS_URL
+    # The feed URL to be used is determined within run_gtfs_etl_via_core_pipeline
+    # based on CLI args and defaults.
+    feed_url_for_logging = args.gtfs_url or DEFAULT_GTFS_URL
 
-    module_logger.info(f"GTFS Feed URL to be processed by core pipeline: {effective_feed_url}")
+    module_logger.info(f"Attempting to process GTFS Feed URL: {feed_url_for_logging}")
     module_logger.info(
-        f"Target Database: dbname='{DB_PARAMS.get('dbname')}', user='{DB_PARAMS.get('user')}', host='{DB_PARAMS.get('host')}'"
+        f"Target Database: dbname='{DB_PARAMS.get('dbname')}', "
+        f"user='{DB_PARAMS.get('user')}', host='{DB_PARAMS.get('host')}'"
     )
 
     try:

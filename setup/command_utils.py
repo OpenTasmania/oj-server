@@ -279,6 +279,18 @@ def command_exists(command: str) -> bool:
     """
     return shutil.which(command) is not None
 
+def elevated_command_exists(command: str) -> bool:
+    """
+    Check if a command exists in the elevated system's PATH using `shutil.which()`.
+
+    Args:
+        command: The name of the command to check.
+
+    Returns:
+        True if the command exists, False otherwise.
+    """
+    return run_elevated_command(["which",f"{command}"]) is not None
+
 
 def check_package_installed(
     package: str, current_logger: Optional[logging.Logger] = None
