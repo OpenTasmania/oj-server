@@ -273,7 +273,7 @@ log_min_duration_statement = 250ms # Log statements slower than this (ms)
                 grep_result.returncode != 0
             ):  # Marker not found, append settings
                 run_elevated_command(
-                    ["tee", "-a", pg_conf_file],  # Append to the file
+                    ["tee", "-a", pg_conf_file],
                     cmd_input=postgresql_custom_conf_content,
                     current_logger=logger_to_use,
                 )
@@ -335,7 +335,7 @@ host    {config.PGDATABASE}    {config.PGUSER}        ::1/128                 sc
 """
             try:
                 run_elevated_command(
-                    ["tee", pg_hba_file],  # Overwrites the file
+                    ["tee", pg_hba_file],
                     cmd_input=pg_hba_content,
                     current_logger=logger_to_use,
                 )

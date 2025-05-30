@@ -259,9 +259,9 @@ def run_elevated_command(
     return run_command(
         elevated_command_list,
         check=check,
-        shell=False,  # Elevated commands should not use shell=True.
+        shell=False,
         capture_output=capture_output,
-        text=True,  # Assuming text mode for stdout/stderr.
+        text=True,
         cmd_input=cmd_input,
         current_logger=current_logger,
     )
