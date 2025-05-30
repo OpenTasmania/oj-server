@@ -4,9 +4,9 @@
 Handles the setup of the CartoCSS compiler and OpenStreetMap-Carto stylesheet.
 
 This module installs the 'carto' npm package, clones or updates the
-OpenStreetMap-Carto repository, processes its external data, compiles
-the Mapnik XML stylesheet, and copies it to the appropriate system location.
-It also updates the font cache.
+OpenStreetMap-Carto repository, processes its external data using a
+potentially custom script, compiles the Mapnik XML stylesheet, and
+copies it to the appropriate system location. It also updates the font cache.
 """
 
 import getpass
@@ -14,8 +14,9 @@ import grp
 import logging
 import os
 import shutil
-import sys # Changed: Imported sys to use sys.executable for venv Python
+import sys
 from typing import Optional
+from pathlib import Path  # Added for Path operations
 
 from setup import config
 from setup.command_utils import (
@@ -24,7 +25,6 @@ from setup.command_utils import (
     run_command,
     run_elevated_command,
 )
-
 
 module_logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     - Installs 'carto' globally via npm if npm is available.
     - Clones the OpenStreetMap-Carto git repository to /opt if not present.
-    - Runs 'get-external-data.py' to fetch shapefiles.
+    - Runs 'get-external-data.py' (potentially a custom version) to fetch shapefiles.
     - Compiles 'project.mml' to 'mapnik.xml' using the 'carto' compiler.
     - Copies the generated 'mapnik.xml' to a system style directory.
     - Updates the system font cache.
@@ -46,9 +46,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     Raises:
         RuntimeError: If the CartoCSS compilation to mapnik.xml fails.
-        Exception: For other critical failures during setup, such as npm
-                   or git command failures when `check=True` is used in
-                   `run_command` or `run_elevated_command`.
+        Exception: For other critical failures during setup.
     """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -86,7 +84,7 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         carto_version = (
             carto_version_result.stdout.strip()
             if carto_version_result.returncode == 0
-            and carto_version_result.stdout
+               and carto_version_result.stdout
             else "Not found or error determining version"
         )
         log_map_server(
@@ -171,7 +169,13 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
     original_cwd = os.getcwd()
     mapnik_xml_created_successfully = False
     try:
-        os.chdir(osm_carto_base_dir)
+        # Determine the path to the custom get-external-data.py script
+        # config.OSM_PROJECT_ROOT should point to the 'osm/' directory
+        custom_get_external_data_script_path = (
+                config.OSM_PROJECT_ROOT / "setup/external/openstreetmap-carto/scripts/get-external-data.py"
+        )
+
+        os.chdir(osm_carto_base_dir)  # Change CWD for carto scripts
         log_map_server(
             f"{config.SYMBOLS['gear']} Getting external data for "
             f"OpenStreetMap-Carto style (running as {current_user})...",
@@ -179,15 +183,38 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
             logger_to_use,
         )
 
-        python_exe_path = sys.executable # Changed: Use sys.executable to ensure Python from the active virtual environment is used.
+        python_exe_path = sys.executable
         if python_exe_path:
-            run_command(
-                [python_exe_path, "scripts/get-external-data.py"],
-                current_logger=logger_to_use,
-            )
+            # Code change: Use the custom script if it exists, otherwise log a warning.
+            # The original script call is commented out.
+            if custom_get_external_data_script_path.is_file():
+                log_map_server(
+                    f"{config.SYMBOLS['info']} Using custom get-external-data.py script: {custom_get_external_data_script_path}",
+                    "info",
+                    logger_to_use,
+                )
+                run_command(
+                    [python_exe_path, str(custom_get_external_data_script_path)],  # Use absolute path to custom script
+                    current_logger=logger_to_use,
+                    # Note: The custom script is run with CWD=/opt/openstreetmap-carto
+                )
+            else:
+                log_map_server(
+                    f"{config.SYMBOLS['warning']} Custom get-external-data.py not found at "
+                    f"{custom_get_external_data_script_path}. Shapefiles might be missing or "
+                    "you might need to run the original script manually if intended.",
+                    "warning",
+                    logger_to_use,
+                )
+
+            # Original script call:
+            # run_command(
+            #     [python_exe_path, "scripts/get-external-data.py"],
+            #     current_logger=logger_to_use,
+            # )
         else:
             log_map_server(
-                f"{config.SYMBOLS['warning']} Python executable (sys.executable) " # Changed: Updated log message to reflect use of sys.executable.
+                f"{config.SYMBOLS['warning']} Python executable (sys.executable) "
                 "was unexpectedly not found. Cannot run get-external-data.py. "
                 "Shapefiles might be missing.",
                 "warning",
@@ -239,8 +266,8 @@ def carto_setup(current_logger: Optional[logging.Logger] = None) -> None:
         if mapnik_xml_created_successfully:
             mapnik_xml_path = os.path.join(os.getcwd(), "mapnik.xml")
             if (
-                os.path.isfile(mapnik_xml_path)
-                and os.path.getsize(mapnik_xml_path) > 0
+                    os.path.isfile(mapnik_xml_path)
+                    and os.path.getsize(mapnik_xml_path) > 0
             ):
                 mapnik_style_target_dir = (
                     "/usr/local/share/maps/style/openstreetmap-carto"

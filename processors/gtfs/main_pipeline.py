@@ -5,10 +5,11 @@ Main orchestrator for the GTFS (General Transit Feed Specification) ETL pipeline
 
 This module coordinates the entire Extract, Transform, Load (ETL) process for
 GTFS data using Psycopg 3 for database interactions and gtfs-kit for
-reading and validating GTFS feeds. It handles:
+reading GTFS feeds. It assumes input GTFS data has been pre-validated.
+It handles:
 1.  Downloading and extracting the GTFS feed.
 2.  Reading the GTFS feed using gtfs-kit.
-3.  Validating the feed using gtfs-kit.
+3.  Issuing a warning about reliance on pre-validated data.
 4.  Setting up the database schema.
 5.  Transforming and loading data from each relevant GTFS table into the
     corresponding database table.
@@ -18,6 +19,7 @@ reading and validating GTFS feeds. It handles:
 
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -25,10 +27,11 @@ from typing import Optional
 import pandas as pd
 import psycopg
 import gtfs_kit
-
-from . import download, load, utils, transform
-from . import schema_definitions as schemas
-from .update_gtfs import (
+from setup.db_utils import get_db_connection
+from setup import core_utils
+from processors.gtfs import download, load, transform
+from processors.gtfs import schema_definitions as schemas
+from processors.gtfs.update_gtfs import (
     GTFS_LOAD_ORDER,
     add_foreign_keys_from_schema,
     create_tables_from_schema,
@@ -74,12 +77,11 @@ def run_full_gtfs_etl_pipeline() -> bool:
     Steps:
     1.  Download and extract the GTFS feed.
     2.  Read the feed using gtfs-kit.
-    3.  Validate the feed using gtfs-kit.
-    4.  Connect to PostgreSQL and ensure the schema exists.
-    5.  Process each GTFS table: Transform data and load to the database.
-    6.  Add foreign key constraints.
-    7.  Clean up temporary files.
-
+    3.  Connect to PostgreSQL and ensure the schema exists.
+    4.  Process each GTFS table: Transform data and load to the database.
+    5.  Add foreign key constraints.
+    6.  Clean up temporary files.
+    This pipeline relies on the input GTFS data being pre-validated.
     Returns:
         True if the pipeline completed successfully, False otherwise.
     """
@@ -110,36 +112,21 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
         module_logger.info("--- Step 2: Reading Feed with gtfs-kit ---")
         feed = gtfs_kit.read_feed(str(TEMP_EXTRACT_PATH), dist_units='km')
-        module_logger.info(f"Feed loaded. Detected tables: {feed.list_tables()}")
+        # Corrected method to list table names
+        module_logger.info(f"Feed loaded. Detected tables: {list(feed.list_fields().keys())}")
 
-        module_logger.info("--- Step 3: Validating Feed with gtfs-kit ---")
-        validation_issues_df = feed.validate()
-        critical_errors_found = False
-        if not validation_issues_df.empty:
-            for index, issue in validation_issues_df.iterrows():
-                log_level = logging.ERROR if issue['type'] == 'error' else logging.WARNING
-                module_logger.log(
-                    log_level,
-                    f"GTFS Validation: [{issue['type']}] {issue['message']} "
-                    f"(Table: {issue['table']}, Column: {issue['column']}, Rows: {issue['rows']})"
-                )
-                if issue['type'] == 'error':
-                    critical_errors_found = True
+        module_logger.warning(
+            "--- Feed Validation Responsibility --- "
+            "This pipeline assumes the input GTFS data has been validated beforehand "
+            "using official GTFS validation tools. Proceeding with data processing."
+        )
 
-        if critical_errors_found:
-            module_logger.warning(
-                "Critical GTFS validation errors found during feed validation. Proceeding with load, but data quality may be affected.")
-            # To abort on critical errors, uncomment below:
-            # module_logger.critical("Critical GTFS validation errors found. Pipeline aborted.")
-            # return False
-        module_logger.info("Feed validation complete.")
-
-        conn = utils.get_db_connection(DB_PARAMS)
+        conn = get_db_connection(DB_PARAMS)
         if not conn:
             module_logger.critical("Failed to connect to the database. Pipeline aborted.")
             return False
 
-        module_logger.info("--- Step 4: Ensuring database schema exists ---")
+        module_logger.info("--- Step 3: Ensuring database schema exists ---")
         with conn.transaction():
             create_tables_from_schema(conn)
         module_logger.info("Database schema transaction complete.")
@@ -148,7 +135,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
         total_records_loaded_successfully = 0
         total_records_sent_to_dlq = 0
 
-        module_logger.info("--- Step 5: Transforming and Loading GTFS Data ---")
+        module_logger.info("--- Step 4: Transforming and Loading GTFS Data ---")
 
         with conn.transaction():
             for gtfs_filename_key in GTFS_LOAD_ORDER:
@@ -159,8 +146,12 @@ def run_full_gtfs_etl_pipeline() -> bool:
                     df_original = getattr(feed, table_base_name)
 
                 if df_original is None or df_original.empty:
-                    module_logger.info(
-                        f"Table '{table_base_name}' (from {gtfs_filename_key}) not found in feed or is empty. Skipping.")
+                    if table_base_name not in ['shapes', 'frequencies', 'feed_info', 'transfers', 'pathways', 'levels',
+                                               'attributions', 'translations', 'gtfs_shapes_lines']:
+                        module_logger.warning(
+                            f"Table '{table_base_name}' (from {gtfs_filename_key}) not found in feed or is empty. Skipping.")
+                    elif table_base_name != 'shapes':
+                        module_logger.info(f"Optional table '{table_base_name}' not found or empty. Skipping.")
                     continue
 
                 df_for_processing = df_original.copy()
@@ -174,15 +165,19 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
                 df_transformed: pd.DataFrame
                 if table_base_name == 'stops':
-                    feed_with_stop_geom = feed.compute_stop_geometry()  # This re-reads feed.stops and adds geometry
-                    df_transformed = feed_with_stop_geom.stops.copy() if feed_with_stop_geom.stops is not None else df_for_processing
+                    stops_gdf = gtfs_kit.geometrize_stops(feed)
+                    if stops_gdf is not None:
+                        df_transformed = stops_gdf.copy()
+                    else:
+                        module_logger.warning("Failed to compute stop geometries. Using original stops data.")
+                        df_transformed = df_for_processing.copy()
                 elif table_base_name == 'shapes':
                     if feed.shapes is not None and not feed.shapes.empty:
-                        shapes_geom_df = feed.compute_shape_geometry().shapes_geometry  # This produces a specific shapes_geometry DataFrame
-                        if shapes_geom_df is not None and not shapes_geom_df.empty:
+                        shapes_lines_gdf = gtfs_kit.geometrize_shapes(feed)
+                        if shapes_lines_gdf is not None and not shapes_lines_gdf.empty:
                             module_logger.info(
-                                f"Processing {len(shapes_geom_df)} shape geometries into 'gtfs_shapes_lines'.")
-                            temp_shapes_df = shapes_geom_df.copy()
+                                f"Processing {len(shapes_lines_gdf)} shape geometries into 'gtfs_shapes_lines'.")
+                            temp_shapes_df = shapes_lines_gdf.copy()
 
                             shapes_lines_db_schema = schemas.GTFS_FILE_SCHEMAS.get("gtfs_shapes_lines.txt")
                             if not shapes_lines_db_schema:
@@ -190,7 +185,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
                                     "db_table_name": "gtfs_shapes_lines",
                                     "columns": {"shape_id": {"type": "TEXT"}, "geom": {"type": "GEOMETRY"}},
                                     "pk_cols": ["shape_id"],
-                                    "geom_config": {"geom_col": "geom", "srid": 4326}  # Added for transform_dataframe
+                                    "geom_config": {"geom_col": "geom", "srid": 4326}
                                 }
 
                             final_shapes_lines_df = transform.transform_dataframe(temp_shapes_df,
@@ -206,7 +201,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
                             total_records_loaded_successfully += loaded_sl
                             total_records_sent_to_dlq += dlq_sl
                         else:
-                            module_logger.info("No shapes data to process for lines.")
+                            module_logger.info("No shape geometries computed or result is empty.")
+                    else:
+                        module_logger.info("No shapes data in feed to process for lines.")
                     continue
                 else:
                     df_transformed = df_for_processing.copy()
@@ -223,7 +220,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
                 total_records_loaded_successfully += loaded_count
                 total_records_sent_to_dlq += dlq_count_from_load
 
-            module_logger.info("--- Step 6: Adding Foreign Keys ---")
+            module_logger.info("--- Step 5: Adding Foreign Keys ---")
             add_foreign_keys_from_schema(conn)
 
         module_logger.info("--- GTFS Data Load and FK Transaction Complete ---")
@@ -244,7 +241,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
             module_logger.info("Database connection closed.")
         download.cleanup_temp_file(TEMP_DOWNLOAD_PATH)
         if TEMP_EXTRACT_PATH.exists():
-            utils.cleanup_directory(TEMP_EXTRACT_PATH)
+            core_utils.cleanup_directory(TEMP_EXTRACT_PATH, ensure_dir_exists_after=True)
         end_time = datetime.now()
         duration = end_time - start_time
         module_logger.info(
@@ -254,7 +251,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
 
 if __name__ == "__main__":
-    utils.setup_logging(log_level=logging.INFO)
+    core_utils.setup_logging(log_level=logging.INFO)
 
     if (
             GTFS_FEED_URL == "https://example.com/default_gtfs_feed.zip"

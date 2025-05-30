@@ -12,14 +12,14 @@ import argparse
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import psycopg
 from psycopg import sql
 from psycopg import Connection as PgConnection
 
-from . import main_pipeline as core_gtfs_pipeline  # For calling the refactored pipeline
-from . import utils as gtfs_utils  # For this script's own logging setup
+from . import main_pipeline as core_gtfs_pipeline
+from setup import core_utils
 
 module_logger = logging.getLogger(__name__)
 
@@ -31,29 +31,18 @@ DB_PARAMS: Dict[str, str] = {
     "port": os.environ.get("PG_PORT", "5432"),
 }
 
-# Constants related to paths and GTFS feed URL might be centralized
-# or overridden by main_pipeline's environment settings.
-# These are kept here if this script needs to pass them or for context.
 LOG_FILE = "/var/log/update_gtfs_cli.log"
-DEFAULT_GTFS_URL = os.environ.get(
-    "GTFS_FEED_URL", "https://example.com/path/to/your/gtfs-feed.zip"
-)
-
-# --- Schema Definitions and Load Order ---
-# These are kept because main_pipeline.py currently imports them from this file.
-# Ideally, these would move to schema_definitions.py or a dedicated db_schema.py.
-
-# GTFS_DEFINITIONS from the original update_gtfs.py was for its own CSV loading.
-# The main_pipeline uses schema_definitions.GTFS_FILE_SCHEMAS.
-# If create_tables_from_schema is to be generic, it should use a passed-in schema
-# or rely on schema_definitions.GTFS_FILE_SCHEMAS.
-# For now, we keep the structure that main_pipeline.py expects to import.
+try:
+    from setup.config import GTFS_FEED_URL as DEFAULT_GTFS_URL_CONFIG
+except ImportError:
+    DEFAULT_GTFS_URL_CONFIG = "https://example.com/default_gtfs_feed.zip"
+DEFAULT_GTFS_URL = os.environ.get("GTFS_FEED_URL", DEFAULT_GTFS_URL_CONFIG)
 
 GTFS_LOAD_ORDER: List[str] = [
     "agency.txt", "stops.txt", "routes.txt", "calendar.txt",
-    "calendar_dates.txt", "shapes.txt", "trips.txt", "stop_times.txt",
+    "calendar_dates.txt", "shapes.txt",
+    "trips.txt", "stop_times.txt",
     "frequencies.txt", "transfers.txt", "feed_info.txt",
-    # Added for clarity, though shapes.txt processing results in gtfs_shapes_lines
     "gtfs_shapes_lines.txt"
 ]
 
@@ -67,9 +56,6 @@ GTFS_FOREIGN_KEYS: List[Tuple[str, List[str], str, List[str], str]] = [
 ]
 
 
-# --- End Schema Definitions for Import by main_pipeline.py ---
-
-
 def sanitize_identifier(name: str) -> str:
     """Sanitize SQL identifiers (table/column names) by quoting them."""
     return '"' + name.replace('"', '""').strip() + '"'
@@ -80,15 +66,14 @@ def create_tables_from_schema(conn: PgConnection) -> None:
     Create database tables based on schema_definitions.GTFS_FILE_SCHEMAS.
     This function is imported and used by main_pipeline.py.
     """
-    from . import schema_definitions  # Import here to use the centralized schema
+    from . import schema_definitions
 
     module_logger.info("Setting up database schema based on schema_definitions.GTFS_FILE_SCHEMAS...")
     with conn.cursor() as cursor:
-        for filename_key in GTFS_LOAD_ORDER:  # Iterate GTFS_LOAD_ORDER
+        for filename_key in GTFS_LOAD_ORDER:
             details = schema_definitions.GTFS_FILE_SCHEMAS.get(filename_key)
             if not details:
-                if filename_key not in ["shapes.txt",
-                                        "gtfs_shapes_lines.txt"]:  # shapes.txt itself might not have a direct table if only lines are stored
+                if filename_key not in ["shapes.txt", "gtfs_shapes_lines.txt"]:
                     module_logger.debug(f"No schema definition for '{filename_key}', skipping table creation.")
                 continue
 
@@ -96,15 +81,15 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             cols_defs_str_list: List[str] = []
 
             db_columns_def = details.get("columns", {})
-            if not isinstance(db_columns_def, dict):  # Ensure it's a dictionary
+            if not isinstance(db_columns_def, dict):
                 module_logger.error(f"Columns definition for {table_name} is not a dictionary. Skipping.")
                 continue
 
             for col_name, col_props in db_columns_def.items():
-                col_type = col_props.get("type", "TEXT")  # Default to TEXT if type not specified
-                col_constraints = ""  # Add logic for pk, not null from col_props if needed
+                col_type = col_props.get("type", "TEXT")
+                col_constraints = ""
                 if col_props.get("pk"):
-                    col_constraints += " PRIMARY KEY"  # Simplified
+                    col_constraints += " PRIMARY KEY"
                 cols_defs_str_list.append(
                     f"{sanitize_identifier(col_name)} {col_type} {col_constraints}".strip()
                 )
@@ -114,11 +99,6 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                 continue
 
             cols_sql_segment = sql.SQL(", ").join(map(sql.SQL, cols_defs_str_list))
-            pk_def_sql_segment = sql.SQL("")  # Primary keys handled in column def for simplicity here
-
-            # Handle composite PKs if defined separately in schema_definitions (not current structure)
-            # For example, if details['pk_cols'] exists and has multiple items for composite.
-            # This simplified version assumes PK is part of column constraint string.
 
             create_sql = sql.SQL("CREATE TABLE IF NOT EXISTS {} ({});").format(
                 sql.Identifier(table_name),
@@ -131,7 +111,6 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                 module_logger.error(f"Error creating table {table_name}: {e}")
                 raise
 
-        # Ensure gtfs_shapes_lines and gtfs_dlq tables from the original update_gtfs.py
         try:
             cursor.execute(
                 sql.SQL("""
@@ -155,11 +134,6 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             module_logger.error(f"Error creating table gtfs_shapes_lines: {e}")
             raise
 
-        # Create a generic DLQ table for the pipeline
-        # main_pipeline.py refers to dlq_table_name=f"dlq_{file_schema_definition['db_table_name']}"
-        # This implies per-table DLQs. The code below creates one generic one.
-        # This part needs reconciliation with how main_pipeline.py names DLQ tables.
-        # For now, we keep the generic one from original update_gtfs.py
         try:
             cursor.execute(sql.SQL("""
                                    CREATE TABLE IF NOT EXISTS gtfs_dlq
@@ -188,7 +162,6 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             module_logger.info("Generic DLQ table 'gtfs_dlq' ensured.")
         except psycopg.Error as e:
             module_logger.error(f"Error creating generic DLQ table gtfs_dlq: {e}")
-            # Not raising, as per-table DLQs might be the primary mechanism
 
     module_logger.info("Database schema setup/verification based on schema_definitions.py complete.")
 
@@ -240,7 +213,6 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None:
                 cursor.execute(alter_sql)
             except psycopg.Error as e:
                 module_logger.error(f"Could not add foreign key {fk_name}: {e}", exc_info=True)
-                # Log to DLQ or handle error
             except Exception as ex:
                 module_logger.error(f"Unexpected error adding foreign key {fk_name}: {ex}", exc_info=True)
     module_logger.info("Foreign key application process finished.")
@@ -249,8 +221,6 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None:
 def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None:
     """
     Drop all defined GTFS foreign keys using Psycopg 3.
-    This function is currently NOT imported by main_pipeline.py.
-    It's kept here if direct use from update_gtfs.py is ever needed for its own ETL.
     """
     module_logger.info("Dropping existing GTFS foreign keys...")
     with conn.cursor() as cursor:
@@ -275,11 +245,9 @@ def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None:
 def run_gtfs_etl_via_core_pipeline(feed_url_override: Optional[str] = None) -> bool:
     """
     Sets the GTFS_FEED_URL environment variable if overridden and runs the main ETL pipeline.
-    This is the primary ETL execution function for this CLI.
 
     Args:
         feed_url_override: Optional URL to override the default GTFS feed URL.
-                           The main_pipeline will pick this up from the environment.
     Returns:
         True if the pipeline completed successfully, False otherwise.
     """
@@ -287,8 +255,6 @@ def run_gtfs_etl_via_core_pipeline(feed_url_override: Optional[str] = None) -> b
         os.environ["GTFS_FEED_URL"] = feed_url_override
         module_logger.info(f"GTFS_FEED_URL overridden for core pipeline by CLI: {feed_url_override}")
 
-    # Ensure other necessary env vars for core_gtfs_pipeline are set (DB params)
-    # These are typically set when the script starts, based on DB_PARAMS
     os.environ["PG_GIS_DB"] = DB_PARAMS["dbname"]
     os.environ["PG_OSM_USER"] = DB_PARAMS["user"]
     os.environ["PG_OSM_PASSWORD"] = DB_PARAMS["password"]
@@ -305,7 +271,7 @@ def setup_update_gtfs_logging(
 ) -> None:
     """Set up logging configuration for the update_gtfs CLI script."""
     log_level = getattr(logging, log_level_str.upper(), logging.INFO)
-    gtfs_utils.setup_logging(  # Call the general logging setup from utils
+    core_utils.setup_logging(
         log_level=log_level,
         log_file=log_file_path,
         log_to_console=log_to_console
@@ -344,7 +310,6 @@ def main_cli() -> None:
         log_to_console=args.log_to_console,
     )
 
-    # feed_url_to_use will be set as an environment variable by run_gtfs_etl_via_core_pipeline
     effective_feed_url = args.gtfs_url or os.environ.get("GTFS_FEED_URL") or DEFAULT_GTFS_URL
 
     module_logger.info(f"GTFS Feed URL to be processed by core pipeline: {effective_feed_url}")

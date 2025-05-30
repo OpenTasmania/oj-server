@@ -1,8 +1,9 @@
-# setup/data_processing.py
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Functions for data preparation, including GTFS processing and placeholders
-for tile rendering and website setup.
+for tile rendering and website setup. This module now imports shared utilities
+from core_utils.
 """
 
 import logging
@@ -15,7 +16,7 @@ from pwd import getpwnam
 from shutil import which
 from tempfile import NamedTemporaryFile
 
-from setup import config
+from setup import config, core_utils
 from setup.cli_handler import cli_prompt_for_rerun
 from setup.command_utils import (
     log_map_server,
@@ -24,21 +25,17 @@ from setup.command_utils import (
 )
 from setup.step_executor import execute_step
 
-# Attempt to import GTFS processing modules.
-# These are optional and the script can proceed with warnings if they're
-# not found, though GTFS processing will fail.
 try:
-    from processors.gtfs import (
+    from processors.gtfs import (  # Relative import for processors package
         main_pipeline as gtfs_main_pipeline,
     )
-    from processors.gtfs import (
-        utils as gtfs_utils,
-    )
+
+    gtfs_processor_available = True
 except ImportError as e:
     gtfs_main_pipeline = None
-    gtfs_utils = None
+    gtfs_processor_available = False
     logging.getLogger(__name__).warning(
-        f"Could not import processors.gtfs module at load time: {e}. "
+        f"Could not import processors.gtfs.main_pipeline at load time: {e}. "
         "GTFS processing will likely fail."
     )
 
@@ -54,7 +51,7 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         current_logger: The logger instance to use. Defaults to module_logger.
 
     Raises:
-        ImportError: If the `gtfs_processor` modules cannot be imported.
+        ImportError: If the `gtfs_processor.main_pipeline` cannot be imported.
         RuntimeError: If the GTFS ETL pipeline fails.
     """
     logger_to_use = current_logger if current_logger else module_logger
@@ -74,7 +71,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             current_group_info = getgrgid(getgid())
             current_group_name = current_group_info.gr_name
         except KeyError:
-            # Fallback to GID if group name is not found
             current_group_name = str(getgid())
         run_elevated_command(
             [
@@ -98,7 +94,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             logger_to_use,
         )
 
-    # Set environment variables for the GTFS processor
     environ["GTFS_FEED_URL"] = config.GTFS_FEED_URL
     environ["PG_OSM_PASSWORD"] = config.PGPASSWORD
     environ["PG_OSM_USER"] = config.PGUSER
@@ -106,46 +101,36 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
     environ["PG_OSM_PORT"] = config.PGPORT
     environ["PG_OSM_DATABASE"] = config.PGDATABASE
 
-    if not gtfs_main_pipeline or not gtfs_utils:
+    if not gtfs_processor_available or not gtfs_main_pipeline:
         log_map_server(
-            f"{config.SYMBOLS['error']} `gtfs_processor` modules "
-            "(main_pipeline, utils) were not imported successfully.",
-            "error",
-            logger_to_use,
-        )
-        log_map_server(
-            "   This script needs `gtfs_processor` to be in its Python "
-            "environment.",
-            "error",
-            logger_to_use,
-        )
-        log_map_server(
-            "   NEXT STEP: Refactor this to use `uv` to run `gtfs_processor` "
-            "in an isolated environment.",
+            f"{config.SYMBOLS['error']} `processors.gtfs.main_pipeline` "
+            "was not imported successfully.",
             "error",
             logger_to_use,
         )
         raise ImportError(
-            "gtfs_processor modules not available. Cannot run GTFS ETL."
+            "processors.gtfs.main_pipeline not available. Cannot run GTFS ETL."
         )
 
     try:
         log_map_server(
-            f"{config.SYMBOLS['info']} Setting up logging for "
-            "gtfs_processor module...",
+            f"{config.SYMBOLS['info']} Setting up logging using core_utils for "
+            "subsequent GTFS processing operations...",
             "info",
             logger_to_use,
         )
-        gtfs_utils.setup_logging(
+        # MODIFIED: Call setup_logging from core_utils
+        # This configures logging globally; the GTFS processor modules will use this configuration.
+        core_utils.setup_logging(
             log_level=INFO,
-            log_file=gtfs_log_file,
-            log_to_console=True,
+            log_file=gtfs_log_file,  # GTFS operations will log here
+            log_to_console=True,  # GTFS operations will also log to console
         )
 
         log_map_server(
             f"{config.SYMBOLS['rocket']} Running GTFS ETL pipeline with URL: "
             f"{config.GTFS_FEED_URL}. Check {gtfs_log_file} for detailed "
-            "logs.",
+            "logs from the GTFS processor.",
             "info",
             logger_to_use,
         )
@@ -166,7 +151,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
                 logger_to_use,
             )
             try:
-                # Verify counts from gtfs_stops table
                 run_command(
                     [
                         "psql",
@@ -184,7 +168,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
                     capture_output=True,
                     current_logger=logger_to_use,
                 )
-                # Verify counts from gtfs_routes table
                 run_command(
                     [
                         "psql",
@@ -218,10 +201,10 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             )
             raise RuntimeError("GTFS ETL Pipeline Failed.")
 
-    except ImportError as e:
+    except ImportError as e:  # Should be caught by the check above, but defensive
         log_map_server(
             f"{config.SYMBOLS['error']} Critical error importing/using "
-            f"`gtfs_processor`: {e}",
+            f"`processors.gtfs.main_pipeline`: {e}",
             "error",
             logger_to_use,
         )
@@ -235,7 +218,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         )
         raise
 
-    # Configure cron job for daily GTFS updates.
     log_map_server(
         f"{config.SYMBOLS['gear']} Setting up cron job for daily GTFS "
         "updates...",
@@ -252,30 +234,32 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         )
         return
 
-    # Determine the target user for the cron job.
-    intended_cron_user = config.PGUSER  # This is 'osmuser'.
+    intended_cron_user = config.PGUSER
     actual_cron_user = intended_cron_user
     use_user_flag_for_crontab = True
 
     try:
         getpwnam(intended_cron_user)
         logger_to_use.info(
-            f"System user '{intended_cron_user}' found. Cron job will be set "
-            "for this user."
+            f"System user '{intended_cron_user}' found. Cron job will be set for this user."
         )
     except KeyError:
         logger_to_use.warning(
             f"System user '{intended_cron_user}' (from config.PGUSER) not "
-            "found. The cron job will be installed for the 'root' user "
-            "instead."
+            "found. Cron job will be installed for the 'root' user instead."
         )
-        actual_cron_user = "root"  # Fallback to root.
-        # When running as root for root's crontab, -u root is not needed.
+        actual_cron_user = "root"
         use_user_flag_for_crontab = False
 
+    # The command should point to the entrypoint in processors.gtfs, often update_gtfs.py if it's the CLI
+    # Assuming your project structure allows running `python -m processors.gtfs.update_gtfs`
+    # Path to the python executable in your virtual environment might be more robust if not using system python for cron
+    # For simplicity, using the found python_executable.
+    # The `update_gtfs.py` script is now a CLI wrapper for main_pipeline.py
+    update_script_module_path = "processors.gtfs.update_gtfs"  # Using the module path
+
     update_script_command = (
-        # Ensure this path is correct if running as different user.
-        f"{python_executable} -m gtfs_processor.update_gtfs"
+        f"{python_executable} -m {update_script_module_path}"
     )
     env_vars_for_cron = (
         f"GTFS_FEED_URL='{config.GTFS_FEED_URL}' "
@@ -292,7 +276,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
 
     temp_cron_path = ""
     try:
-        # Construct the crontab -l command.
         crontab_l_cmd = ["crontab"]
         if use_user_flag_for_crontab:
             crontab_l_cmd.extend(["-u", actual_cron_user])
@@ -300,7 +283,7 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
 
         existing_crontab_result = run_elevated_command(
             crontab_l_cmd,
-            check=False,  # Allow failure if user has no crontab yet.
+            check=False,
             capture_output=True,
             current_logger=logger_to_use,
         )
@@ -310,11 +293,10 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             else ""
         )
 
-        # Avoid duplicate job entries.
         new_crontab_lines = [
             line
             for line in existing_crontab_content.splitlines()
-            if "gtfs_processor.update_gtfs" not in line
+            if update_script_module_path not in line  # Check against module path
         ]
         new_crontab_content = "\n".join(new_crontab_lines)
         if new_crontab_content and not new_crontab_content.endswith("\n"):
@@ -322,12 +304,11 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
         new_crontab_content += cron_job_line + "\n"
 
         with NamedTemporaryFile(
-            mode="w", delete=False, prefix="gtfscron_"
+                mode="w", delete=False, prefix="gtfscron_"
         ) as temp_f:
             temp_f.write(new_crontab_content)
             temp_cron_path = temp_f.name
 
-        # Construct the crontab install command.
         install_cron_cmd = ["crontab"]
         if use_user_flag_for_crontab:
             install_cron_cmd.extend(["-u", actual_cron_user])
@@ -350,7 +331,6 @@ def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
             "error",
             logger_to_use,
         )
-        # Optionally re-raise if this is critical.
     finally:
         if temp_cron_path and exists(temp_cron_path):
             unlink(temp_cron_path)
@@ -369,7 +349,6 @@ def raster_tile_prep(current_logger: logging.Logger = None) -> None:
         "info",
         logger_to_use,
     )
-    # TODO: Add actual logic for raster tile preparation.
 
 
 def website_prep(current_logger: logging.Logger = None) -> None:
@@ -385,7 +364,6 @@ def website_prep(current_logger: logging.Logger = None) -> None:
         "info",
         logger_to_use,
     )
-    # TODO: Add actual logic for website preparation.
 
 
 def data_prep_group(current_logger: logging.Logger) -> bool:
@@ -417,11 +395,11 @@ def data_prep_group(current_logger: logging.Logger) -> bool:
     ]
     for tag, desc, func in step_definitions_in_group:
         if not execute_step(
-            tag,
-            desc,
-            func,
-            logger_to_use,
-            prompt_user_for_rerun=cli_prompt_for_rerun,
+                tag,
+                desc,
+                func,
+                logger_to_use,
+                prompt_user_for_rerun=cli_prompt_for_rerun,
         ):
             overall_success = False
             log_map_server(
