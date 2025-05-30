@@ -5,10 +5,10 @@ Setup an example website page
 """
 
 import logging
-import re  # Import re for IP address matching
-from typing import Optional  # Literal removed
+import re
+from typing import Optional
 
-from setup import config  # Import config to access VM_IP_OR_DOMAIN
+from setup import config
 from setup.command_utils import (
     log_map_server,
     run_elevated_command,
@@ -17,7 +17,6 @@ from setup.command_utils import (
 module_logger = logging.getLogger(__name__)
 
 
-# Removed uri: Literal["http","https"] parameter
 def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -26,15 +25,12 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
         logger_to_use,
     )
 
-    # Get VM_IP_OR_DOMAIN from the global config
     vm_ip_or_domain = config.VM_IP_OR_DOMAIN
 
-    # Determine scheme (http or https)
     is_ip = bool(re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", vm_ip_or_domain))
-    is_default_domain = vm_ip_or_domain == config.VM_IP_OR_DOMAIN_DEFAULT  # "example.com"
+    is_default_domain = vm_ip_or_domain == config.VM_IP_OR_DOMAIN_DEFAULT
     is_localhost = vm_ip_or_domain.lower() == "localhost"
 
-    # Use http for IPs, localhost, or the default "example.com" domain, https otherwise
     scheme = "http" if is_ip or is_default_domain or is_localhost else "https"
 
     log_map_server(
@@ -45,7 +41,6 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
 
     website_html_page_path = "/var/www/html/map_test_page/index.html"
 
-    # Corrected HTML content to use the determined scheme and vm_ip_or_domain
     webpage_content = f"""
 <!DOCTYPE html>
 <html>
@@ -76,7 +71,7 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
         .map-container {{
             position: relative;
             width: 100%;
-            height: 50vh; /* Adjusted for two maps */
+            height: 50vh; 
         }}
 
         .info {{
@@ -133,10 +128,10 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
                 }},
                 'layers': [
                     {{
-                        'id': 'background', // Added a simple background layer
+                        'id': 'background', 
                         'type': 'background',
                         'paint': {{
-                            'background-color': '#f0f0f0' // Light grey background
+                            'background-color': '#f0f0f0' 
                         }}
                     }},
                     {{
@@ -167,7 +162,7 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
                     }}
                 ]
             }},
-            center: [147.3257, -42.8826], // longitude, latitude for Hobart
+            center: [147.3257, -42.8826], 
             zoom: 12
         }});
         vectorMap.addControl(new maplibregl.NavigationControl());
@@ -181,7 +176,6 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
 </html>
 """
     try:
-        # Ensure parent directory exists
         run_elevated_command(["mkdir", "-p", "/var/www/html/map_test_page"], current_logger=logger_to_use)
         run_elevated_command(
             ["tee", website_html_page_path],
@@ -191,6 +185,13 @@ def website_setup(current_logger: Optional[logging.Logger] = None) -> None:
         log_map_server(
             f"{config.SYMBOLS['success']} Created/Updated {website_html_page_path}",
             "success",
+            logger_to_use,
+        )
+        # Log the URL for the test page
+        test_page_url = f"{scheme}://{vm_ip_or_domain}/"
+        log_map_server(
+            f"{config.SYMBOLS['info']} Test website page should be accessible at: {test_page_url}",  # New log message
+            "info",
             logger_to_use,
         )
     except Exception as e:
