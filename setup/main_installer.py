@@ -31,7 +31,6 @@ from setup.data_processing import (
     data_prep_group,
     gtfs_data_prep,
     raster_tile_prep,
-    website_prep,
 )
 from setup.helpers import setup_pgpass, systemd_reload
 from setup.services.apache import apache_modtile_setup
@@ -42,6 +41,7 @@ from setup.services.osrm import osm_osrm_server_setup
 from setup.services.pg_tileserv import pg_tileserv_setup
 from setup.services.postgres import postgres_setup
 from setup.services.renderd import renderd_setup
+from setup.services.website import website_setup
 
 # Assuming services_setup_group is the primary orchestrator for services.
 from setup.services.service_orchestrator import services_setup_group
@@ -80,6 +80,7 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
             "APACHE_SETUP",
             "NGINX_SETUP",
             "CERTBOT_SETUP",
+            "WEBSITE_SETUP",
         ],
     },
     {
@@ -624,10 +625,10 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
             raster_tile_prep,
         ),
         (
-            "website_prep",
-            "WEBSITE_PREP",
-            "Prepare Test Website",
-            website_prep,
+            "website_setup",
+            "WEBSITE_SETUP",
+            "Setup Test Website",
+            website_setup,
         ),
         (
             "task_systemd_reload",

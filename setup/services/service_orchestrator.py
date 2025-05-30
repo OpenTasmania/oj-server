@@ -23,6 +23,7 @@ from setup.services.osrm import osm_osrm_server_setup
 from setup.services.pg_tileserv import pg_tileserv_setup
 from setup.services.postgres import postgres_setup
 from setup.services.renderd import renderd_setup
+from setup.services.website import website_setup
 from setup.services.ufw import ufw_setup
 from setup.step_executor import execute_step
 
@@ -79,6 +80,11 @@ def services_setup_group(
             "CERTBOT_SETUP",
             "Setup Certbot for SSL (optional, requires FQDN)",
             certbot_setup,
+        ),
+        (
+            "WEBSITE_SETUP",
+            "Setup website",
+            website_setup,
         ),
     ]
 
