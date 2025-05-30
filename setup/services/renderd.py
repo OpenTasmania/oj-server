@@ -142,7 +142,8 @@ TILESIZE=256
     renderd_service_content = f"""[Unit]
 Description=Map tile rendering daemon (renderd)
 Documentation=man:renderd(8)
-After=network.target auditd.service postgresql.service # Ensure DB is up if style needs it
+# Ensure DB is up if style needs it
+After=network.target auditd.service postgresql.service
 
 [Service]
 User=www-data

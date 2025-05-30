@@ -390,7 +390,6 @@ def data_prep_group(current_logger: logging.Logger) -> bool:
             "Prepare GTFS Data (Download & Import)",
             gtfs_data_prep,
         ),
-        ("RASTER_PREP", "Pre-render Raster Tiles", raster_tile_prep),
         ("WEBSITE_PREP", "Prepare Test Website", website_prep),
     ]
     for tag, desc, func in step_definitions_in_group:
