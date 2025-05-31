@@ -6,6 +6,7 @@ and service activation.
 """
 import logging
 import os
+from os.path import isdir
 from typing import Optional
 
 from common.command_utils import (
@@ -28,7 +29,12 @@ RENDERD_USER = "www-data"  # User that will run renderd, for file permissions
 def get_mapnik_plugin_dir(current_logger: Optional[logging.Logger] = None) -> str:
     """Determines the Mapnik plugins directory."""
     logger_to_use = current_logger if current_logger else module_logger
-    default_plugins_dir = "/usr/lib/mapnik/3.0/input/"  # Common default
+    default_plugins_dir = "/usr/lib/x86_64-linux-gnu/mapnik/4.0/input/"
+
+    if isdir(default_plugins_dir):
+        log_map_server(f"{config.SYMBOLS['info']} Using default Mapnik plugins directory: {default_plugins_dir}",
+                       "info", logger_to_use)
+        return default_plugins_dir
 
     if command_exists("mapnik-config"):
         try:
@@ -50,7 +56,7 @@ def get_mapnik_plugin_dir(current_logger: Optional[logging.Logger] = None) -> st
         log_map_server(
             f"{config.SYMBOLS['warning']} 'mapnik-config' command not found. Using fallback Mapnik plugins directory: {default_plugins_dir}",
             "warning", logger_to_use)
-        return default_plugins_dir
+        raise
 
 
 def create_renderd_conf_file(current_logger: Optional[logging.Logger] = None) -> None:
