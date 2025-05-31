@@ -7,7 +7,7 @@ Utility function for setting up the .pgpass file for PostgreSQL.
 import getpass
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 
 # Assuming config.py is accessible from the project root or PYTHONPATH is set up
 # If config.py moves to root, this would be: from config import SYMBOLS, PGPASSWORD_DEFAULT

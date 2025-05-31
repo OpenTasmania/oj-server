@@ -17,14 +17,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # --- Common module imports ---
 from common.command_utils import check_package_installed, log_map_server
 from common.pgpass_utils import setup_pgpass
-from common.system_utils import systemd_reload
+from common.system_utils import systemd_reload  # get_current_script_hash is from state_manager
 
 # --- Setup phase module imports ---
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.ufw_setup_actions import enable_ufw_service
 from setup.postgres_installer import ensure_postgres_packages_are_installed
-from setup.state_manager import get_current_script_hash
+from setup.state_manager import get_current_script_hash  # Corrected import
 
 # --- Configure phase module imports ---
 from configure.ufw_configurator import apply_ufw_rules
@@ -46,7 +46,7 @@ from setup.state_manager import (
 )
 from setup.step_executor import execute_step
 
-# Old service imports (to be phased out or refactored as new setup/configure modules are made)
+# Core setup functions (will eventually be fully replaced by core_prerequisites_group)
 from setup.core_setup import (
     boot_verbosity,
     core_conflict_removal,
@@ -54,23 +54,24 @@ from setup.core_setup import (
     core_install,
     docker_install,
     node_js_lts_install,
-    prereqs_install_group,
+    prereqs_install_group,  # This group calls the functions above
 )
+# Unrefactored service modules
 from setup.services.apache import apache_modtile_setup
 from setup.services.carto import carto_setup
 from setup.services.certbot import certbot_setup
 from setup.services.nginx import nginx_setup
 from setup.services.osrm import osm_osrm_server_setup
 from setup.services.pg_tileserv import pg_tileserv_setup
-# Original setup.services.postgres.postgres_setup is no longer directly used for the --postgres flag
 from setup.services.renderd import renderd_setup
 from setup.services.website import website_setup
-# services_setup_group will orchestrate UNREFACTORED services.
 from setup.services.service_orchestrator import services_setup_group
 
-logger = logging.getLogger(__name__)  # Main installer logger
+logger = logging.getLogger(__name__)
 
 # Defines the conceptual order and grouping of installation tasks.
+# This list helps in generating help text and sorting individual flags if multiple are used.
+# The actual execution for --full or group flags relies on calling specific group orchestrator functions.
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {"name": "Core Conflict Removal", "steps": ["CORE_CONFLICTS"]},
     {
@@ -79,8 +80,16 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
             "BOOT_VERBOSITY", "CORE_INSTALL", "DOCKER_INSTALL", "NODEJS_INSTALL",
         ],
     },
-    {
-        "name": "Services (Legacy Orchestration for Unrefactored)",
+    # --- New Conceptual Groups for Refactored Services ---
+    {"name": "Firewall Service (UFW)", "steps": ["CONFIG_UFW_RULES", "SETUP_UFW_ENABLE_SERVICE"]},
+    {"name": "Database Service (PostgreSQL)", "steps": [
+        "SETUP_POSTGRES_PKG_CHECK", "CONFIG_POSTGRES_USER_DB", "CONFIG_POSTGRES_EXTENSIONS",
+        "CONFIG_POSTGRES_PERMISSIONS", "CONFIG_POSTGRESQL_CONF", "CONFIG_PG_HBA_CONF",
+        "SERVICE_POSTGRES_RESTART_ENABLE"
+    ]},
+    # --- End New Conceptual Groups ---
+    {  # This group is for services NOT YET refactored.
+        "name": "Other Services (Legacy Orchestration)",
         "steps": [
             "PGTILESERV_SETUP", "CARTO_SETUP", "RENDERD_SETUP",
             "OSM_OSRM_SERVER_SETUP", "APACHE_SETUP", "NGINX_SETUP",
@@ -92,25 +101,28 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
 ]
 
 task_execution_details_lookup: Dict[str, Tuple[str, int]] = {}
-for group_info in INSTALLATION_GROUPS_ORDER:
+for group_idx, group_info in enumerate(INSTALLATION_GROUPS_ORDER):
     group_name = group_info["name"]
-    for i, task_tag in enumerate(group_info["steps"]):
-        task_execution_details_lookup[task_tag] = (group_name, i + 1)
-task_execution_details_lookup["UFW_FULL_SETUP"] = ("Firewall Service", 1)
-task_execution_details_lookup["POSTGRES_FULL_SETUP"] = ("Database Service", 1)
+    for step_idx, task_tag in enumerate(group_info["steps"]):
+        task_execution_details_lookup[task_tag] = (group_name, step_idx + 1)
+
+# Add overall tags for refactored services
+task_execution_details_lookup["UFW_FULL_SETUP"] = ("Firewall Service (UFW)",
+                                                   0)  # 0 indicates it's an orchestrator for the group
+task_execution_details_lookup["POSTGRES_FULL_SETUP"] = ("Database Service (PostgreSQL)", 0)
 
 group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
     for index, group_info in enumerate(INSTALLATION_GROUPS_ORDER)
 }
-group_order_lookup["Firewall Service"] = group_order_lookup["Prerequisites"] + 1
-group_order_lookup["Database Service"] = group_order_lookup["Prerequisites"] + 2
 
 
 def get_dynamic_help(base_help: str, task_tag: str) -> str:
     details = task_execution_details_lookup.get(task_tag)
-    if details:
-        return f"{base_help} (Conceptual Group: '{details[0]}', Step: {details[1]})"
+    if details and details[1] > 0:  # Only show step number if it's a sub-step
+        return f"{base_help} (Part of: '{details[0]}', Sub-step: {details[1]})"
+    elif details and details[1] == 0:  # Orchestrator for a conceptual group
+        return f"{base_help} (Orchestrates: '{details[0]}')"
     return base_help
 
 
@@ -136,70 +148,45 @@ def setup_main_logging() -> None:
 
 
 def ufw_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
-    """Orchestrates the new UFW setup (activation) and configuration (rules) sequence."""
-    logger_to_use = current_logger if current_logger else logger  # Corrected: use 'logger'
+    logger_to_use = current_logger if current_logger else logger
     log_map_server(f"--- {config.SYMBOLS['step']} Starting UFW Full Setup & Config Sequence ---", "info", logger_to_use)
-
-    if not execute_step(
-            step_tag="CONFIG_UFW_RULES",
-            step_description="Configure UFW Rules",
-            step_function=apply_ufw_rules,
-            current_logger_instance=logger_to_use,
-            prompt_user_for_rerun=cli_prompt_for_rerun,
-    ):
+    if not execute_step("CONFIG_UFW_RULES", "Configure UFW Rules", apply_ufw_rules, logger_to_use,
+                        cli_prompt_for_rerun):
         raise RuntimeError("UFW rule configuration failed.")
-
-    if not execute_step(
-            step_tag="SETUP_UFW_ENABLE_SERVICE",
-            step_description="Enable UFW Service",
-            step_function=enable_ufw_service,
-            current_logger_instance=logger_to_use,
-            prompt_user_for_rerun=cli_prompt_for_rerun,
-    ):
+    if not execute_step("SETUP_UFW_ENABLE_SERVICE", "Enable UFW Service", enable_ufw_service, logger_to_use,
+                        cli_prompt_for_rerun):
         raise RuntimeError("UFW service enabling failed.")
-
     log_map_server(f"--- {config.SYMBOLS['success']} UFW Full Setup & Config Sequence Completed ---", "success",
                    logger_to_use)
 
 
 def postgres_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
-    """Orchestrates the new PostgreSQL setup and configuration sequence."""
-    logger_to_use = current_logger if current_logger else logger  # Corrected: use 'logger'
+    logger_to_use = current_logger if current_logger else logger
     log_map_server(f"--- {config.SYMBOLS['step']} Starting PostgreSQL Full Setup & Config Sequence ---", "info",
                    logger_to_use)
-
     pg_steps_to_execute = [
         ("SETUP_POSTGRES_PKG_CHECK", "Check PostgreSQL Package Installation", ensure_postgres_packages_are_installed),
         ("CONFIG_POSTGRES_USER_DB", "Create PostgreSQL User and Database", create_postgres_user_and_db),
-        ("CONFIG_POSTGRES_EXTENSIONS", "Enable PostgreSQL Extensions (PostGIS, Hstore)", enable_postgres_extensions),
+        ("CONFIG_POSTGRES_EXTENSIONS", "Enable PostgreSQL Extensions", enable_postgres_extensions),
         ("CONFIG_POSTGRES_PERMISSIONS", "Set PostgreSQL Database Permissions", set_postgres_permissions),
         ("CONFIG_POSTGRESQL_CONF", "Customize postgresql.conf", customize_postgresql_conf),
         ("CONFIG_PG_HBA_CONF", "Customize pg_hba.conf", customize_pg_hba_conf),
-        ("SERVICE_POSTGRES_RESTART_ENABLE", "Restart and Enable PostgreSQL Service",
-         restart_and_enable_postgres_service),
+        ("SERVICE_POSTGRES_RESTART_ENABLE", "Restart & Enable PostgreSQL Service", restart_and_enable_postgres_service),
     ]
-
     for tag, description, func_ref in pg_steps_to_execute:
-        if not execute_step(
-                step_tag=tag,
-                step_description=description,
-                step_function=func_ref,
-                current_logger_instance=logger_to_use,
-                prompt_user_for_rerun=cli_prompt_for_rerun,
-        ):
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun):
             raise RuntimeError(f"PostgreSQL setup step '{description}' ({tag}) failed.")
-
     log_map_server(f"--- {config.SYMBOLS['success']} PostgreSQL Full Setup & Config Sequence Completed ---", "success",
                    logger_to_use)
 
 
-def systemd_reload_step_group(current_logger_instance: logging.Logger) -> bool:
-    """Wrapper for systemd_reload as a group step."""
+def systemd_reload_step_group(current_logger_instance: Optional[logging.Logger] = None) -> bool:
+    logger_to_use = current_logger_instance if current_logger_instance else logger
     return execute_step(
         step_tag="SYSTEMD_RELOAD_MAIN",
         step_description="Reload Systemd Daemon (Group Action)",
         step_function=lambda logger_param: systemd_reload(current_logger=logger_param),
-        current_logger_instance=current_logger_instance,
+        current_logger_instance=logger_to_use,
         prompt_user_for_rerun=cli_prompt_for_rerun,
     )
 
@@ -248,13 +235,13 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         ("nodejs-install", "NODEJS_INSTALL", "Run Node.js installation only."),
         ("ufw", "UFW_FULL_SETUP", "Run UFW full setup (rules and enable)."),
         ("postgres", "POSTGRES_FULL_SETUP", "Run PostgreSQL full setup & configuration."),
-        ("pgtileserv", "PGTILESERV_SETUP", "Run pg_tileserv setup only (Old Style)."),
-        ("carto", "CARTO_SETUP", "Run CartoCSS & OSM Style setup only (Old Style)."),
-        ("renderd", "RENDERD_SETUP", "Run Renderd setup only (Old Style)."),
-        ("osrm", "OSM_OSRM_SERVER_SETUP", "Run OSM Data & OSRM setup only (Old Style)."),
-        ("apache", "APACHE_SETUP", "Run Apache for mod_tile setup only (Old Style)."),
-        ("nginx", "NGINX_SETUP", "Run Nginx reverse proxy setup only (Old Style)."),
-        ("certbot", "CERTBOT_SETUP", "Run Certbot SSL setup only (Old Style)."),
+        ("pgtileserv", "PGTILESERV_SETUP", "Run pg_tileserv setup (Old Style)."),  # To be refactored
+        ("carto", "CARTO_SETUP", "Run CartoCSS & OSM Style setup (Old Style)."),  # To be refactored
+        ("renderd", "RENDERD_SETUP", "Run Renderd setup (Old Style)."),  # To be refactored
+        ("osrm", "OSM_OSRM_SERVER_SETUP", "Run OSM Data & OSRM setup (Old Style)."),  # To be refactored
+        ("apache", "APACHE_SETUP", "Run Apache for mod_tile setup (Old Style)."),  # To be refactored
+        ("nginx", "NGINX_SETUP", "Run Nginx reverse proxy setup (Old Style)."),  # To be refactored
+        ("certbot", "CERTBOT_SETUP", "Run Certbot SSL setup (Old Style)."),  # To be refactored
         ("gtfs-prep", "GTFS_PREP", "Run GTFS data preparation only."),
         ("raster-prep", "RASTER_PREP", "Run raster tile pre-rendering only."),
         ("website-setup", "WEBSITE_SETUP", "Run website setup only."),
@@ -269,7 +256,7 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
                                   help="Run core conflict removal group only.")
     group_task_flags.add_argument("--prereqs", action="store_true", help="Run prerequisites installation group only.")
     group_task_flags.add_argument("--services", action="store_true",
-                                  help="Run (mostly unrefactored) services setup group.")
+                                  help="Run setup for remaining (unrefactored) services.")
     group_task_flags.add_argument("--data", action="store_true", help="Run data preparation group only.")
     group_task_flags.add_argument("--systemd-reload", dest="group_systemd_reload_flag", action="store_true",
                                   help="Run systemd reload (as a group action after service changes).")
@@ -342,6 +329,7 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
             log_map_server(f"{config.SYMBOLS['info']} State clearing cancelled.", "info", current_logger=logger)
         return 0
 
+    # Maps argparse destination attribute name to (Tag, Description, Function Reference)
     defined_tasks_map: Dict[str, Tuple[str, str, Callable]] = {
         "boot_verbosity": ("BOOT_VERBOSITY", "Improve Boot Verbosity & Core Utils", boot_verbosity),
         "core_conflicts": ("CORE_CONFLICTS", "Remove Core Conflicts", core_conflict_removal),
@@ -350,17 +338,19 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         "nodejs_install": ("NODEJS_INSTALL", "Install Node.js LTS", node_js_lts_install),
         "ufw": ("UFW_FULL_SETUP", "Run UFW full setup (rules and enable)", ufw_full_setup_sequence),
         "postgres": ("POSTGRES_FULL_SETUP", "Run PostgreSQL full setup & configuration", postgres_full_setup_sequence),
-        "pgtileserv": ("PGTILESERV_SETUP", "Setup pg_tileserv (Old)", pg_tileserv_setup),
-        "carto": ("CARTO_SETUP", "Setup CartoCSS & OSM Style (Old)", carto_setup),
-        "renderd": ("RENDERD_SETUP", "Setup Renderd (Old)", renderd_setup),
-        "osrm": ("OSM_OSRM_SERVER_SETUP", "Setup OSM Data & OSRM (Old)", osm_osrm_server_setup),
-        "apache": ("APACHE_SETUP", "Setup Apache for mod_tile (Old)", apache_modtile_setup),
-        "nginx": ("NGINX_SETUP", "Setup Nginx Reverse Proxy (Old)", nginx_setup),
-        "certbot": ("CERTBOT_SETUP", "Setup Certbot for SSL (Old)", certbot_setup),
+        "pgtileserv": ("PGTILESERV_SETUP", "Setup pg_tileserv (Old Style)", pg_tileserv_setup),
+        "carto": ("CARTO_SETUP", "Setup CartoCSS & OSM Style (Old Style)", carto_setup),
+        "renderd": ("RENDERD_SETUP", "Setup Renderd (Old Style)", renderd_setup),
+        "osrm": ("OSM_OSRM_SERVER_SETUP", "Setup OSM Data & OSRM (Old Style)", osm_osrm_server_setup),
+        "apache": ("APACHE_SETUP", "Setup Apache for mod_tile (Old Style)", apache_modtile_setup),
+        "nginx": ("NGINX_SETUP", "Setup Nginx Reverse Proxy (Old Style)", nginx_setup),
+        "certbot": ("CERTBOT_SETUP", "Setup Certbot for SSL (Old Style)", certbot_setup),
         "gtfs_prep": ("GTFS_PREP", "Prepare GTFS Data", gtfs_data_prep),
         "raster_prep": ("RASTER_PREP", "Pre-render Raster Tiles", raster_tile_prerender),
         "website_setup": ("WEBSITE_SETUP", "Setup Test Website", website_setup),
-        "task_systemd_reload": ("SYSTEMD_RELOAD_TASK", "Reload Systemd Daemon (Task)", systemd_reload),
+        "task_systemd_reload": ("SYSTEMD_RELOAD_TASK", "Reload Systemd Daemon (Task)",
+                                lambda current_logger: systemd_reload(current_logger=current_logger)),
+        # Ensure lambda matches Callable sig
     }
 
     overall_success = True
@@ -369,7 +359,7 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
 
     tasks_to_run_from_flags: List[Dict[str, Any]] = []
     for arg_dest_name in defined_tasks_map.keys():
-        if getattr(parsed_args, arg_dest_name, False):
+        if getattr(parsed_args, arg_dest_name.replace("-", "_"), False):  # Use replace for arg dest
             ran_individual_tasks = True
             tag, desc, func_ref = defined_tasks_map[arg_dest_name]
             tasks_to_run_from_flags.append({"tag": tag, "desc": desc, "func": func_ref})
@@ -379,8 +369,16 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         log_map_server(f"{config.SYMBOLS['rocket']}====== Running Specified Individual Task(s) ======",
                        current_logger=logger)
         # Add sorting logic here if execution order of mixed individual flags matters
-        # For now, assume tasks from flags are independent enough or user specifies one by one.
-        # If sorting is needed: tasks_to_run_from_flags.sort(key=get_sort_key_for_overall_task)
+        # For now, tasks will run in the order they appear in defined_tasks_map if multiple flags are set
+        # Example sort key (if INSTALLATION_GROUPS_ORDER was fully refactored for all tags):
+        # def get_sort_key(task_item):
+        #     details = task_execution_details_lookup.get(task_item["tag"])
+        #     if details:
+        #         group_name, step_in_group = details
+        #         return (group_order_lookup.get(group_name, float('inf')), step_in_group)
+        #     return (float('inf'), float('inf')) # Put unknown tags last
+        # tasks_to_run_from_flags.sort(key=get_sort_key)
+
         for task_info in tasks_to_run_from_flags:
             if not overall_success:
                 log_map_server(
@@ -392,7 +390,7 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
                 task_info["tag"],
                 task_info["desc"],
                 task_info["func"],
-                logger,
+                logger,  # Pass the main logger instance
                 prompt_user_for_rerun=cli_prompt_for_rerun,
             )
             if not step_success:
@@ -403,41 +401,49 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         log_map_server(f"{config.SYMBOLS['rocket']}====== Starting Full Installation Process ======",
                        current_logger=logger)
 
-        # This sequence needs to be carefully defined with new and old orchestrators
-        # during the transition.
-        full_install_sequence = [
+        # --full will run groups. Refactored services (UFW, Postgres) need to be
+        # integrated into this flow, either by refactoring the group orchestrators
+        # or by calling their sequences explicitly here.
+
+        full_install_phases = [
             ("CORE_CONFLICT_REMOVAL_GROUP", "Core Conflict Removal Group", core_conflict_removal_group),
             ("PREREQUISITES_GROUP", "Prerequisites Installation Group", prereqs_install_group),
+            # Explicitly call new sequences for refactored services
             ("UFW_FULL_SETUP", "Full UFW Setup & Configuration", ufw_full_setup_sequence),
             ("POSTGRES_FULL_SETUP", "Full PostgreSQL Setup & Configuration", postgres_full_setup_sequence),
-            # services_setup_group will run *remaining* unrefactored services.
-            # It needs to be intelligent enough not to re-run UFW/Postgres, or be passed skips.
-            ("SERVICES_GROUP_REMAINING", "Setup Remaining Services", services_setup_group),
-            # services_setup_group needs to be adapted
+            # services_setup_group needs to be modified to NOT include UFW and Postgres
+            # or be passed a list of services to skip.
+            # For now, assume it will run other services.
+            ("SERVICES_GROUP_REMAINING", "Setup Remaining Services (Unrefactored)", services_setup_group),
             ("SYSTEMD_RELOAD_GROUP", "Systemd Reload Group", systemd_reload_step_group),
             ("DATA_PREP_GROUP", "Data Preparation Group", data_prep_group),
         ]
 
-        for tag, desc, func_or_group_func in full_install_sequence:
+        for tag, desc, phase_func in full_install_phases:
             if not overall_success:
                 log_map_server(f"{config.SYMBOLS['warning']} Skipping '{desc}' due to previous failure.", "warning",
                                logger)
                 continue
 
-            log_map_server(f"--- {config.SYMBOLS['info']} Executing: {desc} ({tag}) ---", "info", logger)
+            log_map_server(f"--- {config.SYMBOLS['info']} Executing Phase/Group: {desc} ({tag}) ---", "info", logger)
 
-            # Group functions like prereqs_install_group usually return bool.
-            # Overall sequence functions (like ufw_full_setup_sequence) use execute_step internally
-            # and will raise on failure, so they should be wrapped by execute_step here for consistent
-            # overall state marking and error handling for the *entire* sequence.
-            if "GROUP" in tag:
-                if not func_or_group_func(logger):
-                    overall_success = False
+            current_phase_success = True
+            if "GROUP" in tag and tag != "SERVICES_GROUP_REMAINING":  # Group orchestrators return bool
+                current_phase_success = phase_func(logger)
+            elif tag == "SERVICES_GROUP_REMAINING":
+                # TODO: Modify services_setup_group to accept a list of services to skip
+                # For now, it might re-run UFW/Postgres parts if they were in its original list
+                current_phase_success = phase_func(logger)  # Pass logger
             else:  # For overall sequences like UFW_FULL_SETUP, POSTGRES_FULL_SETUP
-                if not execute_step(tag, desc, func_or_group_func, logger, cli_prompt_for_rerun):
-                    overall_success = False
+                try:
+                    phase_func(logger)  # These raise on error
+                except RuntimeError:
+                    current_phase_success = False
+                    # Alternative: Wrap with execute_step if these sequences should also be skippable via state file
+                # current_phase_success = execute_step(tag, desc, phase_func, logger, cli_prompt_for_rerun)
 
-            if not overall_success:
+            if not current_phase_success:
+                overall_success = False
                 log_map_server(f"{config.SYMBOLS['error']} Phase/Group '{desc}' failed.", "error", logger)
                 break
 
@@ -449,11 +455,9 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         overall_success = prereqs_install_group(logger)
     elif parsed_args.services:
         action_taken = True
-        # This will run the OLD services_setup_group. UFW and Postgres might be
-        # re-configured if their old setup functions are still in services_setup_group.
-        # This highlights the need to refactor services_setup_group itself.
         log_map_server(
-            f"{config.SYMBOLS['warning']} Running --services will use the old service orchestrator. UFW and Postgres might be re-actioned by their old setup functions if not removed from that group.",
+            f"{config.SYMBOLS['warning']} Running --services. This will orchestrate remaining unrefactored services. "
+            "UFW and PostgreSQL should be managed by their dedicated flags (--ufw, --postgres) or --full.",
             "warning", logger)
         overall_success = services_setup_group(logger)
         if overall_success: overall_success = systemd_reload_step_group(logger)
