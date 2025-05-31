@@ -111,8 +111,8 @@ def create_apache_tile_site_config(current_logger: Optional[logging.Logger] = No
     # The URI /hot/ should match the URI in renderd.conf (e.g., [default] URI=/hot/).
     AddTileConfig /hot/ tile.openstreetmap.org 
 
-    ErrorLog {{{{APACHE_LOG_DIR}}}}/tiles_error.log
-    CustomLog {{{{APACHE_LOG_DIR}}}}/tiles_access.log combined
+    ErrorLog ${{APACHE_LOG_DIR}}/tiles_error.log
+    CustomLog ${{APACHE_LOG_DIR}}/tiles_access.log combined
 </VirtualHost>
 """
     try:
