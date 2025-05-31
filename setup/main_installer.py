@@ -17,14 +17,20 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # --- Common module imports ---
 from common.command_utils import check_package_installed, log_map_server
 from common.pgpass_utils import setup_pgpass
-from common.system_utils import systemd_reload  # get_current_script_hash is from state_manager
+from common.system_utils import systemd_reload
 
 # --- Setup phase module imports ---
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.ufw_setup_actions import enable_ufw_service
 from setup.postgres_installer import ensure_postgres_packages_are_installed
-from setup.state_manager import get_current_script_hash  # Corrected import
+from setup.carto_installer import (
+    install_carto_cli,
+    setup_osm_carto_repository,
+    prepare_carto_directory_for_processing,
+    fetch_carto_external_data
+)
+from setup.state_manager import get_current_script_hash
 
 # --- Configure phase module imports ---
 from configure.ufw_configurator import apply_ufw_rules
@@ -36,6 +42,12 @@ from configure.postgres_configurator import (
     customize_pg_hba_conf,
     restart_and_enable_postgres_service
 )
+from configure.carto_configurator import (
+    compile_osm_carto_stylesheet,
+    deploy_mapnik_stylesheet,
+    finalize_carto_directory_processing,
+    update_font_cache
+)
 
 # --- Data processing, state, execution tools ---
 from setup.data_processing import data_prep_group, gtfs_data_prep, raster_tile_prerender
@@ -46,7 +58,7 @@ from setup.state_manager import (
 )
 from setup.step_executor import execute_step
 
-# Core setup functions (will eventually be fully replaced by core_prerequisites_group)
+# Core setup functions (prereqs_install_group will call these)
 from setup.core_setup import (
     boot_verbosity,
     core_conflict_removal,
@@ -54,24 +66,23 @@ from setup.core_setup import (
     core_install,
     docker_install,
     node_js_lts_install,
-    prereqs_install_group,  # This group calls the functions above
+    prereqs_install_group,
 )
-# Unrefactored service modules
+# Unrefactored service modules (to be called by services_setup_group for now)
 from setup.services.apache import apache_modtile_setup
-from setup.services.carto import carto_setup
+# setup.services.carto.carto_setup is now replaced
 from setup.services.certbot import certbot_setup
 from setup.services.nginx import nginx_setup
 from setup.services.osrm import osm_osrm_server_setup
 from setup.services.pg_tileserv import pg_tileserv_setup
+# setup.services.postgres.postgres_setup is now replaced
 from setup.services.renderd import renderd_setup
 from setup.services.website import website_setup
+# services_setup_group will orchestrate UNREFACTORED services.
 from setup.services.service_orchestrator import services_setup_group
 
 logger = logging.getLogger(__name__)
 
-# Defines the conceptual order and grouping of installation tasks.
-# This list helps in generating help text and sorting individual flags if multiple are used.
-# The actual execution for --full or group flags relies on calling specific group orchestrator functions.
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {"name": "Core Conflict Removal", "steps": ["CORE_CONFLICTS"]},
     {
@@ -80,19 +91,21 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
             "BOOT_VERBOSITY", "CORE_INSTALL", "DOCKER_INSTALL", "NODEJS_INSTALL",
         ],
     },
-    # --- New Conceptual Groups for Refactored Services ---
     {"name": "Firewall Service (UFW)", "steps": ["CONFIG_UFW_RULES", "SETUP_UFW_ENABLE_SERVICE"]},
     {"name": "Database Service (PostgreSQL)", "steps": [
         "SETUP_POSTGRES_PKG_CHECK", "CONFIG_POSTGRES_USER_DB", "CONFIG_POSTGRES_EXTENSIONS",
         "CONFIG_POSTGRES_PERMISSIONS", "CONFIG_POSTGRESQL_CONF", "CONFIG_PG_HBA_CONF",
         "SERVICE_POSTGRES_RESTART_ENABLE"
     ]},
-    # --- End New Conceptual Groups ---
-    {  # This group is for services NOT YET refactored.
+    {"name": "Carto Service", "steps": [
+        "SETUP_CARTO_CLI", "SETUP_CARTO_REPO", "SETUP_CARTO_PREPARE_DIR", "SETUP_CARTO_FETCH_DATA",
+        "CONFIG_CARTO_COMPILE", "CONFIG_CARTO_DEPLOY_XML", "CONFIG_CARTO_FINALIZE_DIR", "CONFIG_SYSTEM_FONT_CACHE"
+    ]},
+    {
         "name": "Other Services (Legacy Orchestration)",
-        "steps": [
-            "PGTILESERV_SETUP", "CARTO_SETUP", "RENDERD_SETUP",
-            "OSM_OSRM_SERVER_SETUP", "APACHE_SETUP", "NGINX_SETUP",
+        "steps": [  # Services not yet refactored
+            "PGTILESERV_SETUP",  # "CARTO_SETUP" - removed as refactored
+            "RENDERD_SETUP", "OSM_OSRM_SERVER_SETUP", "APACHE_SETUP", "NGINX_SETUP",
             "CERTBOT_SETUP", "WEBSITE_SETUP",
         ],
     },
@@ -106,10 +119,10 @@ for group_idx, group_info in enumerate(INSTALLATION_GROUPS_ORDER):
     for step_idx, task_tag in enumerate(group_info["steps"]):
         task_execution_details_lookup[task_tag] = (group_name, step_idx + 1)
 
-# Add overall tags for refactored services
-task_execution_details_lookup["UFW_FULL_SETUP"] = ("Firewall Service (UFW)",
-                                                   0)  # 0 indicates it's an orchestrator for the group
+# Add overall tags for refactored services for help text and sorting
+task_execution_details_lookup["UFW_FULL_SETUP"] = ("Firewall Service (UFW)", 0)
 task_execution_details_lookup["POSTGRES_FULL_SETUP"] = ("Database Service (PostgreSQL)", 0)
+task_execution_details_lookup["CARTO_FULL_SETUP"] = ("Carto Service", 0)
 
 group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
@@ -119,9 +132,9 @@ group_order_lookup: Dict[str, int] = {
 
 def get_dynamic_help(base_help: str, task_tag: str) -> str:
     details = task_execution_details_lookup.get(task_tag)
-    if details and details[1] > 0:  # Only show step number if it's a sub-step
+    if details and details[1] > 0:
         return f"{base_help} (Part of: '{details[0]}', Sub-step: {details[1]})"
-    elif details and details[1] == 0:  # Orchestrator for a conceptual group
+    elif details and details[1] == 0:
         return f"{base_help} (Orchestrates: '{details[0]}')"
     return base_help
 
@@ -180,6 +193,44 @@ def postgres_full_setup_sequence(current_logger: Optional[logging.Logger] = None
                    logger_to_use)
 
 
+def carto_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting Carto Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    compiled_xml_path_holder = {"path": None}
+
+    carto_steps = [
+        ("SETUP_CARTO_CLI", "Install Carto CSS Compiler (carto CLI)", install_carto_cli),
+        ("SETUP_CARTO_REPO", "Setup OpenStreetMap-Carto Repository", setup_osm_carto_repository),
+        ("SETUP_CARTO_PREPARE_DIR", "Prepare Carto Directory for Processing", prepare_carto_directory_for_processing),
+        ("SETUP_CARTO_FETCH_DATA", "Fetch External Data for Carto Style", fetch_carto_external_data),
+        ("CONFIG_CARTO_COMPILE", "Compile OSM Carto Stylesheet",
+         lambda cl: compiled_xml_path_holder.update({"path": compile_osm_carto_stylesheet(cl)})),
+        ("CONFIG_CARTO_DEPLOY_XML", "Deploy Compiled Mapnik Stylesheet",
+         lambda cl: deploy_mapnik_stylesheet(compiled_xml_path_holder["path"], cl) if compiled_xml_path_holder[
+             "path"] else (_ for _ in ()).throw(RuntimeError("Compiled XML path not set"))),
+        ("CONFIG_CARTO_FINALIZE_DIR", "Finalize Carto Directory Processing", finalize_carto_directory_processing),
+        ("CONFIG_SYSTEM_FONT_CACHE", "Update System Font Cache", update_font_cache),
+    ]
+    try:
+        for tag, description, func_ref in carto_steps:
+            if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun):
+                raise RuntimeError(f"Carto setup step '{description}' ({tag}) failed.")
+    except Exception as e:
+        log_map_server(f"{config.SYMBOLS['error']} Error in Carto sequence: {e}. Attempting to finalize directory.",
+                       "error", logger_to_use)
+        try:
+            finalize_carto_directory_processing(logger_to_use)
+        except Exception as e_finalize:
+            log_map_server(
+                f"{config.SYMBOLS['error']} Error during Carto directory finalization after failure: {e_finalize}",
+                "error", logger_to_use)
+        raise  # Re-raise the original error
+
+    log_map_server(f"--- {config.SYMBOLS['success']} Carto Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
 def systemd_reload_step_group(current_logger_instance: Optional[logging.Logger] = None) -> bool:
     logger_to_use = current_logger_instance if current_logger_instance else logger
     return execute_step(
@@ -235,13 +286,13 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         ("nodejs-install", "NODEJS_INSTALL", "Run Node.js installation only."),
         ("ufw", "UFW_FULL_SETUP", "Run UFW full setup (rules and enable)."),
         ("postgres", "POSTGRES_FULL_SETUP", "Run PostgreSQL full setup & configuration."),
-        ("pgtileserv", "PGTILESERV_SETUP", "Run pg_tileserv setup (Old Style)."),  # To be refactored
-        ("carto", "CARTO_SETUP", "Run CartoCSS & OSM Style setup (Old Style)."),  # To be refactored
-        ("renderd", "RENDERD_SETUP", "Run Renderd setup (Old Style)."),  # To be refactored
-        ("osrm", "OSM_OSRM_SERVER_SETUP", "Run OSM Data & OSRM setup (Old Style)."),  # To be refactored
-        ("apache", "APACHE_SETUP", "Run Apache for mod_tile setup (Old Style)."),  # To be refactored
-        ("nginx", "NGINX_SETUP", "Run Nginx reverse proxy setup (Old Style)."),  # To be refactored
-        ("certbot", "CERTBOT_SETUP", "Run Certbot SSL setup (Old Style)."),  # To be refactored
+        ("carto", "CARTO_FULL_SETUP", "Run Carto full setup & configuration."),
+        ("pgtileserv", "PGTILESERV_SETUP", "Run pg_tileserv setup (Old Style)."),
+        ("renderd", "RENDERD_SETUP", "Run Renderd setup (Old Style)."),
+        ("osrm", "OSM_OSRM_SERVER_SETUP", "Run OSM Data & OSRM setup (Old Style)."),
+        ("apache", "APACHE_SETUP", "Run Apache for mod_tile setup (Old Style)."),
+        ("nginx", "NGINX_SETUP", "Run Nginx reverse proxy setup (Old Style)."),
+        ("certbot", "CERTBOT_SETUP", "Run Certbot SSL setup (Old Style)."),
         ("gtfs-prep", "GTFS_PREP", "Run GTFS data preparation only."),
         ("raster-prep", "RASTER_PREP", "Run raster tile pre-rendering only."),
         ("website-setup", "WEBSITE_SETUP", "Run website setup only."),
@@ -338,8 +389,8 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         "nodejs_install": ("NODEJS_INSTALL", "Install Node.js LTS", node_js_lts_install),
         "ufw": ("UFW_FULL_SETUP", "Run UFW full setup (rules and enable)", ufw_full_setup_sequence),
         "postgres": ("POSTGRES_FULL_SETUP", "Run PostgreSQL full setup & configuration", postgres_full_setup_sequence),
+        "carto": ("CARTO_FULL_SETUP", "Run Carto full setup & configuration", carto_full_setup_sequence),
         "pgtileserv": ("PGTILESERV_SETUP", "Setup pg_tileserv (Old Style)", pg_tileserv_setup),
-        "carto": ("CARTO_SETUP", "Setup CartoCSS & OSM Style (Old Style)", carto_setup),
         "renderd": ("RENDERD_SETUP", "Setup Renderd (Old Style)", renderd_setup),
         "osrm": ("OSM_OSRM_SERVER_SETUP", "Setup OSM Data & OSRM (Old Style)", osm_osrm_server_setup),
         "apache": ("APACHE_SETUP", "Setup Apache for mod_tile (Old Style)", apache_modtile_setup),
@@ -349,8 +400,7 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         "raster_prep": ("RASTER_PREP", "Pre-render Raster Tiles", raster_tile_prerender),
         "website_setup": ("WEBSITE_SETUP", "Setup Test Website", website_setup),
         "task_systemd_reload": ("SYSTEMD_RELOAD_TASK", "Reload Systemd Daemon (Task)",
-                                lambda current_logger: systemd_reload(current_logger=current_logger)),
-        # Ensure lambda matches Callable sig
+                                lambda current_logger_param: systemd_reload(current_logger=current_logger_param)),
     }
 
     overall_success = True
@@ -359,26 +409,37 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
 
     tasks_to_run_from_flags: List[Dict[str, Any]] = []
     for arg_dest_name in defined_tasks_map.keys():
-        if getattr(parsed_args, arg_dest_name.replace("-", "_"), False):  # Use replace for arg dest
+        if getattr(parsed_args, arg_dest_name.replace("-", "_"), False):
             ran_individual_tasks = True
             tag, desc, func_ref = defined_tasks_map[arg_dest_name]
             tasks_to_run_from_flags.append({"tag": tag, "desc": desc, "func": func_ref})
+
+    # Sort tasks if multiple individual flags are specified, based on INSTALLATION_GROUPS_ORDER
+    if ran_individual_tasks and len(tasks_to_run_from_flags) > 1:
+        def get_sort_key(task_item_dict: Dict[str, Any]) -> Tuple[int, int]:
+            tag_for_sort = task_item_dict["tag"]
+            # Use the overall tags for refactored services for sorting
+            if tag_for_sort == "UFW_FULL_SETUP":
+                sort_tag = "CONFIG_UFW_RULES"  # Sort based on first sub-step for group order
+            elif tag_for_sort == "POSTGRES_FULL_SETUP":
+                sort_tag = "SETUP_POSTGRES_PKG_CHECK"
+            elif tag_for_sort == "CARTO_FULL_SETUP":
+                sort_tag = "SETUP_CARTO_CLI"
+            else:
+                sort_tag = tag_for_sort
+
+            details = task_execution_details_lookup.get(sort_tag)
+            if details:
+                group_name, step_in_group = details
+                return (group_order_lookup.get(group_name, float('inf')), step_in_group)
+            return (float('inf'), float('inf'))  # Put unknown tags last
+
+        tasks_to_run_from_flags.sort(key=get_sort_key)
 
     if ran_individual_tasks:
         action_taken = True
         log_map_server(f"{config.SYMBOLS['rocket']}====== Running Specified Individual Task(s) ======",
                        current_logger=logger)
-        # Add sorting logic here if execution order of mixed individual flags matters
-        # For now, tasks will run in the order they appear in defined_tasks_map if multiple flags are set
-        # Example sort key (if INSTALLATION_GROUPS_ORDER was fully refactored for all tags):
-        # def get_sort_key(task_item):
-        #     details = task_execution_details_lookup.get(task_item["tag"])
-        #     if details:
-        #         group_name, step_in_group = details
-        #         return (group_order_lookup.get(group_name, float('inf')), step_in_group)
-        #     return (float('inf'), float('inf')) # Put unknown tags last
-        # tasks_to_run_from_flags.sort(key=get_sort_key)
-
         for task_info in tasks_to_run_from_flags:
             if not overall_success:
                 log_map_server(
@@ -390,7 +451,7 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
                 task_info["tag"],
                 task_info["desc"],
                 task_info["func"],
-                logger,  # Pass the main logger instance
+                logger,
                 prompt_user_for_rerun=cli_prompt_for_rerun,
             )
             if not step_success:
@@ -401,19 +462,14 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         log_map_server(f"{config.SYMBOLS['rocket']}====== Starting Full Installation Process ======",
                        current_logger=logger)
 
-        # --full will run groups. Refactored services (UFW, Postgres) need to be
-        # integrated into this flow, either by refactoring the group orchestrators
-        # or by calling their sequences explicitly here.
-
         full_install_phases = [
             ("CORE_CONFLICT_REMOVAL_GROUP", "Core Conflict Removal Group", core_conflict_removal_group),
             ("PREREQUISITES_GROUP", "Prerequisites Installation Group", prereqs_install_group),
-            # Explicitly call new sequences for refactored services
             ("UFW_FULL_SETUP", "Full UFW Setup & Configuration", ufw_full_setup_sequence),
             ("POSTGRES_FULL_SETUP", "Full PostgreSQL Setup & Configuration", postgres_full_setup_sequence),
-            # services_setup_group needs to be modified to NOT include UFW and Postgres
-            # or be passed a list of services to skip.
-            # For now, assume it will run other services.
+            ("CARTO_FULL_SETUP", "Full Carto Setup & Configuration", carto_full_setup_sequence),
+            # services_setup_group will run *remaining* unrefactored services.
+            # It needs to be modified to skip already refactored services.
             ("SERVICES_GROUP_REMAINING", "Setup Remaining Services (Unrefactored)", services_setup_group),
             ("SYSTEMD_RELOAD_GROUP", "Systemd Reload Group", systemd_reload_step_group),
             ("DATA_PREP_GROUP", "Data Preparation Group", data_prep_group),
@@ -428,19 +484,20 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
             log_map_server(f"--- {config.SYMBOLS['info']} Executing Phase/Group: {desc} ({tag}) ---", "info", logger)
 
             current_phase_success = True
-            if "GROUP" in tag and tag != "SERVICES_GROUP_REMAINING":  # Group orchestrators return bool
-                current_phase_success = phase_func(logger)
+            # Group orchestrators (like prereqs_install_group) return bool
+            # Overall sequence functions (like ufw_full_setup_sequence) use execute_step internally and raise on error.
+            # We wrap these sequences with execute_step for consistent state marking of the overall task.
+            if "GROUP" in tag and tag != "SERVICES_GROUP_REMAINING":
+                if not phase_func(logger):
+                    current_phase_success = False
             elif tag == "SERVICES_GROUP_REMAINING":
                 # TODO: Modify services_setup_group to accept a list of services to skip
-                # For now, it might re-run UFW/Postgres parts if they were in its original list
-                current_phase_success = phase_func(logger)  # Pass logger
-            else:  # For overall sequences like UFW_FULL_SETUP, POSTGRES_FULL_SETUP
-                try:
-                    phase_func(logger)  # These raise on error
-                except RuntimeError:
+                # (UFW, Postgres, Carto in this case)
+                if not phase_func(logger):
                     current_phase_success = False
-                    # Alternative: Wrap with execute_step if these sequences should also be skippable via state file
-                # current_phase_success = execute_step(tag, desc, phase_func, logger, cli_prompt_for_rerun)
+            else:
+                if not execute_step(tag, desc, phase_func, logger, cli_prompt_for_rerun):
+                    current_phase_success = False
 
             if not current_phase_success:
                 overall_success = False
@@ -456,8 +513,8 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
     elif parsed_args.services:
         action_taken = True
         log_map_server(
-            f"{config.SYMBOLS['warning']} Running --services. This will orchestrate remaining unrefactored services. "
-            "UFW and PostgreSQL should be managed by their dedicated flags (--ufw, --postgres) or --full.",
+            f"{config.SYMBOLS['warning']} Running --services. This orchestrates unrefactored services. "
+            "Refactored services (UFW, Postgres, Carto) should be run with their dedicated flags or via --full.",
             "warning", logger)
         overall_success = services_setup_group(logger)
         if overall_success: overall_success = systemd_reload_step_group(logger)
