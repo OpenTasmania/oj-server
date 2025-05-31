@@ -15,7 +15,7 @@ from typing import Dict, Optional
 
 # Relative import for the main pipeline function
 from . import main_pipeline as core_gtfs_pipeline
-from setup import core_utils  # For logging setup utility
+from common import core_utils
 
 module_logger = logging.getLogger(__name__)
 

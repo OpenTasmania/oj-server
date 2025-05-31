@@ -3,7 +3,7 @@ from typing import Optional, Dict
 
 import psycopg
 
-from setup.core_utils import DEFAULT_DB_PARAMS, module_logger
+from common.core_utils import DEFAULT_DB_PARAMS, module_logger
 
 
 def get_db_connection(

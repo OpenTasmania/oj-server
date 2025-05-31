@@ -14,7 +14,7 @@ import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # --- Common module imports ---
-from common.command_utils import check_package_installed, log_map_server
+from common.command_utils import log_map_server
 from common.pgpass_utils import setup_pgpass
 from common.system_utils import systemd_reload
 
@@ -23,28 +23,28 @@ from setup import config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.state_manager import get_current_script_hash
 
-from setup.ufw_setup_actions import enable_ufw_service
-from setup.postgres_installer import ensure_postgres_packages_are_installed
-from setup.carto_installer import (
+from actions.ufw_setup_actions import enable_ufw_service
+from installer.postgres_installer import ensure_postgres_packages_are_installed
+from installer.carto_installer import (
     install_carto_cli, setup_osm_carto_repository,
     prepare_carto_directory_for_processing, fetch_carto_external_data
 )
-from setup.renderd_installer import (
+from installer.renderd_installer import (
     ensure_renderd_packages_installed, create_renderd_directories,
     create_renderd_systemd_service_file
 )
-from setup.nginx_installer import ensure_nginx_package_installed
-from setup.pg_tileserv_installer import (
+from installer.nginx_installer import ensure_nginx_package_installed
+from installer.pg_tileserv_installer import (
     download_and_install_pg_tileserv_binary, create_pg_tileserv_system_user,
     setup_pg_tileserv_binary_permissions, create_pg_tileserv_systemd_service_file
 )
-from setup.osrm_installer import (
+from installer.osrm_installer import (
     ensure_osrm_dependencies, setup_osrm_data_directories,
     download_base_pbf, prepare_region_boundaries
 )
-from setup.apache_installer import ensure_apache_packages_installed
-from setup.certbot_installer import install_certbot_packages
-from setup.website_content_deployer import deploy_test_website_content
+from installer.apache_installer import ensure_apache_packages_installed
+from installer.certbot_installer import install_certbot_packages
+from actions.website_content_deployer import deploy_test_website_content
 
 # --- Configure phase module imports ---
 from configure.ufw_configurator import apply_ufw_rules
@@ -81,7 +81,7 @@ from setup.gtfs_environment_setup import setup_gtfs_logging_and_env_vars
 from dataproc.gtfs_processor_runner import run_gtfs_etl_pipeline_and_verify
 from configure.gtfs_automation_configurator import configure_gtfs_update_cronjob
 from dataproc.raster_processor import raster_tile_prerender
-from setup.osrm_data_processor import (  # OSRM data processing steps
+from dataproc.osrm_data_processor import (  # OSRM data processing steps
     extract_regional_pbfs_with_osmium,
     build_osrm_graphs_for_region
 )
@@ -96,9 +96,6 @@ from setup.core_setup import (
     boot_verbosity, core_conflict_removal, core_conflict_removal_group,
     core_install, docker_install, node_js_lts_install, prereqs_install_group,
 )
-# services_setup_group orchestrates UNREFACTORED services (if any left).
-# If all services are refactored, this import and its usage might be removed.
-from setup.services.service_orchestrator import services_setup_group
 
 logger = logging.getLogger(__name__)
 

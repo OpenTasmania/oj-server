@@ -22,7 +22,7 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-from setup.helpers import backup_file
+from common.file_utils import backup_file
 from setup.step_executor import execute_step
 
 module_logger = logging.getLogger(__name__)

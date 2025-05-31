@@ -86,7 +86,7 @@ fi
 2. Run the installer
     * Checks for required Python packages
     * Prompts to install any missing packages using sudo apt install
-    * Runs the main mapping installer ([main_map_server_entry](setup/main_installer.py))
+    * Runs the main mapping installer ([main_map_server_entry](installer/main_installer.py))
 
 ```bash
 python3 install.py
@@ -127,7 +127,6 @@ Arguments for setup.main_installer (passed if --continue-install is used):
 ================================================================================
 Help information for the main setup module (setup.main_installer):
 ================================================================================
-Could not import processors.gtfs module at load time: cannot import name 'model_validator' from 'pydantic' (/usr/lib/python3/dist-packages/pydantic/__init__.py). GTFS processing will likely fail.
 usage: main_installer.py [-h] [-a ADMIN_GROUP_IP] [-f GTFS_FEED_URL] [-v VM_IP_OR_DOMAIN] [-b PG_TILESERV_BINARY_LOCATION] [-l LOG_PREFIX] [-H PGHOST] [-P PGPORT] [-D PGDATABASE]
                          [-U PGUSER] [-W PGPASSWORD] [--boot-verbosity] [--core-conflicts] [--core-install] [--docker-install] [--nodejs-install] [--ufw] [--postgres]
                          [--pgtileserv] [--carto] [--renderd] [--osrm] [--apache] [--nginx] [--certbot] [--gtfs-prep] [--raster-prep] [--website-prep] [--task-systemd-reload]
@@ -222,7 +221,7 @@ The setup process is designed to be followed sequentially.
 
 1. [Installer](install.py)
     * Ensure prequisites are available.
-2. [Map server installer](setup/main_installer.py)
+2. [Map server installer](installer/main_installer.py)
     * Install the map server.
     * Import data from processors.
 3. Submodules

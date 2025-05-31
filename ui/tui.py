@@ -16,11 +16,11 @@ import urwid
 
 # Assuming these are correctly imported relative to the TUI's execution context
 # when integrated into the main application.
-from . import (
+from setup import (
     config as app_config,  # Renamed to avoid conflict if testing standalone
 )
-from .state_manager import view_completed_steps
-from .step_executor import execute_step
+from setup.state_manager import view_completed_steps
+from setup.step_executor import execute_step
 
 module_logger = logging.getLogger(__name__)
 

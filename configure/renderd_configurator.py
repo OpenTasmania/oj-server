@@ -17,7 +17,7 @@ from common.command_utils import (
 from common.system_utils import systemd_reload
 from setup import config  # For SYMBOLS, VM_IP_OR_DOMAIN etc.
 from setup.state_manager import get_current_script_hash
-from setup.renderd_installer import RENDERD_GROUP
+from installer.renderd_installer import RENDERD_GROUP
 module_logger = logging.getLogger(__name__)
 
 RENDERD_CONF_PATH = "/etc/renderd.conf"  # Must match path in service file
