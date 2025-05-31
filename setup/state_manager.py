@@ -18,13 +18,13 @@ import tempfile
 from typing import List, Optional
 
 from common.command_utils import log_map_server, run_elevated_command
+from common.system_utils import calculate_project_hash
 from setup.config import (
     OSM_PROJECT_ROOT,
     SCRIPT_VERSION,
     STATE_FILE_PATH,
     SYMBOLS,
 )
-from common.system_utils import calculate_project_hash
 
 module_logger = logging.getLogger(__name__)
 

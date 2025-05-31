@@ -15,14 +15,14 @@ import os
 import tempfile
 from typing import Optional
 
-from setup import config
-from setup.cli_handler import cli_prompt_for_rerun
 from common.command_utils import (
     log_map_server,
     run_command,
     run_elevated_command,
 )
 from common.file_utils import backup_file
+from setup import config
+from setup.cli_handler import cli_prompt_for_rerun
 from setup.step_executor import execute_step
 
 module_logger = logging.getLogger(__name__)

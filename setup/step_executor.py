@@ -12,8 +12,8 @@ successful execution.
 import logging
 from typing import Callable, Optional
 
-from setup import config  # For SYMBOLS
 from common.command_utils import log_map_server
+from setup import config  # For SYMBOLS
 from setup.state_manager import is_step_completed, mark_step_completed
 
 module_logger = logging.getLogger(__name__)

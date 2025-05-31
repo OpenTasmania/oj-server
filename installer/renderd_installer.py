@@ -5,14 +5,12 @@ Handles setup of Renderd: package checks, directory creation,
 and systemd service file definition.
 """
 import logging
-import os  # For os.cpu_count()
 from typing import Optional
 
 from common.command_utils import (
     log_map_server,
     run_elevated_command,
-    check_package_installed,
-    command_exists
+    check_package_installed
 )
 from setup import config  # For SYMBOLS
 from setup.state_manager import get_current_script_hash

@@ -5,9 +5,8 @@ Handles configuration of OSRM services, primarily setting up and activating
 systemd services for osrm-routed for processed regions.
 """
 import logging
-import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
 from common.system_utils import systemd_reload

@@ -6,8 +6,7 @@ File system utility functions, such as backing up files and cleaning directories
 
 import datetime
 import logging
-import os
-import shutil # For shutil.rmtree
+import shutil  # For shutil.rmtree
 import subprocess
 from pathlib import Path
 from typing import Optional

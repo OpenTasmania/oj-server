@@ -4,12 +4,12 @@
 Handles configuration of SSL certificates using Certbot with the Nginx plugin.
 """
 import logging
-import re # For IP address and FQDN validation
-import subprocess # For CalledProcessError
+import re  # For IP address and FQDN validation
+import subprocess  # For CalledProcessError
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from setup import config # For SYMBOLS, VM_IP_OR_DOMAIN etc.
+from setup import config  # For SYMBOLS, VM_IP_OR_DOMAIN etc.
 
 module_logger = logging.getLogger(__name__)
 

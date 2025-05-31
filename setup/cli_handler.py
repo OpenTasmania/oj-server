@@ -10,9 +10,8 @@ configuration, and managing setup state through a simple CLI menu.
 import datetime
 import logging
 
-from . import config  # For SYMBOLS, config values
 from common.command_utils import log_map_server
-
+from . import config  # For SYMBOLS, config values
 # Assuming direct use for CLI menu:
 from .state_manager import clear_state_file, view_completed_steps
 

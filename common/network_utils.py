@@ -6,8 +6,9 @@ Network-related utility functions.
 import logging
 import re
 from typing import Optional
-from setup import config # Assuming config.py is still accessible like this
-from .command_utils import log_map_server # common.command_utils
+
+from setup import config  # Assuming config.py is still accessible like this
+from .command_utils import log_map_server  # common.command_utils
 
 module_logger = logging.getLogger(__name__)
 

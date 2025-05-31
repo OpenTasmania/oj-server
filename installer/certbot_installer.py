@@ -4,8 +4,9 @@
 Handles installation of Certbot packages.
 """
 import logging
+
 from common.command_utils import log_map_server, run_elevated_command
-from setup import config # For SYMBOLS
+from setup import config  # For SYMBOLS
 
 module_logger = logging.getLogger(__name__)
 

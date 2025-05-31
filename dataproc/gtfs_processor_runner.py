@@ -4,18 +4,19 @@
 Handles the execution of the GTFS ETL pipeline and subsequent data verification.
 """
 import logging
-from typing import Optional
 import os
+from typing import Optional
 
 # Assuming common utilities are in common/
 from common.command_utils import log_map_server, run_command
-from setup import config # For config vars and SYMBOLS
+from setup import config  # For config vars and SYMBOLS
 
 # The GTFS processor's main_pipeline is imported dynamically or conditionally
 # by the calling orchestrator (e.g., main_installer.py) to avoid import errors
 # if dependencies are not yet met. Here, we assume it will be passed or available.
 
 module_logger = logging.getLogger(__name__)
+
 
 def run_gtfs_etl_pipeline_and_verify(current_logger: Optional[logging.Logger] = None) -> None:
     """
@@ -37,7 +38,7 @@ def run_gtfs_etl_pipeline_and_verify(current_logger: Optional[logging.Logger] = 
         gtfs_processor_available = True
     except ImportError as e:
         gtfs_main_pipeline = None
-        gt_processor_available = False # Typo corrected
+        gt_processor_available = False  # Typo corrected
         log_map_server(
             f"{config.SYMBOLS['error']} Critical: Could not import 'processors.gtfs.main_pipeline': {e}. "
             "GTFS ETL cannot run. Ensure Python dependencies are installed in the correct environment.",
@@ -89,8 +90,10 @@ def run_gtfs_etl_pipeline_and_verify(current_logger: Optional[logging.Logger] = 
             "-U", os.environ.get("PG_OSM_USER", "osmuser"),
             "-d", os.environ.get("PG_OSM_DATABASE", "gis"),
         ]
-        run_command(psql_common_args + ["-c", "SELECT COUNT(*) FROM gtfs_stops;"], capture_output=True, current_logger=logger_to_use)
-        run_command(psql_common_args + ["-c", "SELECT COUNT(*) FROM gtfs_routes;"], capture_output=True, current_logger=logger_to_use)
+        run_command(psql_common_args + ["-c", "SELECT COUNT(*) FROM gtfs_stops;"], capture_output=True,
+                    current_logger=logger_to_use)
+        run_command(psql_common_args + ["-c", "SELECT COUNT(*) FROM gtfs_routes;"], capture_output=True,
+                    current_logger=logger_to_use)
         log_map_server(f"{config.SYMBOLS['success']} GTFS data verification counts queried.", "success", logger_to_use)
     except Exception as e_psql:
         log_map_server(

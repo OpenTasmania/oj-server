@@ -10,7 +10,6 @@ for network issues, file I/O, and zip file processing.
 """
 
 import logging
-import os
 import zipfile
 from pathlib import Path
 from typing import Optional, Union

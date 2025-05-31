@@ -23,14 +23,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Tuple
 
+import gtfs_kit
 import pandas as pd
 import psycopg
-from psycopg import sql
 from psycopg import Connection as PgConnection
-import gtfs_kit
+from psycopg import sql
 
-from common.db_utils import get_db_connection
 from common import core_utils
+from common.db_utils import get_db_connection
 from processors.gtfs import download, load, transform  # Relative imports for siblings
 from processors.gtfs import schema_definitions as schemas  # Relative import
 

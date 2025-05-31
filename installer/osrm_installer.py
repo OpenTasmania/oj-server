@@ -6,9 +6,9 @@ PBF download, and region boundary file preparation.
 """
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
-import shutil
 
 from common.command_utils import (
     log_map_server,

@@ -8,7 +8,6 @@ import logging
 import os
 from getpass import getuser
 from grp import getgrgid
-from pwd import getpwnam  # For checking user existence for cron
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command

@@ -5,7 +5,6 @@ Handles configuration of automated GTFS updates, typically via cron.
 """
 import logging
 import os
-from getpass import getuser
 from pwd import getpwnam  # For checking user existence
 from shutil import which
 from tempfile import NamedTemporaryFile

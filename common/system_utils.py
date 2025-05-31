@@ -9,7 +9,6 @@ determining the Debian codename, and calculating a project hash.
 
 import hashlib
 import logging
-import os
 import subprocess
 from pathlib import Path
 from typing import List, Optional

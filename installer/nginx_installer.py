@@ -8,7 +8,7 @@ import logging
 from typing import Optional
 
 from common.command_utils import log_map_server, check_package_installed, command_exists
-from setup import config # For SYMBOLS
+from setup import config  # For SYMBOLS
 
 module_logger = logging.getLogger(__name__)
 

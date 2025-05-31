@@ -12,7 +12,6 @@ import logging
 import os
 import shutil  # For shutil.which
 import subprocess
-import sys
 from typing import List, Optional, Union
 
 # Assuming config.py is still in the 'setup' directory for now.

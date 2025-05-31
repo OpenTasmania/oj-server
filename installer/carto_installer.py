@@ -4,12 +4,12 @@
 Handles installation of CartoCSS compiler (carto) and setup of the
 OpenStreetMap-Carto stylesheet repository.
 """
+import getpass  # For user/group info
+import grp
 import logging
 import os
 import sys
 from pathlib import Path
-import getpass # For user/group info
-import grp
 from typing import Optional
 
 from common.command_utils import (
