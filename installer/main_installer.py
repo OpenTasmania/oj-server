@@ -13,7 +13,7 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from actions.website_content_deployer import deploy_test_website_content
+from actions.website_setup_actions import deploy_test_website_content
 
 from actions.ufw_setup_actions import enable_ufw_service
 # --- Common module imports ---
