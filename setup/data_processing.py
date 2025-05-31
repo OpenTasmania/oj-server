@@ -6,6 +6,7 @@ Functions for data preparation, including GTFS processing and raster tile
 pre-rendering. This module now imports shared utilities from core_utils.
 """
 
+import datetime
 import logging
 import os # Added for os.cpu_count()
 import subprocess # Added for CalledProcessError
@@ -18,6 +19,8 @@ from os.path import exists
 from pwd import getpwnam
 from shutil import which
 from tempfile import NamedTemporaryFile
+from typing import Dict, Optional
+from pathlib import Path
 
 from setup import config, core_utils
 from setup.cli_handler import cli_prompt_for_rerun
@@ -43,6 +46,7 @@ except ImportError as e:
 
 module_logger = logging.getLogger(__name__)
 
+OSM_CARTO_DIR = "/opt/openstreetmap-carto"
 
 def gtfs_data_prep(current_logger: logging.Logger = None) -> None:
     # ... (gtfs_data_prep content remains the same)
@@ -507,3 +511,84 @@ def data_prep_group(current_logger: logging.Logger) -> bool:
         logger_to_use,
     )
     return overall_success
+
+
+def import_pbf_to_postgis_flex(
+        pbf_file_path: str,
+        db_config_dict: Dict[str, str],
+        flat_nodes_storage_dir: str,  # e.g., /opt/osm_data
+        current_logger: Optional[logging.Logger] = None,
+        osm2pgsql_cache_mb: Optional[int] = None,
+) -> bool:
+    """Imports a PBF file into PostGIS using osm2pgsql with the Flex backend."""
+    logger_to_use = current_logger if current_logger else module_logger
+    region_name = Path(pbf_file_path).stem.replace(".osm", "")  # Get basename without .osm.pbf
+    log_map_server(
+        f"{config.SYMBOLS['info']} Starting PostGIS import for {region_name} ({pbf_file_path}) using osm2pgsql (Flex backend)...",
+        "info", logger_to_use
+    )
+
+    lua_script_path = Path(OSM_CARTO_DIR) / "openstreetmap-carto.lua"  # Path to style lua
+    # Or use openstreetmap-carto-flex.lua if that's preferred and exists
+    # lua_script_path_flex = Path(OSM_CARTO_DIR) / "openstreetmap-carto-flex.lua"
+    # if lua_script_path_flex.is_file():
+    #    lua_script_path = lua_script_path_flex
+
+    if not lua_script_path.is_file():
+        log_map_server(f"{config.SYMBOLS['critical']} OSM-Carto Lua script not found at {lua_script_path}.", "critical",
+                       logger_to_use)
+        return False
+
+    num_processes = str(os.cpu_count() or 1)
+    cache_size = str(osm2pgsql_cache_mb or os.environ.get("OSM2PGSQL_CACHE_DEFAULT", "20000"))  # Default 20GB
+
+    flat_nodes_file = Path(flat_nodes_storage_dir) / f"flat-nodes-{region_name}-{datetime.date.today().isoformat()}.bin"
+
+    # Ensure PGPASSWORD is set in environment for osm2pgsql
+    process_env = os.environ.copy()
+    if "password" in db_config_dict and db_config_dict["password"]:
+        process_env["PGPASSWORD"] = db_config_dict["password"]
+
+    osm2pgsql_cmd = [
+        "osm2pgsql", "--verbose", "--create", "--slim", "-C", cache_size,
+        "--host", db_config_dict.get("host", "localhost"),
+        "--port", str(db_config_dict.get("port", "5432")),
+        "--username", db_config_dict.get("user", config.PGUSER),
+        "--database", db_config_dict.get("dbname", config.PGDATABASE),
+        "--hstore", "--multi-geometry", "--tag-transform-script", str(lua_script_path),
+        "--style", str(lua_script_path),  # Flex style often same as transform
+        "--output=flex", "--number-processes", num_processes,
+        "--flat-nodes", str(flat_nodes_file),
+        pbf_file_path
+    ]
+    log_map_server(f"{config.SYMBOLS['debug']} osm2pgsql command: {' '.join(osm2pgsql_cmd)}", "debug", logger_to_use)
+
+    try:
+        # osm2pgsql can take a long time. User running this script needs appropriate DB perms.
+        completed_process = subprocess.run(
+            osm2pgsql_cmd, env=process_env, check=False, capture_output=True, text=True
+        )
+        if completed_process.stdout: logger_to_use.debug(
+            f"osm2pgsql STDOUT for {region_name}:\n{completed_process.stdout}")
+        if completed_process.stderr:
+            log_level_stderr = "error" if completed_process.returncode != 0 else "debug"
+            logger_to_use.log(getattr(logging, log_level_stderr.upper()),
+                              f"osm2pgsql STDERR for {region_name}:\n{completed_process.stderr}")
+
+        if completed_process.returncode == 0:
+            log_map_server(f"{config.SYMBOLS['success']} osm2pgsql import for {region_name} completed successfully.",
+                           "success", logger_to_use)
+            return True
+        else:
+            log_map_server(
+                f"{config.SYMBOLS['critical']} osm2pgsql import for {region_name} FAILED (RC: {completed_process.returncode}).",
+                "critical", logger_to_use)
+            return False
+    except FileNotFoundError:
+        log_map_server(f"{config.SYMBOLS['critical']} osm2pgsql command not found. Is it installed and in PATH?",
+                       "critical", logger_to_use)
+        return False
+    except Exception as e:
+        log_map_server(f"{config.SYMBOLS['critical']} Unexpected error during osm2pgsql for {region_name}: {e}",
+                       "critical", logger_to_use)
+        return False
