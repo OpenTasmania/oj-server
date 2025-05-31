@@ -24,7 +24,7 @@ from setup.config import (
     STATE_FILE_PATH,
     SYMBOLS,
 )
-from setup.helpers import calculate_project_hash
+from common.system_utils import calculate_project_hash
 
 module_logger = logging.getLogger(__name__)
 
