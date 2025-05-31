@@ -39,7 +39,7 @@ STATE_FILE_PATH: Path = Path(STATE_FILE_DIR) / "progress_state.txt"
 SCRIPT_VERSION: str = "1.4"
 
 # Define the root directory of the 'osm' project for hashing.
-# This assumes config.py is in osm/setup/
+# This assumes config.py is in setup/
 OSM_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
 # TODO: Trim the package lists

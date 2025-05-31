@@ -108,21 +108,24 @@ def fetch_carto_external_data(current_logger: Optional[logging.Logger] = None) -
     python_exe_path = sys.executable # Assumes main_installer is run from the project's venv
 
     # Determine path to the custom get-external-data.py or the one in OSM_CARTO_BASE_DIR
-    custom_script_path = config.OSM_PROJECT_ROOT / "setup/external/openstreetmap-carto/scripts/get-external-data.py"
+    custom_script_path = config.OSM_PROJECT_ROOT / "external/openstreetmap-carto/scripts/get-external-data.py"
     script_to_run = []
 
     if custom_script_path.is_file():
         log_map_server(f"{config.SYMBOLS['info']} Using custom get-external-data.py: {custom_script_path}", "info", logger_to_use)
         script_to_run = [python_exe_path, str(custom_script_path)]
     else:
+        log_map_server(f"{config.SYMBOLS['warning']} Custom get-external-data.py: {custom_script_path} not found", "warning",
+                       logger_to_use)
         default_script_path = Path(OSM_CARTO_BASE_DIR) / "scripts/get-external-data.py"
         if default_script_path.is_file():
             log_map_server(f"{config.SYMBOLS['info']} Using default get-external-data.py from Carto repo: {default_script_path}", "info", logger_to_use)
             script_to_run = [python_exe_path, str(default_script_path)]
         else:
-            log_map_server(f"{config.SYMBOLS['warning']} No get-external-data.py script found at custom or default paths. Shapefiles might be missing.", "warning", logger_to_use)
+            log_map_server(f"{config.SYMBOLS['fatal']} No get-external-data.py script found at custom or default paths. Shapefiles might be missing.",
+                           "fatal", logger_to_use)
             # Optionally, revert ownership here if this is considered a fatal error for this step
-            return # Or raise an error
+            raise # Or raise an error
 
     try:
         os.chdir(OSM_CARTO_BASE_DIR) # Scripts expect to be run from here
