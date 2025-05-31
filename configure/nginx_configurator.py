@@ -36,7 +36,7 @@ def create_nginx_proxy_site_config(current_logger: Optional[logging.Logger] = No
     if config.VM_IP_OR_DOMAIN == config.VM_IP_OR_DOMAIN_DEFAULT:
         server_name_config = "_"  # Catch-all if default example.com is used
 
-    # Nginx variables ($variable_name) need to be escaped with '$$' in
+    # Nginx variables ($variable_name) need to be escaped with '$' in
     # Python f-strings to be interpreted literally by Nginx.
     nginx_transit_proxy_conf_content = f"""\
 # {nginx_conf_path}
@@ -54,12 +54,12 @@ server {{
 
     # Standard proxy headers
     proxy_http_version 1.1;
-    proxy_set_header Upgrade $$http_upgrade;
+    proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
-    proxy_set_header Host $$host;
-    proxy_set_header X-Real-IP $$remote_addr;
-    proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $$scheme;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
     proxy_buffering off;
 
     # Proxy to pg_tileserv (default port 7800)
@@ -87,7 +87,7 @@ server {{
     location / {{
         root {WEBSITE_ROOT_DIR};
         index index.html index.htm;
-        try_files $$uri $$uri/ /index.html =404; # Fallback to index.html or 404
+        try_files $uri $uri/ /index.html =404; # Fallback to index.html or 404
     }}
 }}
 """

@@ -7,7 +7,7 @@ Actual package installation is expected to be done by a core prerequisite step.
 import logging
 from typing import Optional
 
-from common.command_utils import log_map_server, check_package_installed, command_exists
+from common.command_utils import log_map_server, check_package_installed, command_exists, elevated_command_exists
 from setup import config  # For SYMBOLS
 
 module_logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def ensure_nginx_package_installed(current_logger: Optional[logging.Logger] = No
 
     nginx_package_name = "nginx" # Common package name for Nginx
 
-    if command_exists("nginx") and check_package_installed(nginx_package_name, current_logger=logger_to_use):
+    if elevated_command_exists("nginx") and check_package_installed(nginx_package_name, current_logger=logger_to_use):
         log_map_server(
             f"{config.SYMBOLS['success']} Nginx package '{nginx_package_name}' is installed and command exists.",
             "success", # Changed from debug to success for the check itself
