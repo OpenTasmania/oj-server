@@ -15,7 +15,7 @@ import subprocess  # For CalledProcessError
 from typing import Optional
 
 from setup import config
-from configure.command_utils import (
+from common.command_utils import (
     log_map_server,
     run_command,
     run_elevated_command,

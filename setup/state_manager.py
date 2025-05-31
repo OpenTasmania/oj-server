@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 from typing import List, Optional
 
-from configure.command_utils import log_map_server, run_elevated_command
+from common.command_utils import log_map_server, run_elevated_command
 from setup.config import (
     OSM_PROJECT_ROOT,
     SCRIPT_VERSION,

@@ -21,7 +21,7 @@ from tempfile import NamedTemporaryFile
 
 from setup import config, core_utils
 from setup.cli_handler import cli_prompt_for_rerun
-from configure.command_utils import (
+from common.command_utils import (
     log_map_server,
     run_command,
     run_elevated_command,

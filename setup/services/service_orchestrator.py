@@ -14,7 +14,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun
-from configure.command_utils import log_map_server
+from common.command_utils import log_map_server
 from setup.services.apache import apache_modtile_setup
 from setup.services.carto import carto_setup
 from setup.services.certbot import certbot_setup

@@ -14,7 +14,7 @@ import os
 from typing import Optional
 
 from setup import config
-from configure.command_utils import (
+from common.command_utils import (
     elevated_command_exists,
     log_map_server,
     run_elevated_command,

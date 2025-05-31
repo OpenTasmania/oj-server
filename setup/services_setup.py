@@ -15,7 +15,7 @@ from typing import Callable, List, Optional, Tuple
 
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun
-from configure.command_utils import log_map_server, run_elevated_command
+from common.command_utils import log_map_server, run_elevated_command
 from setup.helpers import backup_file, validate_cidr
 from setup.step_executor import execute_step
 

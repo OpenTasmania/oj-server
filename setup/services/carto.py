@@ -17,7 +17,7 @@ import sys
 from typing import Optional
 
 from setup import config
-from configure.command_utils import (
+from common.command_utils import (
     command_exists,
     log_map_server,
     run_command,
