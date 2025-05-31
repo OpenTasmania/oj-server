@@ -13,13 +13,11 @@ import getpass
 import grp
 import logging
 import os
-import shutil
 import sys
 from typing import Optional
-from pathlib import Path  # Added for Path operations
 
 from setup import config
-from setup.command_utils import (
+from configure.command_utils import (
     command_exists,
     log_map_server,
     run_command,

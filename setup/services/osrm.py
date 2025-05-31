@@ -17,7 +17,7 @@ import traceback
 from typing import Dict, List, Optional
 
 from setup import config
-from setup.command_utils import log_map_server, run_elevated_command
+from configure.command_utils import log_map_server, run_elevated_command
 
 module_logger = logging.getLogger(__name__)
 

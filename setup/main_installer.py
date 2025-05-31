@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
-from setup.command_utils import check_package_installed, log_map_server
+from configure.command_utils import check_package_installed, log_map_server
 from setup.core_setup import (
     boot_verbosity,
     core_conflict_removal,

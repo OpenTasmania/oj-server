@@ -17,7 +17,7 @@ from typing import List, Optional, Union
 
 # Import from config within the same package.
 # This provides SYMBOLS and LOG_PREFIX_DEFAULT (for logger fallback).
-from . import config
+from setup import config
 
 # Each module should define its own logger.
 # The main logger (configured in main.py using config.LOG_PREFIX) will

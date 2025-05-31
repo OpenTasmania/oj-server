@@ -21,13 +21,12 @@ from tempfile import NamedTemporaryFile
 
 from setup import config, core_utils
 from setup.cli_handler import cli_prompt_for_rerun
-from setup.command_utils import (
+from configure.command_utils import (
     log_map_server,
     run_command,
     run_elevated_command,
 )
 from setup.step_executor import execute_step
-from setup.services import website as services_website
 
 try:
     from processors.gtfs import (

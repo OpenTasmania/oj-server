@@ -13,7 +13,7 @@ import subprocess  # For CalledProcessError
 from typing import Optional
 
 from setup import config  # Access config.ADMIN_GROUP_IP, config.SYMBOLS
-from setup.command_utils import log_map_server, run_elevated_command
+from configure.command_utils import log_map_server, run_elevated_command
 from setup.helpers import validate_cidr  # Import necessary helpers
 
 module_logger = logging.getLogger(__name__)

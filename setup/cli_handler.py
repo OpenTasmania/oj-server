@@ -11,7 +11,7 @@ import datetime
 import logging
 
 from . import config  # For SYMBOLS, config values
-from .command_utils import log_map_server
+from configure.command_utils import log_map_server
 
 # Assuming direct use for CLI menu:
 from .state_manager import clear_state_file, view_completed_steps

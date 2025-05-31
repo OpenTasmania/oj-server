@@ -13,7 +13,7 @@ import logging
 from typing import Callable, Optional
 
 from setup import config  # For SYMBOLS
-from setup.command_utils import log_map_server
+from configure.command_utils import log_map_server
 from setup.state_manager import is_step_completed, mark_step_completed
 
 module_logger = logging.getLogger(__name__)
