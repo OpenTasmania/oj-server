@@ -77,8 +77,7 @@ PYTHON_SYSTEM_PACKAGES: list[str] = [
 ]
 
 POSTGRES_PACKAGES: list[str] = [
-    "postgresql",
-    "postgresql-contrib",
+    "postgresql-17",
     "libpq-dev",
     "postgresql-common",
     "postgis",
