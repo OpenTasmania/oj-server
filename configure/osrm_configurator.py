@@ -31,7 +31,7 @@ def create_osrm_routed_service_file(
     service_file_path = f"/etc/systemd/system/{service_name}"
 
     # Path to the .osrm file on the host, which will be mounted into Docker
-    host_osrm_file_path = Path(OSRM_BASE_PROCESSED_DIR) / region_name / f"{region_name}.osrm"
+    host_osrm_file_path = Path(OSRM_BASE_PROCESSED_DIR) / region_name / f"{region_name}_processing.osrm"
     # Path to the .osrm file INSIDE the Docker container for osrm-routed
     container_osrm_file_path = f"/data/{region_name}.osrm"
 
