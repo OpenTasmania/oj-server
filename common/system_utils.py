@@ -183,7 +183,7 @@ def systemd_reload(
 
 
 def get_debian_codename(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: Optional[AppSettings], current_logger: Optional[logging.Logger] = None
 ) -> Optional[str]:
     """
     Get the Debian codename (e.g., 'bookworm', 'bullseye').
