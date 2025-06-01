@@ -105,7 +105,7 @@ def view_configuration(
             get_current_script_hash(
                 project_root_dir=static_config.OSM_PROJECT_ROOT,
                 app_settings=app_config,
-                current_logger=logger_to_use,
+                logger_instance=logger_to_use,
             )
             or "N/A"
     )
