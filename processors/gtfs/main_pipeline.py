@@ -17,7 +17,7 @@ import psycopg
 
 from common.core_utils import setup_logging as common_setup_logging
 from common.db_utils import get_db_connection
-from common.file_utils import cleanup_directory
+from common.file_utils import cleanup_directory # Updated cleanup_directory is used here
 from processors.gtfs import download, load, transform
 from processors.gtfs import schema_definitions as schemas
 from .db_setup import (
@@ -26,7 +26,7 @@ from .db_setup import (
 )
 from .pipeline_definitions import GTFS_LOAD_ORDER
 
-module_logger = logging.getLogger(__name__)
+module_logger = logging.getLogger(__name__) # Used for cleanup_directory call
 
 try:
     from setup.config import GTFS_FEED_URL as CONFIG_GTFS_FEED_URL
@@ -54,7 +54,7 @@ TEMP_DOWNLOAD_PATH = TEMP_DOWNLOAD_DIR / TEMP_ZIP_FILENAME
 TEMP_EXTRACT_PATH = TEMP_DOWNLOAD_DIR / TEMP_EXTRACT_DIR_NAME
 
 
-def run_full_gtfs_etl_pipeline() -> bool:
+def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSettings
     start_time = datetime.now()
     module_logger.info(
         f"===== GTFS ETL Pipeline (gtfs-kit) Started at {start_time.isoformat()} ====="
@@ -95,7 +95,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
         module_logger.info("GTFS feed downloaded and extracted successfully.")
 
         module_logger.info("--- Step 2: Reading Feed with gtfs-kit ---")
-        feed = gtfs_kit.read_feed(str(TEMP_EXTRACT_PATH), dist_units="km")
+        feed: gtfs_kit.Feed = gtfs_kit.read_feed(str(TEMP_EXTRACT_PATH), dist_units="km") # type: ignore[assignment]
         module_logger.info(
             f"Feed loaded. Detected tables: {list(feed.list_fields().keys())}" # type: ignore[attr-defined]
         )
@@ -183,8 +183,8 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
                 df_transformed: pd.DataFrame
                 if table_base_name == "stops":
-                    if feed.stops is not None and not feed.stops.empty:  # type: ignore[attr-defined]
-                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops)  # type: ignore[attr-defined]
+                    if feed.stops is not None and not feed.stops.empty: # type: ignore[attr-defined]
+                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops) # type: ignore[attr-defined]
                         df_transformed = (
                             stops_gdf.copy()
                             if stops_gdf is not None
@@ -199,9 +199,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
                         table_base_name == "shapes"
                         and gtfs_filename_key == "shapes.txt"
                 ):
-                    if feed.shapes is not None and not feed.shapes.empty:  # type: ignore[attr-defined]
+                    if feed.shapes is not None and not feed.shapes.empty: # type: ignore[attr-defined]
                         shapes_lines_gdf = gtfs_kit.geometrize_shapes(
-                            feed.shapes  # type: ignore[attr-defined]
+                            feed.shapes # type: ignore[attr-defined]
                         )
                         if (
                                 shapes_lines_gdf is not None
@@ -220,7 +220,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
                                 module_logger.error(
                                     "Schema for 'gtfs_shapes_lines.txt' not found. Cannot load shape lines."
                                 )
-                                df_transformed = df_for_processing.copy()
+                                df_transformed = df_for_processing.copy() # Fallback to original points if lines fail
                             else:
                                 final_shapes_lines_df = (
                                     transform.transform_dataframe(
@@ -236,27 +236,32 @@ def run_full_gtfs_etl_pipeline() -> bool:
                                 )
                                 total_records_loaded_successfully += loaded_sl
                                 total_records_sent_to_dlq += dlq_sl
+                                # After processing lines, df_transformed should be the original points for shapes.txt
                                 df_transformed = df_for_processing.copy()
                         else:
                             module_logger.info(
-                                "No shape geometries computed or result is empty."
+                                "No shape geometries computed or result is empty for 'gtfs_shapes_lines'."
                             )
-                            df_transformed = df_for_processing.copy()
+                            df_transformed = df_for_processing.copy() # Process original points
                     else:
                         module_logger.info(
-                            "No shapes data in feed. Skipping line geometrization and point loading for shapes.txt."
+                            "No shapes data in feed. Skipping line geometrization. Original shapes.txt points will be processed if they exist."
                         )
-                        df_transformed = pd.DataFrame()
+                        # If feed.shapes was None or empty, df_for_processing (a copy of original feed.shapes)
+                        # will also be None or empty. transform_dataframe and load_dataframe_to_db handle empty DataFrames.
+                        df_transformed = df_for_processing.copy()
                 else:
                     df_transformed = df_for_processing.copy()
 
+                # This check was specific to shapes.txt points after attempting line geometrization.
+                # If df_transformed (original shapes.txt points) is empty, it should be skipped.
                 if (
                         df_transformed.empty
                         and table_base_name == "shapes"
                         and gtfs_filename_key == "shapes.txt"
                 ):
                     module_logger.info(
-                        f"Skipping loading for '{table_base_name}' as df_transformed is empty."
+                        f"Skipping loading for original points in '{table_base_name}' (from shapes.txt) as its DataFrame is empty after (optional) line processing."
                     )
                     continue
 
@@ -288,10 +293,10 @@ def run_full_gtfs_etl_pipeline() -> bool:
             "--- Main Transaction (Schema, Data Load, FKs) Complete ---"
         )
         module_logger.info(
-            f"Total records processed: {total_records_processed}"
+            f"Total records processed from feed files: {total_records_processed}"
         )
         module_logger.info(
-            f"Total records loaded successfully: {total_records_loaded_successfully}"
+            f"Total records loaded successfully to DB: {total_records_loaded_successfully}"
         )
         module_logger.info(
             f"Total records sent to DLQ: {total_records_sent_to_dlq}"
@@ -316,7 +321,13 @@ def run_full_gtfs_etl_pipeline() -> bool:
             module_logger.info("Database connection closed.")
         download.cleanup_temp_file(TEMP_DOWNLOAD_PATH)
         if TEMP_EXTRACT_PATH.exists():
-            cleanup_directory(TEMP_EXTRACT_PATH, ensure_dir_exists_after=True)
+            # Corrected call to cleanup_directory:
+            cleanup_directory(
+                TEMP_EXTRACT_PATH,
+                app_settings=None, # Pass None as AppSettings is not available here
+                ensure_dir_exists_after=True,
+                current_logger=module_logger # Pass this module's logger
+            )
         end_time = datetime.now()
         duration = end_time - start_time
         module_logger.info(
