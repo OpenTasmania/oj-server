@@ -32,15 +32,14 @@ requires-python = ">=3.13,<4.0"
 
 dependencies = [
     "Cython>=3,<4",
-    "requests>=2.25.0,<3.0.0", # For downloading GTFS zip files
-    "pandas>=2.0.0,<3.0.0", # For data manipulation
-    'psycopg[c]>=3.2.9,<4', # Recommended: Psycopg 3 with C optimizations. Adjust version as needed.
-    "gtfs-kit>=10.0.0,<11.0.0", # For parsing GTFS files
-    # gtfsparse > 2.0.0 currently presents build issues due to pyarrow
-    "pydantic>=2.0.0,<3.0.0", # For data validation and schema definitions
-    "pydantic-settings>=2.0.0,<3.0.0", # For pydantic settings, duh
-    "python-dotenv>=1.0.0,<2.0.0", # For managing environment variables (e.g., .env file for DB creds)
-    "PyYAML>=6.0.0,<7.0.0", # For any YAML configurations, or if a dependency needs it
+    "requests>=2.25.0,<3.0.0",
+    "pandas>=2.0.0,<3.0.0",
+    'psycopg[c]>=3.2.9,<4',
+    "gtfs-kit>=10.0.0,<11.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "pydantic-settings>=2.0.0,<3.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+    "PyYAML>=6.0.0,<7.0.0",
     "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git@5.0.2",
     "yafc @ git+https://gitlab.com/opentasmania/yafconfigurator.git@3.0.1",
     "urwid>=3.0.0,<4.0.0",
@@ -57,7 +56,6 @@ install-map-server = "osm_osrm_server.install_map_server:main"
 dev = [
     "ruff>=0.1.0",
     "pre-commit>=3.0.0",
-    "black>=24.0,<25.0",
     "coverage>=7.0,<8.0",
     "mypy>=1.0,<2.0",
     "pytest>=8.0,<9.0",
@@ -77,23 +75,18 @@ where = ["."]
 include = ["osm_osrm_server*"]
 exclude = ["tests*"]
 
-[tool.black]
-line-length = 78
-
-[tool.flake8]
-ignore = "E501"
-
 [tool.mypy]
 python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
+exclude = ['\.git','\.venv', 'build', 'dist']
 
 [tool.pytest.ini_options]
 addopts = """
-       --cov-report html:cover/coverage_html
-       --cov-report json:cover/coverage.json
-       --cov-report xml:cover/coverage.xml
-       """
+        --cov-report html:cover/coverage_html
+        --cov-report json:cover/coverage.json
+        --cov-report xml:cover/coverage.xml
+        """
 
 [tool.coverage.report]
 show_missing = true
@@ -120,7 +113,7 @@ select = [
 ]
 
 ignore = [
-    "E501"  # Line length will be handled by black
+    "E501"  # Line length will be handled by ruff format
 ]
 
 [tool.ruff.lint.per-file-ignores]
