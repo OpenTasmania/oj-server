@@ -4,15 +4,15 @@
 Orchestrates data preparation tasks like GTFS processing and raster tile pre-rendering.
 """
 import logging
-from pathlib import Path
-from typing import Dict, Optional
+from pathlib import Path # Keep Path if used, though project_root is no longer constructed here for the GTFS call
+from typing import Optional # Removed Dict as db_params_dict is removed
 
 from common.command_utils import log_map_server
-from dataproc.raster_processor import raster_tile_prerender  # Local import
+from dataproc.raster_processor import raster_tile_prerender
 from processors.gtfs.orchestrator import (
-    process_and_setup_gtfs,  # GTFS main orchestrator
+    process_and_setup_gtfs,
 )
-from setup import config as static_config  # For OSM_PROJECT_ROOT
+from setup import config as static_config # Used by main_installer for OSM_PROJECT_ROOT, potentially for tags
 from setup.cli_handler import cli_prompt_for_rerun
 from setup.config_models import AppSettings
 from setup.step_executor import execute_step
@@ -21,12 +21,12 @@ module_logger = logging.getLogger(__name__)
 
 # Define tag for GTFS processing if not already globally available via static_config
 # It's better if main_installer.py defines all tags used by execute_step.
-# Assuming GTFS_PROCESS_AND_SETUP_TAG is defined in main_installer and static_config
+# These should match the tags used in installer/main_installer.py for consistency.
 GTFS_PROCESSING_TAG = getattr(
-    static_config, "GTFS_PROCESS_AND_SETUP_TAG", "GTFS_PROCESSING_AND_SETUP"
+    static_config, "GTFS_PROCESS_AND_SETUP_TAG", "GTFS_PROCESS_AND_SETUP" # Fallback, ensure tag exists in static_config or main_installer
 )
-RASTER_PREP_TAG = (
-    "RASTER_PREP"  # Ensure this matches the tag in main_installer.py
+RASTER_PREP_TAG = getattr(
+    static_config, "RASTER_PREP_TAG", "RASTER_PREP" # Fallback, ensure tag exists
 )
 
 
@@ -51,28 +51,16 @@ def data_prep_group(
     def _run_gtfs_processing_step(
             ac: AppSettings, cl: Optional[logging.Logger]
     ):
-        db_params_dict: Dict[str, str] = {
-            "PGHOST": ac.pg.host,
-            "PGPORT": str(ac.pg.port),
-            "PGDATABASE": ac.pg.database,
-            "PGUSER": ac.pg.user,
-            "PGPASSWORD": ac.pg.password,
-        }
-        # Consider making these log paths configurable via AppSettings.gtfs or a dedicated GTFS config section
-        gtfs_app_log = "/var/log/gtfs_processor_app.log"
-        cron_output_log = "/var/log/gtfs_cron_output.log"
-        project_root = Path(static_config.OSM_PROJECT_ROOT)
-
+        """
+        Calls the main GTFS processing orchestrator.
+        It relies on `app_settings` (passed as 'ac') for all its configurations.
+        """
+        # All specific parameters like gtfs_feed_url, db_params, project_root,
+        # log file paths, and cron user are now derived by process_and_setup_gtfs
+        # and its sub-modules directly from the 'ac' (AppSettings) object.
         process_and_setup_gtfs(
-            gtfs_feed_url=str(ac.gtfs_feed_url),
-            db_params=db_params_dict,
-            project_root=project_root,
-            gtfs_app_log_file=gtfs_app_log,  # Log file for GTFS app's own detailed logging
-            # gtfs_app_log_level, gtfs_app_log_prefix can be passed if needed, defaults in orchestrator
-            cron_run_user=ac.pg.user,
-            cron_job_output_log_file=cron_output_log,
-            # python_executable_for_cron can be passed if needed
-            orchestrator_logger=cl,  # Logger for messages from process_and_setup_gtfs itself
+            app_settings=ac,
+            orchestrator_logger=cl
         )
 
     step_definitions = [
@@ -85,17 +73,18 @@ def data_prep_group(
     ]
 
     for tag, desc, func_ref in step_definitions:
-        # Ensure cli_prompt_for_rerun is passed correctly
         if not execute_step(
                 tag,
                 desc,
-                func_ref,
-                app_cfg,
-                logger_to_use,
-                lambda prompt, ac_prompt, cl_prompt: cli_prompt_for_rerun(
-                    prompt,
-                    app_settings=ac_prompt,
-                    current_logger_instance=cl_prompt,
+                func_ref, # This will be _run_gtfs_processing_step or raster_tile_prerender
+                app_cfg,  # Passed as 'ac' to _run_gtfs_processing_step
+                logger_to_use, # Passed as 'cl' to _run_gtfs_processing_step
+                # The lambda ensures cli_prompt_for_rerun gets the correct AppSettings
+                # and logger instance from the current scope of execute_step.
+                lambda prompt_msg, settings_for_prompt, logger_for_prompt: cli_prompt_for_rerun(
+                    prompt_msg,
+                    app_settings=settings_for_prompt,
+                    current_logger_instance=logger_for_prompt,
                 ),
         ):
             overall_success = False
