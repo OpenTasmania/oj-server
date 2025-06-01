@@ -4,113 +4,94 @@
 Handles configuration of SSL certificates using Certbot with the Nginx plugin.
 """
 import logging
-import re  # For IP address and FQDN validation
-import subprocess  # For CalledProcessError
+import re
+import subprocess
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from setup import config  # For SYMBOLS, VM_IP_OR_DOMAIN etc.
+from setup.config_models import AppSettings, VM_IP_OR_DOMAIN_DEFAULT  # For type hinting & default comparison
+
+# from setup import config as static_config # Not needed if symbols come from app_settings
 
 module_logger = logging.getLogger(__name__)
 
-def run_certbot_nginx(current_logger: Optional[logging.Logger] = None) -> None:
+
+def run_certbot_nginx(
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None
+) -> None:
     """
     Runs Certbot to obtain and install SSL certificate for the configured domain,
-    and configures Nginx.
+    and configures Nginx. Uses settings from app_settings.
     """
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(
-        f"{config.SYMBOLS['step']} Running Certbot with Nginx plugin...",
-        "info",
-        logger_to_use,
-    )
+    symbols = app_settings.symbols
+    certbot_cfg = app_settings.certbot
 
-    domain_to_certify = config.VM_IP_OR_DOMAIN
-    is_default_domain = domain_to_certify == config.VM_IP_OR_DOMAIN_DEFAULT
+    log_map_server(
+        f"{symbols.get('step', '➡️')} Running Certbot with Nginx plugin...",
+        "info", logger_to_use, app_settings)
+
+    domain_to_certify = app_settings.vm_ip_or_domain
+    is_default_domain = domain_to_certify == VM_IP_OR_DOMAIN_DEFAULT  # Imported default
     is_ip_address = bool(re.fullmatch(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", domain_to_certify))
     is_localhost = domain_to_certify.lower() == "localhost"
-    # Basic FQDN check: must contain at least one dot and not be an IP or localhost.
     is_fqdn_like = "." in domain_to_certify and not is_ip_address and not is_localhost
 
     if is_default_domain or is_ip_address or is_localhost or not is_fqdn_like:
         log_map_server(
-            f"{config.SYMBOLS['warning']} Skipping Certbot execution: VM_IP_OR_DOMAIN "
-            f"('{domain_to_certify}') is default, an IP address, localhost, "
-            "or not a Fully Qualified Domain Name (FQDN). Certbot requires a "
-            "public FQDN for certificate issuance.",
-            "warning",
-            logger_to_use,
-        )
+            f"{symbols.get('warning', '!')} Skipping Certbot: VM_IP_OR_DOMAIN ('{domain_to_certify}') "
+            "is default, an IP, localhost, or not an FQDN. Certbot requires a public FQDN.",
+            "warning", logger_to_use, app_settings)
         log_map_server(
-            f"   Ensure DNS records for '{domain_to_certify}' point to this "
-            "server's public IP and that Nginx (ports 80/443) is "
-            "accessible externally if you wish to use Certbot.",
-            "info",
-            logger_to_use,
-        )
-        # Not raising an error, as this might be an intentional skip for local dev.
-        # The calling step in main_installer can decide if this is a failure or a skippable warning.
-        # For state management, the step might be marked as "skipped" or "completed with warning".
-        return
+            f"   Ensure DNS for '{domain_to_certify}' points to this server and Nginx (80/443) is accessible externally.",
+            "info", logger_to_use, app_settings)
+        return  # Not raising an error, as this might be intentional for local dev.
 
-    # Generate a plausible admin email based on the domain.
-    domain_parts = domain_to_certify.split(".")
-    email_domain_part = domain_to_certify # Fallback
-    if len(domain_parts) >= 2:
-        # Use the last two parts for a generic email, e.g., admin@example.com
-        email_domain_part = f"{domain_parts[-2]}.{domain_parts[-1]}"
-    admin_email = f"admin@{email_domain_part}"
+    # Derive admin email if not explicitly set in a future CertbotSettings field
+    admin_email = getattr(certbot_cfg, 'admin_email', None)  # Check if admin_email is in CertbotSettings
+    if not admin_email:
+        domain_parts = domain_to_certify.split(".")
+        email_domain_part = domain_to_certify
+        if len(domain_parts) >= 2:
+            email_domain_part = f"{domain_parts[-2]}.{domain_parts[-1]}"
+        admin_email = f"admin@{email_domain_part}"  # Default derivation
+        log_map_server(f"{symbols.get('info', 'ℹ️')} Using derived admin email for Certbot: {admin_email}", "info",
+                       logger_to_use, app_settings)
+    else:
+        log_map_server(f"{symbols.get('info', 'ℹ️')} Using configured admin email for Certbot: {admin_email}", "info",
+                       logger_to_use, app_settings)
 
     log_map_server(
-        f"{config.SYMBOLS['info']} Attempting to obtain SSL certificate for domain: "
-        f"{domain_to_certify} with registration email {admin_email}...",
-        "info",
-        logger_to_use,
-    )
+        f"{symbols.get('info', 'ℹ️')} Attempting SSL certificate for domain: {domain_to_certify} with email {admin_email}...",
+        "info", logger_to_use, app_settings)
 
     certbot_cmd = [
-        "certbot",
-        "--nginx",  # Use the Nginx plugin.
-        "-d", domain_to_certify,  # Domain to certify.
-        "--non-interactive",  # Run without interactive prompts.
-        "--agree-tos",  # Agree to Let's Encrypt Terms of Service.
-        "--email", admin_email,  # Email for registration and renewal notices.
-        "--redirect",  # Automatically redirect HTTP to HTTPS.
-        # Consider these for enhanced security if appropriate for your setup:
-        # "--hsts", # HTTP Strict Transport Security
-        # "--staple-ocsp", # OCSP Stapling
-        # "--uir" # Uncomment if you want to handle insecure redirects manually.
+        "certbot", "--nginx", "-d", domain_to_certify,
+        "--non-interactive", "--agree-tos", "--email", admin_email,
+        "--redirect",  # Default: redirect HTTP to HTTPS
     ]
+
+    if certbot_cfg.use_hsts: certbot_cmd.append("--hsts")
+    if certbot_cfg.use_staple_ocsp: certbot_cmd.append("--staple-ocsp")
+    if certbot_cfg.use_uir: certbot_cmd.append("--uir")
+
     try:
-        # run_elevated_command will raise CalledProcessError if certbot returns non-zero
-        run_elevated_command(certbot_cmd, capture_output=True, current_logger=logger_to_use, check=True)
+        run_elevated_command(certbot_cmd, app_settings, capture_output=True, current_logger=logger_to_use, check=True)
         log_map_server(
-            f"{config.SYMBOLS['success']} Certbot SSL certificate obtained and "
-            f"Nginx configured for {domain_to_certify}.",
-            "success",
-            logger_to_use,
-        )
+            f"{symbols.get('success', '✅')} Certbot SSL certificate obtained and Nginx configured for {domain_to_certify}.",
+            "success", logger_to_use, app_settings)
         log_map_server(
-            f"{config.SYMBOLS['info']} Certbot auto-renewal timer should be active. "
-            "Check with: sudo systemctl list-timers | grep certbot",
-            "info",
-            logger_to_use,
-        )
+            f"{symbols.get('info', 'ℹ️')} Certbot auto-renewal timer should be active. Check with: sudo systemctl list-timers | grep certbot",
+            "info", logger_to_use, app_settings)
     except subprocess.CalledProcessError as e:
-        # Error details are already logged by run_elevated_command.
         log_map_server(
-            f"{config.SYMBOLS['error']} Certbot command FAILED. Please check "
-            "Certbot logs (usually in /var/log/letsencrypt/) for detailed "
-            "error messages.",
-            "error",
-            logger_to_use,
-        )
-        # Re-raise so that execute_step in main_installer.py can catch it and mark the step as failed.
+            f"{symbols.get('error', '❌')} Certbot command FAILED. Check Certbot logs (usually /var/log/letsencrypt/).",
+            "error", logger_to_use, app_settings)
+        # Output from run_elevated_command already includes stderr/stdout from the failed command
         raise RuntimeError(f"Certbot execution failed for domain {domain_to_certify}.") from e
     except Exception as e_unexp:
         log_map_server(
-            f"{config.SYMBOLS['error']} An unexpected error occurred during Certbot execution: {e_unexp}",
-            "error",
-            logger_to_use,
-        )
-        raise # Re-raise for execute_step
+            f"{symbols.get('error', '❌')} An unexpected error occurred during Certbot execution: {e_unexp}",
+            "error", logger_to_use, app_settings, exc_info=True)
+        raise

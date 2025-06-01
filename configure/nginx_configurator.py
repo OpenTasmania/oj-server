@@ -5,171 +5,149 @@ Handles configuration of Nginx as a reverse proxy for map services.
 """
 import logging
 import os
-import subprocess  # For CalledProcessError
+import subprocess
 from typing import Optional
 
-from common.command_utils import log_map_server, run_elevated_command
-from common.system_utils import systemd_reload
-from setup import config  # For SYMBOLS, VM_IP_OR_DOMAIN etc.
-from setup.state_manager import get_current_script_hash
+from common.command_utils import log_map_server, run_elevated_command, elevated_command_exists
+from common.system_utils import systemd_reload,get_current_script_hash
+
+from setup.config_models import AppSettings, VM_IP_OR_DOMAIN_DEFAULT  # For default comparison
+from setup import config as static_config  # For fixed paths if any, or SCRIPT_VERSION
+
 
 module_logger = logging.getLogger(__name__)
 
+# Standard Nginx paths
 NGINX_SITES_AVAILABLE_DIR = "/etc/nginx/sites-available"
 NGINX_SITES_ENABLED_DIR = "/etc/nginx/sites-enabled"
-PROXY_CONF_NAME = "transit_proxy"  # Name of our Nginx site config file
-
-# This directory is set up by setup/services/website.py
-WEBSITE_ROOT_DIR = "/var/www/html/map_test_page"
 
 
-def create_nginx_proxy_site_config(current_logger: Optional[logging.Logger] = None) -> None:
-    """Creates the Nginx site configuration file for reverse proxying."""
+# PROXY_CONF_NAME is now app_settings.nginx.proxy_conf_name_base
+# WEBSITE_ROOT_DIR is now app_settings.webapp.root_dir
+
+def create_nginx_proxy_site_config(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+    """Creates the Nginx site configuration file for reverse proxying using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
-    script_hash = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
+    symbols = app_settings.symbols
+    script_hash = get_current_script_hash(project_root_dir=static_config.OSM_PROJECT_ROOT, app_settings=app_settings,
+                                          logger_instance=logger_to_use) or "UNKNOWN_HASH"
 
-    nginx_conf_path = os.path.join(NGINX_SITES_AVAILABLE_DIR, PROXY_CONF_NAME)
-    log_map_server(f"{config.SYMBOLS['step']} Creating Nginx site configuration: {nginx_conf_path}...", "info",
-                   logger_to_use)
+    proxy_conf_filename = app_settings.nginx.proxy_conf_name_base  # e.g., "transit_proxy"
+    # If you want .conf extension to always be there:
+    if not proxy_conf_filename.endswith(".conf"):
+        # proxy_conf_filename_with_ext = f"{proxy_conf_filename}.conf" # Use this for actual file name if desired
+        pass  # For now, assume proxy_conf_name_base is the full filename part
 
-    server_name_config = config.VM_IP_OR_DOMAIN
-    if config.VM_IP_OR_DOMAIN == config.VM_IP_OR_DOMAIN_DEFAULT:
-        server_name_config = "_"  # Catch-all if default example.com is used
+    nginx_conf_path = os.path.join(NGINX_SITES_AVAILABLE_DIR, proxy_conf_filename)
+    log_map_server(f"{symbols.get('step', '➡️')} Creating Nginx site configuration: {nginx_conf_path} from template...",
+                   "info", logger_to_use, app_settings)
 
-    # Nginx variables ($variable_name) need to be escaped with '$' in
-    # Python f-strings to be interpreted literally by Nginx.
-    nginx_transit_proxy_conf_content = f"""\
-# {nginx_conf_path}
-# Configured by script V{script_hash}
-# Nginx server block as a reverse proxy for map services.
+    server_name_val = app_settings.vm_ip_or_domain
+    if server_name_val == VM_IP_OR_DOMAIN_DEFAULT:  # Compare with imported default
+        server_name_val = "_"  # Catch-all if default example.com is used
 
-server {{
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    nginx_template = app_settings.nginx.proxy_site_template
+    format_vars = {
+        "script_hash": script_hash,
+        "server_name_nginx": server_name_val,
+        "proxy_conf_filename_base": proxy_conf_filename,  # For log file names
+        "pg_tileserv_port": app_settings.pg_tileserv.http_port,
+        "apache_port": app_settings.apache.listen_port,
+        "osrm_port_car": app_settings.osrm.car_profile_port,  # Add other OSRM profiles if needed
+        "website_root_dir": app_settings.webapp.root_dir,
+    }
 
-    server_name {server_name_config};
-
-    access_log /var/log/nginx/{PROXY_CONF_NAME}.access.log;
-    error_log /var/log/nginx/{PROXY_CONF_NAME}.error.log;
-
-    # Standard proxy headers
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_buffering off;
-
-    # Proxy to pg_tileserv (default port 7800)
-    location /vector/ {{
-        proxy_pass http://localhost:7800/;
-        # Add specific headers for pg_tileserv if needed later
-    }}
-
-    # Proxy to Apache/mod_tile/renderd for raster tiles (default port 8080)
-    # The '/hot/' path segment must match Apache's AddTileConfig and Renderd's URI.
-    location /raster/hot/ {{
-        proxy_pass http://localhost:8080/hot/;
-    }}
-
-    # Proxy to OSRM backend (default port 5000)
-    # This assumes OSRM is running and listening on localhost:5000.
-    # If multiple OSRM regions run on different ports, this needs adjustment
-    # or multiple location blocks.
-    location /route/v1/ {{
-        proxy_pass http://localhost:5000/route/v1/;
-    }}
-
-    # Serve the test website page from the root location.
-    # The WEBSITE_ROOT_DIR is prepared by the website_setup step.
-    location / {{
-        root {WEBSITE_ROOT_DIR};
-        index index.html index.htm;
-        try_files $uri $uri/ /index.html =404; # Fallback to index.html or 404
-    }}
-}}
-"""
     try:
+        nginx_conf_content_final = nginx_template.format(**format_vars)
         run_elevated_command(
-            ["tee", nginx_conf_path],
-            cmd_input=nginx_transit_proxy_conf_content, current_logger=logger_to_use
+            ["tee", nginx_conf_path], app_settings,
+            cmd_input=nginx_conf_content_final, current_logger=logger_to_use
         )
-        log_map_server(f"{config.SYMBOLS['success']} Created Nginx site configuration: {nginx_conf_path}", "success",
-                       logger_to_use)
+        log_map_server(f"{symbols.get('success', '✅')} Created Nginx site configuration: {nginx_conf_path}", "success",
+                       logger_to_use, app_settings)
+    except KeyError as e_key:
+        log_map_server(
+            f"{symbols.get('error', '❌')} Missing placeholder key '{e_key}' for Nginx proxy template. Check config.yaml/models.",
+            "error", logger_to_use, app_settings)
+        raise
     except Exception as e:
-        log_map_server(f"{config.SYMBOLS['error']} Failed to write Nginx site configuration {nginx_conf_path}: {e}",
-                       "error", logger_to_use)
+        log_map_server(f"{symbols.get('error', '❌')} Failed to write Nginx site configuration {nginx_conf_path}: {e}",
+                       "error", logger_to_use, app_settings)
         raise
 
 
-def manage_nginx_sites(current_logger: Optional[logging.Logger] = None) -> None:
+def manage_nginx_sites(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
     """Enables the new Nginx proxy site and disables the default site."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Managing Nginx sites (enabling {PROXY_CONF_NAME}, disabling default)...",
-                   "info", logger_to_use)
+    symbols = app_settings.symbols
+    proxy_conf_filename = app_settings.nginx.proxy_conf_name_base  # e.g., "transit_proxy"
 
-    source_conf_path = os.path.join(NGINX_SITES_AVAILABLE_DIR, PROXY_CONF_NAME)
-    symlink_path = os.path.join(NGINX_SITES_ENABLED_DIR, PROXY_CONF_NAME)
+    log_map_server(
+        f"{symbols.get('step', '➡️')} Managing Nginx sites (enabling {proxy_conf_filename}, disabling default)...",
+        "info", logger_to_use, app_settings)
 
-    # Ensure source file exists before trying to symlink
+    source_conf_path = os.path.join(NGINX_SITES_AVAILABLE_DIR, proxy_conf_filename)
+    symlink_path = os.path.join(NGINX_SITES_ENABLED_DIR, proxy_conf_filename)
+
     if not os.path.exists(source_conf_path):
-        # Try elevated check
         try:
-            run_elevated_command(["test", "-f", source_conf_path], check=True, current_logger=logger_to_use)
+            run_elevated_command(["test", "-f", source_conf_path], app_settings, check=True,
+                                 current_logger=logger_to_use)
         except Exception:
             log_map_server(
-                f"{config.SYMBOLS['error']} Nginx site file {source_conf_path} does not exist. Cannot enable.", "error",
-                logger_to_use)
+                f"{symbols.get('error', '❌')} Nginx site file {source_conf_path} does not exist. Cannot enable.",
+                "error", logger_to_use, app_settings)
             raise FileNotFoundError(f"{source_conf_path} not found.")
 
-    run_elevated_command(["ln", "-sf", source_conf_path, symlink_path], current_logger=logger_to_use)
-    log_map_server(f"{config.SYMBOLS['success']} Enabled Nginx site '{PROXY_CONF_NAME}'.", "success", logger_to_use)
+    run_elevated_command(["ln", "-sf", source_conf_path, symlink_path], app_settings, current_logger=logger_to_use)
+    log_map_server(f"{symbols.get('success', '✅')} Enabled Nginx site '{proxy_conf_filename}'.", "success",
+                   logger_to_use, app_settings)
 
-    # Disable default Nginx site
     default_nginx_symlink = os.path.join(NGINX_SITES_ENABLED_DIR, "default")
     try:
-        # Check if it's a symlink and exists
-        test_result = run_elevated_command(["test", "-L", default_nginx_symlink], check=False, capture_output=True,
-                                           current_logger=logger_to_use)
-        if test_result.returncode == 0:  # Symlink exists
-            run_elevated_command(["rm", default_nginx_symlink], current_logger=logger_to_use)
-            log_map_server(f"{config.SYMBOLS['info']} Disabled default Nginx site.", "info", logger_to_use)
+        # Check if 'default' symlink exists in sites-enabled
+        # elevated_command_exists was refactored
+        if elevated_command_exists(f"test -L {default_nginx_symlink}", app_settings, current_logger=logger_to_use):
+            run_elevated_command(["rm", default_nginx_symlink], app_settings, current_logger=logger_to_use)
+            log_map_server(f"{symbols.get('info', 'ℹ️')} Disabled default Nginx site.", "info", logger_to_use,
+                           app_settings)
         else:
             log_map_server(
-                f"{config.SYMBOLS['info']} Default Nginx site not enabled or symlink not found at {default_nginx_symlink}. Skipping disable.",
-                "info", logger_to_use)
-    except Exception as e:
+                f"{symbols.get('info', 'ℹ️')} Default Nginx site not enabled or symlink not found. Skipping disable.",
+                "info", logger_to_use, app_settings)
+    except Exception as e:  # Catch any error during disable, log as warning
         log_map_server(
-            f"{config.SYMBOLS['warning']} Could not disable default Nginx site (error: {e}). This might be okay if it wasn't enabled.",
-            "warning", logger_to_use)
+            f"{symbols.get('warning', '!')} Could not disable default Nginx site (error: {e}). This might be okay.",
+            "warning", logger_to_use, app_settings)
 
 
-def test_nginx_configuration(current_logger: Optional[logging.Logger] = None) -> None:
+def test_nginx_configuration(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
     """Tests the Nginx configuration for syntax errors."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Testing Nginx configuration (nginx -t)...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    log_map_server(f"{symbols.get('step', '➡️')} Testing Nginx configuration (nginx -t)...", "info", logger_to_use,
+                   app_settings)
     try:
-        run_elevated_command(["nginx", "-t"], current_logger=logger_to_use,
-                             check=True)  # check=True will raise on error
-        log_map_server(f"{config.SYMBOLS['success']} Nginx configuration test successful.", "success", logger_to_use)
-    except subprocess.CalledProcessError as e:
-        log_map_server(
-            f"{config.SYMBOLS['error']} Nginx configuration test FAILED. Command: '{e.cmd}'. Output: {e.stderr or e.stdout}",
-            "error", logger_to_use)
+        run_elevated_command(["nginx", "-t"], app_settings, current_logger=logger_to_use, check=True)
+        log_map_server(f"{symbols.get('success', '✅')} Nginx configuration test successful.", "success", logger_to_use,
+                       app_settings)
+    except subprocess.CalledProcessError as e:  # check=True will raise this on failure
+        # Error already logged by run_elevated_command
+        # log_map_server(f"{symbols.get('error','❌')} Nginx configuration test FAILED. Output: {e.stderr or e.stdout}", "error", logger_to_use, app_settings)
         raise  # Propagate failure, this is critical
 
 
-def activate_nginx_service(current_logger: Optional[logging.Logger] = None) -> None:
+def activate_nginx_service(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
     """Reloads systemd, restarts and enables the Nginx service."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Activating Nginx service...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    log_map_server(f"{symbols.get('step', '➡️')} Activating Nginx service...", "info", logger_to_use, app_settings)
 
-    systemd_reload(current_logger=logger_to_use)
-    run_elevated_command(["systemctl", "restart", "nginx.service"], current_logger=logger_to_use)
-    run_elevated_command(["systemctl", "enable", "nginx.service"], current_logger=logger_to_use)
+    systemd_reload(app_settings, current_logger=logger_to_use)  # Pass app_settings
+    run_elevated_command(["systemctl", "restart", "nginx.service"], app_settings, current_logger=logger_to_use)
+    run_elevated_command(["systemctl", "enable", "nginx.service"], app_settings, current_logger=logger_to_use)
 
-    log_map_server(f"{config.SYMBOLS['info']} Nginx service status:", "info", logger_to_use)
-    run_elevated_command(["systemctl", "status", "nginx.service", "--no-pager", "-l"], current_logger=logger_to_use)
-    log_map_server(f"{config.SYMBOLS['success']} Nginx service activated.", "success", logger_to_use)
+    log_map_server(f"{symbols.get('info', 'ℹ️')} Nginx service status:", "info", logger_to_use, app_settings)
+    run_elevated_command(["systemctl", "status", "nginx.service", "--no-pager", "-l"], app_settings,
+                         current_logger=logger_to_use)
+    log_map_server(f"{symbols.get('success', '✅')} Nginx service activated.", "success", logger_to_use, app_settings)

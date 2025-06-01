@@ -10,168 +10,181 @@ from typing import Optional
 from common.command_utils import log_map_server, run_elevated_command, elevated_command_exists
 from common.file_utils import backup_file
 from common.system_utils import systemd_reload
-from setup import config  # For SYMBOLS, VM_IP_OR_DOMAIN etc.
+
+# Import AppSettings for type hinting
+from setup.config_models import AppSettings, VM_IP_OR_DOMAIN_DEFAULT  # For default comparison
+# Import static_config for fixed paths or truly static values
+from setup import config as static_config
 from setup.state_manager import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 
+# These paths are standard Apache paths, less likely to be runtime configurable
+# but could be if needed (e.g. app_settings.apache.ports_conf_path)
 PORTS_CONF_PATH = "/etc/apache2/ports.conf"
 MOD_TILE_CONF_AVAILABLE_PATH = "/etc/apache2/conf-available/mod_tile.conf"
 APACHE_TILES_SITE_CONF_AVAILABLE_PATH = "/etc/apache2/sites-available/001-tiles.conf"
 
 
-def configure_apache_ports(current_logger: Optional[logging.Logger] = None) -> None:
-    """Modifies Apache's listening port (e.g., from 80 to 8080)."""
+def configure_apache_ports(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+    """Modifies Apache's listening port using app_settings.apache.listen_port."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Configuring Apache listening ports...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    target_listen_port = app_settings.apache.listen_port
 
-    if not os.path.exists(PORTS_CONF_PATH):  # Check first, then backup
-        # Attempt an elevated check if the initial check fails - backup_file does this too
+    log_map_server(f"{symbols.get('step', '➡️')} Configuring Apache listening ports to {target_listen_port}...", "info",
+                   logger_to_use, app_settings)
+
+    if not os.path.exists(PORTS_CONF_PATH):
         try:
-            run_elevated_command(["test", "-f", PORTS_CONF_PATH], check=True, capture_output=True,
+            run_elevated_command(["test", "-f", PORTS_CONF_PATH], app_settings, check=True, capture_output=True,
                                  current_logger=logger_to_use)
         except Exception:
             log_map_server(
-                f"{config.SYMBOLS['critical']} Apache ports configuration file {PORTS_CONF_PATH} not found. Cannot configure ports.",
-                "critical", logger_to_use)
+                f"{symbols.get('critical', '🔥')} Apache ports configuration file {PORTS_CONF_PATH} not found.",
+                "critical", logger_to_use, app_settings)
             raise FileNotFoundError(f"{PORTS_CONF_PATH} not found.")
 
-    if backup_file(PORTS_CONF_PATH,
-                   current_logger=logger_to_use):  # backup_file now returns True if file existed and was backed up (or didn't exist)
-        # This sed command replaces "Listen 80" with "Listen 8080".
-        run_elevated_command(
-            ["sed", "-i.bak_ports_sed", "s/^Listen 80$/Listen 8080/", PORTS_CONF_PATH],
-            current_logger=logger_to_use
-        )
-        run_elevated_command(  # Also for IPv6
-            ["sed", "-i", "s/^Listen \\[::\\]:80$/Listen [::]:8080/", PORTS_CONF_PATH],
-            current_logger=logger_to_use, check=False  # Allow to fail if IPv6 not present
-        )
-        log_map_server(f"{config.SYMBOLS['success']} Apache configured to listen on port 8080 (original backed up).",
-                       "success", logger_to_use)
-    # If backup_file returned False due to an issue other than file not existing initially, it would have logged.
-    # If it returned true because file didn't exist, the earlier check would have caught it.
+    if backup_file(PORTS_CONF_PATH, app_settings, current_logger=logger_to_use):
+        # Replace "Listen 80" with "Listen <target_listen_port>"
+        # And "Listen [::]:80" with "Listen [::]:<target_listen_port>"
+        # Using f-strings for sed expressions requires careful quoting if port could have special chars (not an issue for int)
+        sed_cmd_ipv4 = ["sed", "-i.bak_ports_sed", f"s/^Listen 80$/Listen {target_listen_port}/", PORTS_CONF_PATH]
+        sed_cmd_ipv6 = ["sed", "-i", f"s/^Listen \\[::\\]:80$/Listen [::]:{target_listen_port}/", PORTS_CONF_PATH]
+
+        run_elevated_command(sed_cmd_ipv4, app_settings, current_logger=logger_to_use)
+        run_elevated_command(sed_cmd_ipv6, app_settings, current_logger=logger_to_use,
+                             check=False)  # Allow to fail if IPv6 line not present
+
+        log_map_server(
+            f"{symbols.get('success', '✅')} Apache configured to listen on port {target_listen_port} (original backed up).",
+            "success", logger_to_use, app_settings)
 
 
-def create_mod_tile_config(current_logger: Optional[logging.Logger] = None) -> None:
-    """Creates /etc/apache2/conf-available/mod_tile.conf."""
+def create_mod_tile_config(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+    """Creates /etc/apache2/conf-available/mod_tile.conf using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
-    script_hash = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
-    log_map_server(f"{config.SYMBOLS['step']} Creating mod_tile Apache configuration...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    script_hash = get_current_script_hash(project_root_dir=static_config.OSM_PROJECT_ROOT, app_settings=app_settings,
+                                          logger_instance=logger_to_use) or "UNKNOWN_HASH"
 
-    mod_tile_conf_content = f"""\
-# {MOD_TILE_CONF_AVAILABLE_PATH} - Generated by script V{script_hash}
-LoadModule tile_module /usr/lib/apache2/modules/mod_tile.so
+    log_map_server(f"{symbols.get('step', '➡️')} Creating mod_tile Apache configuration from template...", "info",
+                   logger_to_use, app_settings)
 
-ModTileRenderdSocketName /var/run/renderd/renderd.sock
-ModTileEnableStats On
-ModTileBulkMode Off
-ModTileRequestTimeout 5
-ModTileMissingRequestTimeout 30
-ModTileMaxLoadOld 2
-ModTileMaxLoadMissing 5
+    mod_tile_template = app_settings.apache.mod_tile_conf_template
+    format_vars = {
+        "script_hash": script_hash,
+        "mod_tile_request_timeout": app_settings.apache.mod_tile_request_timeout,
+        "mod_tile_missing_request_timeout": app_settings.apache.mod_tile_missing_request_timeout,
+        "mod_tile_max_load_old": app_settings.apache.mod_tile_max_load_old,
+        "mod_tile_max_load_missing": app_settings.apache.mod_tile_max_load_missing,
+    }
 
-<IfModule mod_expires.c>
-    ExpiresActive On
-    ExpiresByType image/png "access plus 1 month"
-</IfModule>
-<IfModule mod_headers.c>
-    Header set Cache-Control "max-age=2592000, public"
-</IfModule>
-"""
     try:
+        mod_tile_conf_content_final = mod_tile_template.format(**format_vars)
         run_elevated_command(
-            ["tee", MOD_TILE_CONF_AVAILABLE_PATH],
-            cmd_input=mod_tile_conf_content, current_logger=logger_to_use
+            ["tee", MOD_TILE_CONF_AVAILABLE_PATH], app_settings,
+            cmd_input=mod_tile_conf_content_final, current_logger=logger_to_use
         )
-        log_map_server(f"{config.SYMBOLS['success']} Created/Updated {MOD_TILE_CONF_AVAILABLE_PATH}", "success",
-                       logger_to_use)
+        log_map_server(f"{symbols.get('success', '✅')} Created/Updated {MOD_TILE_CONF_AVAILABLE_PATH}", "success",
+                       logger_to_use, app_settings)
+    except KeyError as e_key:
+        log_map_server(
+            f"{symbols.get('error', '❌')} Missing placeholder key '{e_key}' for mod_tile.conf template. Check config.yaml/models.",
+            "error", logger_to_use, app_settings)
+        raise
     except Exception as e:
-        log_map_server(f"{config.SYMBOLS['error']} Failed to write {MOD_TILE_CONF_AVAILABLE_PATH}: {e}", "error",
-                       logger_to_use)
+        log_map_server(f"{symbols.get('error', '❌')} Failed to write {MOD_TILE_CONF_AVAILABLE_PATH}: {e}", "error",
+                       logger_to_use, app_settings)
         raise
 
 
-def create_apache_tile_site_config(current_logger: Optional[logging.Logger] = None) -> None:
-    """Creates the Apache site configuration for serving tiles."""
+def create_apache_tile_site_config(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+    """Creates the Apache site configuration for serving tiles using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
-    script_hash = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
-    log_map_server(f"{config.SYMBOLS['step']} Creating Apache tile serving site configuration...", "info",
-                   logger_to_use)
+    symbols = app_settings.symbols
+    script_hash = get_current_script_hash(project_root_dir=static_config.OSM_PROJECT_ROOT, app_settings=app_settings,
+                                          logger_instance=logger_to_use) or "UNKNOWN_HASH"
 
-    server_name = config.VM_IP_OR_DOMAIN if config.VM_IP_OR_DOMAIN != config.VM_IP_OR_DOMAIN_DEFAULT else "tiles.localhost"
-    admin_email = f"webmaster@{config.VM_IP_OR_DOMAIN}" if config.VM_IP_OR_DOMAIN != config.VM_IP_OR_DOMAIN_DEFAULT else "webmaster@localhost"
+    log_map_server(f"{symbols.get('step', '➡️')} Creating Apache tile serving site configuration from template...",
+                   "info", logger_to_use, app_settings)
 
-    apache_tiles_site_content = apache_tiles_site_content = f"""\
-# {APACHE_TILES_SITE_CONF_AVAILABLE_PATH} - Generated by script V{script_hash}
-<VirtualHost *:8080>
-    ServerName {server_name}
-    ServerAdmin {admin_email}
+    # Determine ServerName and ServerAdmin for the template
+    # VM_IP_OR_DOMAIN_DEFAULT imported from config_models for comparison
+    server_name_val = app_settings.vm_ip_or_domain
+    if server_name_val == VM_IP_OR_DOMAIN_DEFAULT:  # Compare with imported default
+        server_name_val = "tiles.localhost"  # Default if using placeholder domain
 
-    # The URI /hot/ should match the URI in renderd.conf (e.g., [default] URI=/hot/).
-    AddTileConfig /hot/ tile.openstreetmap.org 
+    admin_email_val = f"webmaster@{app_settings.vm_ip_or_domain}"
+    if app_settings.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT:
+        admin_email_val = "webmaster@localhost"
 
-    ErrorLog ${{APACHE_LOG_DIR}}/tiles_error.log
-    CustomLog ${{APACHE_LOG_DIR}}/tiles_access.log combined
-</VirtualHost>
-"""
+    tile_site_template = app_settings.apache.tile_site_template
+    format_vars = {
+        "script_hash": script_hash,
+        "apache_listen_port": app_settings.apache.listen_port,
+        "server_name_apache": server_name_val,
+        "admin_email_apache": admin_email_val,
+    }
+
     try:
+        apache_tiles_site_content_final = tile_site_template.format(**format_vars)
         run_elevated_command(
-            ["tee", APACHE_TILES_SITE_CONF_AVAILABLE_PATH],
-            cmd_input=apache_tiles_site_content, current_logger=logger_to_use
+            ["tee", APACHE_TILES_SITE_CONF_AVAILABLE_PATH], app_settings,
+            cmd_input=apache_tiles_site_content_final, current_logger=logger_to_use
         )
-        log_map_server(f"{config.SYMBOLS['success']} Created/Updated {APACHE_TILES_SITE_CONF_AVAILABLE_PATH}",
-                       "success", logger_to_use)
+        log_map_server(f"{symbols.get('success', '✅')} Created/Updated {APACHE_TILES_SITE_CONF_AVAILABLE_PATH}",
+                       "success", logger_to_use, app_settings)
+    except KeyError as e_key:
+        log_map_server(
+            f"{symbols.get('error', '❌')} Missing placeholder key '{e_key}' for Apache tile site template. Check config.yaml/models.",
+            "error", logger_to_use, app_settings)
+        raise
     except Exception as e:
-        log_map_server(f"{config.SYMBOLS['error']} Failed to write {APACHE_TILES_SITE_CONF_AVAILABLE_PATH}: {e}",
-                       "error", logger_to_use)
+        log_map_server(f"{symbols.get('error', '❌')} Failed to write {APACHE_TILES_SITE_CONF_AVAILABLE_PATH}: {e}",
+                       "error", logger_to_use, app_settings)
         raise
 
 
-def manage_apache_modules_and_sites(current_logger: Optional[logging.Logger] = None) -> None:
+def manage_apache_modules_and_sites(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
     """Enables necessary Apache configurations, modules, and sites."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Enabling Apache modules and site configurations...", "info",
-                   logger_to_use)
+    symbols = app_settings.symbols
+    log_map_server(f"{symbols.get('step', '➡️')} Enabling Apache modules and site configurations...", "info",
+                   logger_to_use, app_settings)
 
-    # Enable mod_tile.conf (which loads the module)
-    run_elevated_command(["a2enconf", "mod_tile"], current_logger=logger_to_use)
-    # Enable other modules
-    for mod in ["expires", "headers"]:
-        run_elevated_command(["a2enmod", mod], current_logger=logger_to_use)
+    run_elevated_command(["a2enconf", "mod_tile"], app_settings, current_logger=logger_to_use)
+    for mod in ["expires", "headers"]:  # These module names are static
+        run_elevated_command(["a2enmod", mod], app_settings, current_logger=logger_to_use)
 
-    # Enable the tile site
     tile_site_name = os.path.basename(APACHE_TILES_SITE_CONF_AVAILABLE_PATH).replace(".conf", "")
-    run_elevated_command(["a2ensite", tile_site_name], current_logger=logger_to_use)
+    run_elevated_command(["a2ensite", tile_site_name], app_settings, current_logger=logger_to_use)
 
-    # Disable default site
     default_site_enabled_path = "/etc/apache2/sites-enabled/000-default.conf"
-    # Check if symlink exists (meaning it's enabled)
-    if elevated_command_exists(f"test -L {default_site_enabled_path}"):  # Simplified check
-        # elevated_command_exists can use 'test -L' which returns 0 if true
-        test_result = run_elevated_command(["test", "-L", default_site_enabled_path], check=False, capture_output=True,
-                                           current_logger=logger_to_use)
-        if test_result.returncode == 0:
-            log_map_server(f"{config.SYMBOLS['info']} Disabling default Apache site (000-default)...", "info",
-                           logger_to_use)
-            run_elevated_command(["a2dissite", "000-default"], current_logger=logger_to_use)
-        else:
-            log_map_server(
-                f"{config.SYMBOLS['info']} Default Apache site not enabled or does not exist at {default_site_enabled_path}. Skipping disable.",
-                "info", logger_to_use)
-
-    log_map_server(f"{config.SYMBOLS['success']} Apache modules and sites configured.", "success", logger_to_use)
+    # elevated_command_exists now takes app_settings
+    if elevated_command_exists(f"test -L {default_site_enabled_path}", app_settings, current_logger=logger_to_use):
+        log_map_server(f"{symbols.get('info', 'ℹ️')} Disabling default Apache site (000-default)...", "info",
+                       logger_to_use, app_settings)
+        run_elevated_command(["a2dissite", "000-default"], app_settings, current_logger=logger_to_use)
+    else:
+        log_map_server(
+            f"{symbols.get('info', 'ℹ️')} Default Apache site not enabled or not found. Skipping disable.",
+            "info", logger_to_use, app_settings)
+    log_map_server(f"{symbols.get('success', '✅')} Apache modules and sites configured.", "success", logger_to_use,
+                   app_settings)
 
 
-def activate_apache_service(current_logger: Optional[logging.Logger] = None) -> None:
+def activate_apache_service(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
     """Reloads systemd, restarts and enables the Apache service."""
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Activating Apache service...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    log_map_server(f"{symbols.get('step', '➡️')} Activating Apache service...", "info", logger_to_use, app_settings)
 
-    systemd_reload(current_logger=logger_to_use)
-    run_elevated_command(["systemctl", "restart", "apache2.service"], current_logger=logger_to_use)
-    run_elevated_command(["systemctl", "enable", "apache2.service"], current_logger=logger_to_use)
+    systemd_reload(app_settings, current_logger=logger_to_use)  # Pass app_settings
+    run_elevated_command(["systemctl", "restart", "apache2.service"], app_settings, current_logger=logger_to_use)
+    run_elevated_command(["systemctl", "enable", "apache2.service"], app_settings, current_logger=logger_to_use)
 
-    log_map_server(f"{config.SYMBOLS['info']} Apache service status:", "info", logger_to_use)
-    run_elevated_command(["systemctl", "status", "apache2.service", "--no-pager", "-l"], current_logger=logger_to_use)
-    log_map_server(f"{config.SYMBOLS['success']} Apache service activated.", "success", logger_to_use)
+    log_map_server(f"{symbols.get('info', 'ℹ️')} Apache service status:", "info", logger_to_use, app_settings)
+    run_elevated_command(["systemctl", "status", "apache2.service", "--no-pager", "-l"], app_settings,
+                         current_logger=logger_to_use)
+    log_map_server(f"{symbols.get('success', '✅')} Apache service activated.", "success", logger_to_use, app_settings)

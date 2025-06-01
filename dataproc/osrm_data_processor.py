@@ -1,206 +1,201 @@
-# setup/osrm_data_processor.py
+# dataproc/osrm_data_processor.py
 # -*- coding: utf-8 -*-
 """
-Handles OSRM data processing: Osmium extraction and OSRM graph building via Docker.
+Handles OSRM data processing: Osmium extraction and OSRM graph building using container runtime.
 """
 import logging
 import os
-import subprocess  # For CalledProcessError
+import subprocess
 from pathlib import Path
 from typing import Optional, Dict, List
 
 from common.command_utils import log_map_server, run_elevated_command, run_command
-from setup import config
+from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
 
-# Constants from original osrm.py relevant to Docker processing
-OSM_DATA_REGIONS_DIR = "/opt/osm_data/regions"  # Source for GeoJSONs and where regional PBFs will be placed
-OSRM_BASE_PROCESSED_DIR = "/opt/osrm_processed_data"
-OSRM_DOCKER_IMAGE = "osrm/osrm-backend:latest"
-OSRM_PROFILE_LUA_IN_CONTAINER = "/opt/car.lua"  # Default car profile in OSRM container
 
-
-def _run_osrm_docker_command_internal(  # Renamed to avoid direct call, now internal helper
+def _run_osrm_container_command_internal(
         command_args: List[str],
-        region_osrm_data_dir_host: str,  # Host path for OSRM outputs for this region
-        pbf_host_path_for_mount: Optional[str],  # Host path to input PBF for this step (if any)
-        pbf_filename_in_container_mount: Optional[str],  # Name of PBF inside /mnt_readonly_pbf
-        logger: logging.Logger,
+        app_settings: AppSettings,
+        region_osrm_data_dir_host: str,
+        pbf_host_path_for_mount: Optional[str],
+        pbf_filename_in_container_mount: Optional[str],
+        current_logger: Optional[logging.Logger],
         step_name: str,
         region_name_log: str,
 ) -> bool:
-    """Helper to run OSRM Docker commands for processing steps."""
-    # Docker execution usually needs current user's UID/GID if creating files on host
-    # to avoid root-owned files in host-mounted volumes.
+    """Helper to run OSRM tools via configured container runtime."""
+    logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
+    container_cmd = app_settings.container_runtime_command
+    osrm_image = app_settings.osrm_service.image_tag
+
     docker_exec_uid = str(os.getuid())
     docker_exec_gid = str(os.getgid())
 
-    docker_base_cmd = ["docker", "run", "--rm", "-u", f"{docker_exec_uid}:{docker_exec_gid}"]
+    container_base_cmd = [container_cmd, "run", "--rm", "-u", f"{docker_exec_uid}:{docker_exec_gid}"]
     volume_mounts = []
 
     if pbf_host_path_for_mount and pbf_filename_in_container_mount:
         volume_mounts.extend(
             ["-v", f"{pbf_host_path_for_mount}:/mnt_readonly_pbf/{pbf_filename_in_container_mount}:ro"])
 
-    # Mount the processing directory read-write for OSRM tool outputs
-    Path(region_osrm_data_dir_host).mkdir(parents=True, exist_ok=True)  # Ensure it exists
+    Path(region_osrm_data_dir_host).mkdir(parents=True, exist_ok=True)
     volume_mounts.extend(["-v", f"{region_osrm_data_dir_host}:/data_processing"])
 
-    full_docker_cmd = (
-            docker_base_cmd + volume_mounts +
-            ["-w", "/data_processing", OSRM_DOCKER_IMAGE] + command_args
+    full_container_cmd = (
+            container_base_cmd + volume_mounts +
+            ["-w", "/data_processing", osrm_image] +
+            command_args
     )
 
-    log_map_server(f"{config.SYMBOLS['info']} Running Docker {step_name} for {region_name_log}...", "info", logger)
-    log_map_server(f"{config.SYMBOLS['debug']} Docker command: {' '.join(full_docker_cmd)}", "debug", logger)
+    log_map_server(f"{symbols.get('info', 'ℹ️')} Running {container_cmd} {step_name} for {region_name_log}...", "info",
+                   logger_to_use, app_settings)
+    log_map_server(f"{symbols.get('debug', '🐛')} {container_cmd} command: {' '.join(full_container_cmd)}", "debug",
+                   logger_to_use, app_settings)
 
     try:
-        # Docker commands are often run with sudo if user isn't in docker group,
-        # but run_elevated_command handles this.
-        result = run_elevated_command(full_docker_cmd, current_logger=logger, capture_output=True, check=True)
-        # check=True will raise CalledProcessError on failure. Output is logged by run_elevated_command.
-        log_map_server(f"{config.SYMBOLS['success']} Docker {step_name} for {region_name_log} completed successfully.",
-                       "success", logger)
+        run_elevated_command(full_container_cmd, app_settings, current_logger=logger_to_use, capture_output=True,
+                             check=True)
+        log_map_server(
+            f"{symbols.get('success', '✅')} {container_cmd} {step_name} for {region_name_log} completed successfully.",
+            "success", logger_to_use, app_settings)
         return True
-    except subprocess.CalledProcessError as e:
-        # Error already logged by run_elevated_command
-        log_map_server(f"{config.SYMBOLS['critical']} Docker {step_name} for {region_name_log} FAILED. See logs.",
-                       "critical", logger)
+    except subprocess.CalledProcessError:  # Error logged by run_elevated_command
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} {container_cmd} {step_name} for {region_name_log} FAILED. Check logs.",
+            "critical", logger_to_use, app_settings)
         return False
     except Exception as e:
-        log_map_server(f"{config.SYMBOLS['critical']} Exception during Docker {step_name} for {region_name_log}: {e}",
-                       "critical", logger)
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} Exception during {container_cmd} {step_name} for {region_name_log}: {e}",
+            "critical", logger_to_use, app_settings, exc_info=True)
         return False
 
 
 def extract_regional_pbfs_with_osmium(
         base_pbf_full_path: str,
+        app_settings: AppSettings,
         current_logger: Optional[logging.Logger] = None
 ) -> Dict[str, str]:
-    """
-    Extracts regional PBFs using Osmium based on GeoJSON files in OSM_DATA_REGIONS_DIR.
-    Returns a dictionary mapping region base name to its extracted PBF file path.
-    """
     logger_to_use = current_logger if current_logger else module_logger
-    log_map_server(f"{config.SYMBOLS['step']} Extracting regional PBFs using Osmium...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    osrm_data_cfg = app_settings.osrm_data
+
+    geojson_base_dir = Path(osrm_data_cfg.base_dir) / "regions"
+
+    log_map_server(
+        f"{symbols.get('step', '➡️')} Extracting regional PBFs using Osmium from base: {base_pbf_full_path}, boundaries in: {geojson_base_dir}",
+        "info", logger_to_use, app_settings)
 
     extracted_pbf_paths: Dict[str, str] = {}
-    geojson_suffix = "RegionMap.json"  # From original osrm.py
+    geojson_suffix = "RegionMap.json"
 
-    # Ensure the user running osmium can write to OSM_DATA_REGIONS_DIR
-    # This should be covered by setup_osrm_data_directories in the installer part.
+    if not Path(base_pbf_full_path).is_file():
+        log_map_server(f"{symbols.get('error', '❌')} Base PBF file {base_pbf_full_path} not found.", "error",
+                       logger_to_use, app_settings)
+        return extracted_pbf_paths
 
-    for root, _, files in os.walk(OSM_DATA_REGIONS_DIR):
+    if not geojson_base_dir.is_dir():
+        log_map_server(f"{symbols.get('warning', '!')} GeoJSON boundary directory {geojson_base_dir} not found.",
+                       "warning", logger_to_use, app_settings)
+        return extracted_pbf_paths
+
+    for root, _, files in os.walk(geojson_base_dir):
         for geojson_filename in files:
             if geojson_filename.endswith(geojson_suffix):
-                geojson_full_path = os.path.join(root, geojson_filename)
-                region_base_name = geojson_filename.removesuffix(geojson_suffix)
+                geojson_full_path = Path(root) / geojson_filename
+                region_base_name_from_file = geojson_filename.removesuffix(geojson_suffix)
+                relative_path_from_regions_root = geojson_full_path.parent.relative_to(geojson_base_dir)
+                unique_region_key_parts = list(relative_path_from_regions_root.parts) + [region_base_name_from_file]
+                unique_region_key = "_".join(filter(None, unique_region_key_parts)).replace(" ", "_")
 
-                output_pbf_filename = f"{region_base_name}.osm.pbf"
-                # Regional PBFs are stored alongside their GeoJSONs
-                output_pbf_full_path = os.path.join(root, output_pbf_filename)
+                output_pbf_filename = f"{unique_region_key}.osm.pbf"
+                output_pbf_full_path = geojson_full_path.parent / output_pbf_filename
 
-                log_map_server(f"Processing region: {region_base_name} from {geojson_filename}", "debug", logger_to_use)
+                log_map_server(f"Processing Osmium for region key: {unique_region_key} from {geojson_filename}",
+                               "debug", logger_to_use, app_settings)
 
-                if os.path.isfile(output_pbf_full_path):
+                if output_pbf_full_path.is_file():
                     log_map_server(
-                        f"{config.SYMBOLS['info']} Regional PBF {output_pbf_full_path} already exists. Skipping Osmium extraction.",
-                        "info", logger_to_use)
-                    extracted_pbf_paths[region_base_name] = output_pbf_full_path
+                        f"{symbols.get('info', 'ℹ️')} Regional PBF {output_pbf_full_path} already exists. Skipping.",
+                        "info", logger_to_use, app_settings)
+                    extracted_pbf_paths[unique_region_key] = str(output_pbf_full_path)
                     continue
 
-                osmium_cmd = [
-                    "osmium", "extract", "--strategy", "smart",
-                    "-p", geojson_full_path, base_pbf_full_path,
-                    "-o", output_pbf_full_path, "--overwrite"
-                ]
+                osmium_cmd = ["osmium", "extract", "--strategy", "smart", "-p", str(geojson_full_path),
+                              str(base_pbf_full_path), "-o", str(output_pbf_full_path), "--overwrite"]
                 try:
-                    # Osmium runs as current user. Assumes current user has write access to OSM_DATA_REGIONS_DIR.
-                    run_command(osmium_cmd, check=True, current_logger=logger_to_use)
+                    run_command(osmium_cmd, app_settings, check=True, current_logger=logger_to_use)
                     log_map_server(
-                        f"{config.SYMBOLS['success']} Extracted {output_pbf_full_path} for {region_base_name}.",
-                        "success", logger_to_use)
-                    extracted_pbf_paths[region_base_name] = output_pbf_full_path
+                        f"{symbols.get('success', '✅')} Extracted {output_pbf_full_path} for {unique_region_key}.",
+                        "success", logger_to_use, app_settings)
+                    extracted_pbf_paths[unique_region_key] = str(output_pbf_full_path)
                 except subprocess.CalledProcessError as e:
-                    log_map_server(f"{config.SYMBOLS['error']} Osmium extraction failed for {region_base_name}: {e}",
-                                   "error", logger_to_use)
-                    # Decide if one failure should stop all. For now, continue.
+                    log_map_server(f"{symbols.get('error', '❌')} Osmium extraction failed for {unique_region_key}: {e}",
+                                   "error", logger_to_use, app_settings)
                 except Exception as e:
-                    log_map_server(
-                        f"{config.SYMBOLS['error']} Unexpected error during Osmium extraction for {region_base_name}: {e}",
-                        "error", logger_to_use)
+                    log_map_server(f"{symbols.get('error', '❌')} Unexpected Osmium error for {unique_region_key}: {e}",
+                                   "error", logger_to_use, app_settings, exc_info=True)
 
     if not extracted_pbf_paths:
-        log_map_server(f"{config.SYMBOLS['warning']} No regional PBFs were extracted by Osmium.", "warning",
-                       logger_to_use)
+        log_map_server(f"{symbols.get('warning', '!')} No regional PBFs extracted by Osmium.", "warning", logger_to_use,
+                       app_settings)
     return extracted_pbf_paths
 
 
 def build_osrm_graphs_for_region(
-        region_name: str,
-        regional_pbf_path: str,  # Host path to the specific regional PBF
+        region_name_key: str,
+        regional_pbf_host_path: str,
+        app_settings: AppSettings,
         current_logger: Optional[logging.Logger] = None
 ) -> bool:
-    """Runs osrm-extract, osrm-partition, and osrm-customize for a given regional PBF."""
     logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
+    osrm_data_cfg = app_settings.osrm_data
+
     log_map_server(
-        f"{config.SYMBOLS['step']} Building OSRM graphs for region: {region_name} from PBF: {regional_pbf_path}",
-        "info", logger_to_use)
+        f"{symbols.get('step', '➡️')} Building OSRM graphs for region: {region_name_key} from PBF: {regional_pbf_host_path}",
+        "info", logger_to_use, app_settings)
 
-    region_osrm_output_dir_host = os.path.join(OSRM_BASE_PROCESSED_DIR, region_name)
-    Path(region_osrm_output_dir_host).mkdir(parents=True, exist_ok=True)
-    # Ensure this dir is writable by user `docker_exec_uid` inside container
-    # This typically means current host user if UID/GID mapping is used,
-    # or root if not (leading to root-owned files on host).
-    # The _run_osrm_docker_command_internal uses current UID/GID for -u flag.
+    region_processed_output_dir_host = str(Path(osrm_data_cfg.processed_dir) / region_name_key)
+    pbf_filename_on_host = Path(regional_pbf_host_path).name
+    osrm_base_filename_in_container = region_name_key
+    pbf_path_for_extract_in_container = f"/mnt_readonly_pbf/{pbf_filename_on_host}"
 
-    pbf_filename_on_host = os.path.basename(regional_pbf_path)
+    extract_cmd_args = ["osrm-extract", "-p", str(osrm_data_cfg.profile_script_in_container),
+                        pbf_path_for_extract_in_container]
+    if not _run_osrm_container_command_internal(
+            extract_cmd_args, app_settings, region_processed_output_dir_host,
+            regional_pbf_host_path, pbf_filename_on_host,
+            logger_to_use, "osrm-extract", region_name_key):
+        return False
 
-    # OSRM output files will use region_name as base, e.g., region_name.osrm
-    osrm_base_filename_in_container = f"{region_name}.osrm"  # This is what osrm-extract -o expects
-    # For osrm-extract, the input PBF is copied inside the Docker command
-    internal_pbf_copy_name_in_container = f"{region_name}_processing.osm.pbf"
+    # Ensure output of osrm-extract (e.g., pbf_filename_on_host_stem.osrm) is renamed to region_name_key.osrm if different
+    # OSRM typically uses the input PBF stem for its output files.
+    # If pbf_filename_on_host's stem is not already region_name_key, a rename is needed inside the container or on host.
+    # For simplicity, current logic assumes the stem of pbf_filename_on_host matches region_name_key or that
+    # osrm-extract output is correctly named region_name_key.osrm (e.g. input was region_name_key.osm.pbf)
+    # This might need a robust rename step if input PBF names are arbitrary.
+    # Example rename logic (if needed, inside the container or via another docker exec):
+    # pbf_stem = Path(pbf_filename_on_host).stem.removesuffix('.osm') # Common pattern
+    # if pbf_stem != region_name_key:
+    #     rename_cmd = ["mv", f"./{pbf_stem}.osrm", f"./{region_name_key}.osrm"] # Plus all other extensions
+    #     _run_osrm_container_command_internal(rename_cmd, ...)
 
-    # 1. osrm-extract
-    # Command inside container: cp /mnt_readonly_pbf/<pbf_file> ./<internal_copy_name>.osm.pbf && osrm-extract -p <profile> ./<internal_copy_name>.osm.pbf -o ./<region_name>.osrm && rm ./<internal_copy_name>.osm.pbf
-    extract_shell_cmd = (
-        f'cp "/mnt_readonly_pbf/{pbf_filename_on_host}" "./{internal_pbf_copy_name_in_container}" && '
-        f'osrm-extract -p "{OSRM_PROFILE_LUA_IN_CONTAINER}" "./{internal_pbf_copy_name_in_container}" && '  # Default osrm-extract output is input_basename.osrm
-        f'mv "./{Path(internal_pbf_copy_name_in_container).stem}.osrm" "./{osrm_base_filename_in_container}" && '  # Ensure output is region_name.osrm
-        f'rm "./{internal_pbf_copy_name_in_container}"'
-    )
-    extract_ok = _run_osrm_docker_command_internal(
-        command_args=["sh", "-c", extract_shell_cmd],
-        region_osrm_data_dir_host=region_osrm_output_dir_host,
-        pbf_host_path_for_mount=regional_pbf_path,
-        pbf_filename_in_container_mount=pbf_filename_on_host,
-        logger=logger_to_use,
-        step_name="osrm-extract",
-        region_name_log=region_name
-    )
-    if not extract_ok: return False
+    partition_cmd_args = ["osrm-partition", f"./{osrm_base_filename_in_container}.osrm"]
+    if not _run_osrm_container_command_internal(
+            partition_cmd_args, app_settings, region_processed_output_dir_host,
+            None, None, logger_to_use, "osrm-partition", region_name_key):
+        return False
 
-    # 2. osrm-partition
-    partition_cmd_args = ["osrm-partition", f"./{osrm_base_filename_in_container}"]
-    partition_ok = _run_osrm_docker_command_internal(
-        command_args=partition_cmd_args,
-        region_osrm_data_dir_host=region_osrm_output_dir_host,
-        pbf_host_path_for_mount=None, pbf_filename_in_container_mount=None,  # No PBF input here
-        logger=logger_to_use,
-        step_name="osrm-partition",
-        region_name_log=region_name
-    )
-    if not partition_ok: return False
+    customize_cmd_args = ["osrm-customize", f"./{osrm_base_filename_in_container}.osrm"]
+    if not _run_osrm_container_command_internal(
+            customize_cmd_args, app_settings, region_processed_output_dir_host,
+            None, None, logger_to_use, "osrm-customize", region_name_key):
+        return False
 
-    # 3. osrm-customize
-    customize_cmd_args = ["osrm-customize", f"./{osrm_base_filename_in_container}"]
-    customize_ok = _run_osrm_docker_command_internal(
-        command_args=customize_cmd_args,
-        region_osrm_data_dir_host=region_osrm_output_dir_host,
-        pbf_host_path_for_mount=None, pbf_filename_in_container_mount=None,  # No PBF input here
-        logger=logger_to_use,
-        step_name="osrm-customize",
-        region_name_log=region_name
-    )
-    return customize_ok
+    log_map_server(f"{symbols.get('success', '✅')} OSRM graphs built for region: {region_name_key}", "success",
+                   logger_to_use, app_settings)
+    return True

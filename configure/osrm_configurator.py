@@ -9,97 +9,113 @@ from pathlib import Path
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from common.system_utils import systemd_reload
-from setup import config  # For SYMBOLS
-from setup.state_manager import get_current_script_hash
+from common.system_utils import systemd_reload,get_current_script_hash
+from setup.config_models import AppSettings
+from setup import config as static_config
 
 module_logger = logging.getLogger(__name__)
 
-OSRM_BASE_PROCESSED_DIR = "/opt/osrm_processed_data"  # Must match data_processor
-OSRM_DOCKER_IMAGE = "osrm/osrm-backend:latest"  # Must match data_processor
 
+# OSRM_BASE_PROCESSED_DIR is now app_settings.osrm_data.processed_dir
+# OSRM_DOCKER_IMAGE is now app_settings.osrm_service.image_tag
+# CONTAINER_RUNTIME_COMMAND is app_settings.container_runtime_command
 
 def create_osrm_routed_service_file(
-        region_name: str,
+        region_name_key: str,  # Unique key for the region, e.g., "Australia_Tasmania_Hobart"
+        app_settings: AppSettings,
         current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates a systemd service file for osrm-routed for a specific region."""
+    """Creates a systemd service file for osrm-routed for a specific region using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
-    script_hash = get_current_script_hash(logger_instance=logger_to_use) or "UNKNOWN_HASH"
+    symbols = app_settings.symbols
+    script_hash = get_current_script_hash(project_root_dir=static_config.OSM_PROJECT_ROOT, app_settings=app_settings,
+                                          logger_instance=logger_to_use) or "UNKNOWN_HASH"
 
-    service_name = f"osrm-routed-{region_name}.service"
+    osrm_data_cfg = app_settings.osrm_data
+    osrm_service_cfg = app_settings.osrm_service
+
+    service_name = f"osrm-routed-{region_name_key}.service"
     service_file_path = f"/etc/systemd/system/{service_name}"
 
-    # Path to the .osrm file on the host, which will be mounted into Docker
-    host_osrm_file_path = Path(OSRM_BASE_PROCESSED_DIR) / region_name / f"{region_name}_processing.osrm"
-    # Path to the .osrm file INSIDE the Docker container for osrm-routed
-    container_osrm_file_path = f"/data/{region_name}.osrm"
+    # Path to the directory on host containing this region's .osrm files (e.g., /opt/osrm_processed_data/Australia_Tasmania_Hobart/)
+    host_osrm_data_dir_for_this_region = Path(osrm_data_cfg.processed_dir) / region_name_key
+    # The OSRM filename inside the container (relative to its /data_processing mount)
+    # OSRM tools use region_name_key as the base, e.g., Australia_Tasmania_Hobart.osrm
+    osrm_filename_stem_in_container = region_name_key
 
     log_map_server(
-        f"{config.SYMBOLS['step']} Creating systemd service file for {service_name} at {service_file_path}...", "info",
-        logger_to_use)
+        f"{symbols.get('step', '➡️')} Creating systemd service file for {service_name} at {service_file_path} from template...",
+        "info", logger_to_use, app_settings)
 
-    # Check if the actual .osrm data file exists on host
-    if not host_osrm_file_path.exists():
+    # Check if the main .osrm data file exists on host to ensure data processing was successful for this region
+    # The actual file might be region_name_key.osrm, region_name_key.hsgr etc.
+    # Checking for the base .osrm file is a good indicator.
+    expected_osrm_file_on_host = host_osrm_data_dir_for_this_region / f"{osrm_filename_stem_in_container}.osrm"
+    if not expected_osrm_file_on_host.exists():
         log_map_server(
-            f"{config.SYMBOLS['error']} OSRM data file {host_osrm_file_path} not found. Cannot create service for {region_name}.",
-            "error", logger_to_use)
-        raise FileNotFoundError(f"OSRM data file {host_osrm_file_path} missing for service {service_name}")
+            f"{symbols.get('error', '❌')} OSRM data file {expected_osrm_file_on_host} not found. Cannot create service for {region_name_key}.",
+            "error", logger_to_use, app_settings)
+        raise FileNotFoundError(f"OSRM data file {expected_osrm_file_on_host} missing for service {service_name}")
 
-    # Define port mapping (example, could be dynamic or configured)
-    # This needs a strategy if multiple regions run simultaneously on same host.
-    # For now, let's use a base port and increment or have a config map.
-    # Simple approach: each region gets a different port if this function is called per region.
-    # This is a placeholder; a robust port management strategy is needed for multiple regions.
-    host_port = 5000  # Default OSRM port. For multiple regions, this must be unique.
-    # Example: host_port = 5000 + hash(region_name) % 100 # or some other scheme
+    # Port mapping: Use a configured default host port for now.
+    # For multiple regions, a port management strategy is needed.
+    # This could involve a dictionary in AppSettings: osrm_service.region_port_map = {"region_key": port}
+    # Or incrementing from car_profile_default_host_port.
+    # For simplicity here, using the default car profile port.
+    host_port_for_this_region = osrm_service_cfg.car_profile_default_host_port
+    # A more robust way for multiple regions might be:
+    # host_port_for_this_region = osrm_service_cfg.car_profile_default_host_port + index_of_region (if regions are processed in a list)
+    # This needs to be coordinated with Nginx config if Nginx proxies to specific ports per region.
 
-    service_content = f"""[Unit]
-Description=OSRM Routed service for {region_name}
-After=docker.service network-online.target
-Wants=docker.service
-
-[Service]
-Restart=always
-RestartSec=5
-ExecStartPre=-/usr/bin/docker stop {service_name}
-ExecStartPre=-/usr/bin/docker rm {service_name}
-ExecStart=/usr/bin/docker run --rm --name {service_name} \\
-    -p 127.0.0.1:{host_port}:5000 \\
-    -v "{host_osrm_file_path.parent}":"/data":ro \\
-    {OSRM_DOCKER_IMAGE} osrm-routed "{container_osrm_file_path}" --max-table-size 8000
-
-ExecStop=/usr/bin/docker stop {service_name}
-
-[Install]
-WantedBy=multi-user.target
-# File created by script V{script_hash} for region {region_name}
-"""
-    # Note on port: If multiple OSRM instances are to run, each needs a unique host port.
-    # The -p 127.0.0.1:{host_port}:5000 binds only to localhost on the host.
-    # Nginx would then proxy_pass to localhost:<host_port_for_region>.
+    systemd_template_str = osrm_service_cfg.systemd_template
+    format_vars = {
+        "script_hash": script_hash,
+        "region_name": region_name_key,
+        "container_runtime_command": app_settings.container_runtime_command,
+        "host_port_for_region": host_port_for_this_region,
+        "container_osrm_port": osrm_service_cfg.container_osrm_port,
+        "host_osrm_data_dir_for_region": str(host_osrm_data_dir_for_this_region),
+        "osrm_image_tag": osrm_service_cfg.image_tag,
+        "osrm_filename_in_container": f"{osrm_filename_stem_in_container}.osrm",
+        # osrm-routed expects the .osrm extension
+        "max_table_size_routed": osrm_data_cfg.max_table_size_routed,
+        "extra_osrm_routed_args": osrm_service_cfg.extra_routed_args,
+    }
 
     try:
-        run_elevated_command(["tee", service_file_path], cmd_input=service_content, current_logger=logger_to_use)
-        log_map_server(f"{config.SYMBOLS['success']} Created/Updated {service_file_path}", "success", logger_to_use)
+        service_content_final = systemd_template_str.format(**format_vars)
+        run_elevated_command(["tee", service_file_path], app_settings, cmd_input=service_content_final,
+                             current_logger=logger_to_use)
+        log_map_server(f"{symbols.get('success', '✅')} Created/Updated {service_file_path}", "success", logger_to_use,
+                       app_settings)
+    except KeyError as e_key:
+        log_map_server(
+            f"{symbols.get('error', '❌')} Missing placeholder key '{e_key}' for OSRM systemd template. Check config.yaml/models.",
+            "error", logger_to_use, app_settings)
+        raise
     except Exception as e:
-        log_map_server(f"{config.SYMBOLS['error']} Failed to write {service_file_path}: {e}", "error", logger_to_use)
+        log_map_server(f"{symbols.get('error', '❌')} Failed to write {service_file_path}: {e}", "error", logger_to_use,
+                       app_settings, exc_info=True)
         raise
 
 
 def activate_osrm_routed_service(
-        region_name: str,
+        region_name_key: str,  # Unique key for the region
+        app_settings: AppSettings,
         current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reloads systemd, enables and restarts the osrm-routed service for a region."""
     logger_to_use = current_logger if current_logger else module_logger
-    service_name = f"osrm-routed-{region_name}.service"
-    log_map_server(f"{config.SYMBOLS['step']} Activating {service_name}...", "info", logger_to_use)
+    symbols = app_settings.symbols
+    service_name = f"osrm-routed-{region_name_key}.service"
+    log_map_server(f"{symbols.get('step', '➡️')} Activating {service_name}...", "info", logger_to_use, app_settings)
 
-    systemd_reload(current_logger=logger_to_use)  # Reload to pick up new/changed service file
-    run_elevated_command(["systemctl", "enable", service_name], current_logger=logger_to_use)
-    run_elevated_command(["systemctl", "restart", service_name], current_logger=logger_to_use)
+    systemd_reload(app_settings, current_logger=logger_to_use)
+    run_elevated_command(["systemctl", "enable", service_name], app_settings, current_logger=logger_to_use)
+    run_elevated_command(["systemctl", "restart", service_name], app_settings, current_logger=logger_to_use)
 
-    log_map_server(f"{config.SYMBOLS['info']} {service_name} status:", "info", logger_to_use)
-    run_elevated_command(["systemctl", "status", service_name, "--no-pager", "-l"], current_logger=logger_to_use)
-    log_map_server(f"{config.SYMBOLS['success']} {service_name} activated.", "success", logger_to_use)
+    log_map_server(f"{symbols.get('info', 'ℹ️')} {service_name} status:", "info", logger_to_use, app_settings)
+    run_elevated_command(["systemctl", "status", service_name, "--no-pager", "-l"], app_settings,
+                         current_logger=logger_to_use, check=False)  # Allow status to show failure
+    log_map_server(f"{symbols.get('success', '✅')} {service_name} activation process completed (check status above).",
+                   "success", logger_to_use, app_settings)

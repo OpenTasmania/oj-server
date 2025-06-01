@@ -10,12 +10,8 @@ import shutil
 import subprocess
 from typing import List, Optional, Union
 
-# Import AppSettings for type hinting and default symbols if app_settings is None
+# Import AppSettings for type hinting and SYMBOLS_DEFAULT for fallback
 from setup.config_models import AppSettings, SYMBOLS_DEFAULT
-
-# static_config will be used for truly static things if any are left here,
-# but SYMBOLS now come from app_settings.
-# from setup import config as static_config
 
 module_logger = logging.getLogger(__name__)
 
@@ -24,7 +20,7 @@ def log_map_server(
         message: str,
         level: str = "info",
         current_logger: Optional[logging.Logger] = None,
-        app_settings: Optional[AppSettings] = None,  # Added app_settings
+        app_settings: Optional[AppSettings] = None,
 ) -> None:
     """
     Log a message using the provided logger or a default module logger.
@@ -32,21 +28,14 @@ def log_map_server(
     """
     effective_logger = current_logger if current_logger else module_logger
 
-    # Use symbols from app_settings if available, otherwise fallback
-    # This part is tricky if app_settings is not always available.
-    # For now, assume that if app_settings is None, we might be in a very early startup phase
-    # or a context where full AppSettings isn't loaded.
-    # However, the goal is for AppSettings to be available for most logging.
-    symbols = SYMBOLS_DEFAULT
-    if app_settings and hasattr(app_settings, 'symbols'):
-        symbols = app_settings.symbols
+    symbols_to_use = SYMBOLS_DEFAULT
+    if app_settings and hasattr(app_settings, 'symbols') and app_settings.symbols:
+        symbols_to_use = app_settings.symbols
 
-    # Construct message with potential symbol prefix if the message doesn't already have one
-    # This logic can be refined based on how symbols are used in messages.
-    # For now, assuming messages might already include symbols or not need them.
-    # The original log_map_server prepended config.LOG_PREFIX, handled by setup_logging now.
-    # It also sometimes had symbols in the message string itself.
-    # Let's assume `message` is the final string to log.
+    # Note: Actual symbol insertion into the message string is assumed to be done by the caller
+    # or specific log messages. This function primarily handles routing to the correct log level.
+    # If automatic prefixing with a symbol based on level was intended, that logic would go here.
+    # For now, it respects the message as given.
 
     if level == "warning":
         effective_logger.warning(message)
@@ -66,7 +55,7 @@ def _get_elevated_command_prefix() -> List[str]:
 
 def run_command(
         command: Union[List[str], str],
-        app_settings: Optional[AppSettings],  # Added app_settings
+        app_settings: Optional[AppSettings],
         check: bool = True,
         shell: bool = False,
         capture_output: bool = False,
@@ -76,7 +65,7 @@ def run_command(
         cwd: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     effective_logger = current_logger if current_logger else module_logger
-    symbols = app_settings.symbols if app_settings else SYMBOLS_DEFAULT
+    symbols = app_settings.symbols if app_settings and app_settings.symbols else SYMBOLS_DEFAULT
     command_to_log_str: str
     command_to_run: Union[List[str], str]
 
@@ -89,51 +78,52 @@ def run_command(
     else:
         if isinstance(command, str):
             log_map_server(
-                f"{symbols.get('warning', '')} Running string command '{command}' without shell=True. Consider list format.",
+                f"{symbols.get('warning', '!')} Running string command '{command}' without shell=True. Consider list format.",
                 "warning", effective_logger, app_settings)
-            command_to_run = command.split()
+            command_to_run = command.split()  # Basic split, consider shlex for complex cases
             command_to_log_str = command
         else:
             command_to_run = command
-            command_to_log_str = " ".join(command)
+            command_to_log_str = subprocess.list2cmdline(command) if isinstance(command, list) else command
 
     log_map_server(
-        f"{symbols.get('gear', '')} Executing: {command_to_log_str} {f'(in {cwd})' if cwd else ''}",
-        "debug", effective_logger, app_settings)  # Changed to debug for less verbose logs by default
+        f"{symbols.get('gear', '⚙️')} Executing: {command_to_log_str} {f'(in {cwd})' if cwd else ''}",
+        "debug", effective_logger, app_settings)
     try:
         result = subprocess.run(
             command_to_run, check=check, shell=shell, capture_output=capture_output,
             text=text, input=cmd_input, cwd=cwd,
         )
-        if capture_output:
+        if capture_output:  # Log captured output only at debug level for brevity
             if result.stdout and result.stdout.strip():
                 log_map_server(f"   stdout: {result.stdout.strip()}", "debug", effective_logger, app_settings)
-            if result.stderr and result.stderr.strip() and (not check or result.returncode == 0):
+            if result.stderr and result.stderr.strip() and (not check or result.returncode == 0):  # Non-error stderr
                 log_map_server(f"   stderr: {result.stderr.strip()}", "debug", effective_logger, app_settings)
         return result
     except subprocess.CalledProcessError as e:
         stdout_info = e.stdout.strip() if e.stdout and hasattr(e.stdout, 'strip') else "N/A"
         stderr_info = e.stderr.strip() if e.stderr and hasattr(e.stderr, 'strip') else "N/A"
-        cmd_executed_str = " ".join(e.cmd) if isinstance(e.cmd, list) else str(e.cmd)
-        log_map_server(f"{symbols.get('error', '')} Command `{cmd_executed_str}` failed (rc {e.returncode}).", "error",
+        cmd_executed_str = subprocess.list2cmdline(e.cmd) if isinstance(e.cmd, list) else str(e.cmd)
+
+        log_map_server(f"{symbols.get('error', '❌')} Command `{cmd_executed_str}` failed (rc {e.returncode}).", "error",
                        effective_logger, app_settings)
         if stdout_info != "N/A": log_map_server(f"   stdout: {stdout_info}", "error", effective_logger, app_settings)
         if stderr_info != "N/A": log_map_server(f"   stderr: {stderr_info}", "error", effective_logger, app_settings)
         raise
     except FileNotFoundError as e:
         log_map_server(
-            f"{symbols.get('error', '')} Command not found: {e.filename}. Ensure it's installed and in PATH.", "error",
+            f"{symbols.get('error', '❌')} Command not found: {e.filename}. Ensure it's installed and in PATH.", "error",
             effective_logger, app_settings)
         raise
     except Exception as e:
-        log_map_server(f"{symbols.get('error', '')} Unexpected error running command `{command_to_log_str}`: {e}",
-                       "error", effective_logger, app_settings)
+        log_map_server(f"{symbols.get('error', '❌')} Unexpected error running command `{command_to_log_str}`: {e}",
+                       "error", effective_logger, app_settings, exc_info=True)
         raise
 
 
 def run_elevated_command(
         command: List[str],
-        app_settings: Optional[AppSettings],  # Added app_settings
+        app_settings: Optional[AppSettings],
         check: bool = True,
         capture_output: bool = False,
         cmd_input: Optional[str] = None,
@@ -150,49 +140,57 @@ def run_elevated_command(
 
 
 def command_exists(command_name: str) -> bool:
+    """Checks if a command exists in the system's PATH."""
     return shutil.which(command_name) is not None
 
 
 def elevated_command_exists(command_name: str, app_settings: Optional[AppSettings],
-                            current_logger: Optional[logging.Logger] = None) -> bool:  # Added app_settings
+                            current_logger: Optional[logging.Logger] = None) -> bool:
+    """Checks if a command exists when searched with elevated privileges."""
     try:
         run_elevated_command(["which", command_name], app_settings, capture_output=True, check=True,
                              current_logger=current_logger)
         return True
     except subprocess.CalledProcessError:
-        return False
-    except FileNotFoundError:
-        symbols = app_settings.symbols if app_settings else SYMBOLS_DEFAULT
+        return False  # Command not found via elevated 'which'
+    except FileNotFoundError:  # sudo or which might be missing
+        symbols = app_settings.symbols if app_settings and app_settings.symbols else SYMBOLS_DEFAULT
         log_map_server(
-            f"{symbols.get('warning', '')} Could not check for elevated command '{command_name}' as 'sudo' or 'which' may be missing.",
+            f"{symbols.get('warning', '!')} Could not check for elevated command '{command_name}' as 'sudo' or 'which' may be missing.",
             "warning", current_logger, app_settings)
+        return False
+    except Exception as e:  # Other unexpected errors
+        symbols = app_settings.symbols if app_settings and app_settings.symbols else SYMBOLS_DEFAULT
+        log_map_server(f"{symbols.get('warning', '!')} Error checking elevated command '{command_name}': {e}",
+                       "warning", current_logger, app_settings)
         return False
 
 
 def check_package_installed(
         package_name: str,
-        app_settings: Optional[AppSettings],  # Added app_settings
+        app_settings: Optional[AppSettings],
         current_logger: Optional[logging.Logger] = None,
 ) -> bool:
+    """Checks if an apt package is installed using dpkg-query."""
     logger_to_use = current_logger if current_logger else module_logger
-    symbols = app_settings.symbols if app_settings else SYMBOLS_DEFAULT
+    symbols = app_settings.symbols if app_settings and app_settings.symbols else SYMBOLS_DEFAULT
     try:
         result = run_command(
             ["dpkg-query", "-W", "-f='${Status}'", package_name],
-            app_settings,  # Pass app_settings
-            check=False,
+            app_settings,
+            check=False,  # dpkg-query returns non-zero if package not found
             capture_output=True,
             text=True,
             current_logger=logger_to_use,
         )
         return result.returncode == 0 and "install ok installed" in result.stdout
-    except FileNotFoundError:
+    except FileNotFoundError:  # If dpkg-query itself is not found
         log_map_server(
-            f"{symbols.get('error', '')} dpkg-query command not found. Cannot check package '{package_name}'.",
+            f"{symbols.get('error', '❌')} dpkg-query command not found. Cannot check package '{package_name}'.",
             "error", logger_to_use, app_settings)
         return False
-    except Exception as e:
+    except Exception as e:  # Other unexpected errors
         log_map_server(
-            f"{symbols.get('error', '')} Error checking if package '{package_name}' is installed: {e}",
+            f"{symbols.get('error', '❌')} Error checking if package '{package_name}' is installed: {e}",
             "error", logger_to_use, app_settings)
         return False
