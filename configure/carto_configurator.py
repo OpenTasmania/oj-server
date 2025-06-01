@@ -4,12 +4,7 @@
 Handles configuration of CartoCSS project, stylesheet compilation,
 deployment, and font cache updates.
 """
-import datetime
 import logging
-import os
-import re
-import shutil
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from common.command_utils import (
@@ -22,9 +17,6 @@ from setup.config_models import (  # For PGPASSWORD_DEFAULT comparison
     PGPASSWORD_DEFAULT,
     AppSettings,
 )
-
-# Import static_config for truly static paths if needed
-# from setup import config as static_config
 
 module_logger = logging.getLogger(__name__)
 

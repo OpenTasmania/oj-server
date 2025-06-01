@@ -5,7 +5,6 @@ Handles initial setup checks for PostgreSQL.
 Actual package installation is expected to be done by a core prerequisite step.
 """
 import logging
-from typing import Optional
 
 from common.command_utils import check_package_installed, log_map_server
 from setup import (
