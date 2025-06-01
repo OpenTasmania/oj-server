@@ -14,10 +14,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import urwid
 
-# Assuming these are correctly imported relative to the TUI's execution context
-# For the __main__ block, we'll use a DummyConfig.
-# For actual integration, AppSettings would come from the main installer.
-from setup.config_models import AppSettings, SYMBOLS_DEFAULT
+# For actual integration, AppSettings would come from the main installer's loaded config.
+# For the __main__ block, we use a DummyAppSettings.
+from setup.config_models import AppSettings, SYMBOLS_DEFAULT  # Assuming AppSettings can be imported
 from setup.state_manager import view_completed_steps
 from setup.step_executor import execute_step  # This is the real execute_step
 
@@ -62,7 +61,7 @@ class LogDisplay(urwid.WidgetWrap):
         attr = attr_map_key if any((p[0] == attr_map_key for p in palette)) else "body"
         styled_text_widget = urwid.AttrMap(urwid.Text(message), attr)
         self.log_lines.append(styled_text_widget)
-        if self.log_lines:
+        if self.log_lines:  # pragma: no branch
             self.list_box.set_focus(len(self.log_lines) - 1)
 
     def clear_logs(self) -> None:
@@ -124,7 +123,7 @@ class YesNoDialog(urwid.WidgetWrap):
         return super().keypress(size, key)
 
 
-# Step function signature expected by execute_step and thus by _task_runner's 'func'
+# Type alias for step functions expected by execute_step and TUI
 StepFunctionType = Callable[[AppSettings, Optional[logging.Logger]], Any]
 
 
@@ -133,7 +132,7 @@ class InstallerTUI:
 
     def __init__(
             self,
-            defined_tasks: List[Tuple[str, str, StepFunctionType]],  # Use StepFunctionType
+            defined_tasks: List[Tuple[str, str, StepFunctionType]],
             app_settings_instance: AppSettings,  # Added app_settings_instance
     ) -> None:
         self.defined_tasks = defined_tasks
@@ -181,8 +180,9 @@ class InstallerTUI:
         if key == "ctrl c":
             self.confirm_exit_dialog()
         elif key == "q":
-            is_main_menu = isinstance(self.interactive_pane_placeholder.original_widget, urwid.LineBox) and \
-                           self.interactive_pane_placeholder.original_widget.original_widget is self.main_menu_listbox
+            is_main_menu_linebox_widget = self.interactive_pane_placeholder.original_widget
+            is_main_menu = isinstance(is_main_menu_linebox_widget, urwid.LineBox) and \
+                           is_main_menu_linebox_widget.original_widget is self.main_menu_listbox
             if not is_main_menu and not self.is_task_running:
                 self.show_main_menu()
             elif self.is_task_running:
@@ -206,13 +206,12 @@ class InstallerTUI:
             return
         self.log_display.clear_logs()
         self.log_display.add_message("--- Current Configuration ---", "header")
-        # In a real app, self.app_settings would be AppSettings. Here, using the dummy app_config for display.
-        cfg_to_display = self.app_settings  # Use the stored app_settings
+        cfg_to_display = self.app_settings
         try:
             self.log_display.add_message(f"Admin IP: {cfg_to_display.admin_group_ip}", "info")
-            self.log_display.add_message(f"GTFS URL: {cfg_to_display.gtfs_feed_url}", "info")
+            self.log_display.add_message(f"GTFS URL: {str(cfg_to_display.gtfs_feed_url)}", "info")
             self.log_display.add_message(f"VM Domain: {cfg_to_display.vm_ip_or_domain}", "info")
-            # Add more config details from cfg_to_display as needed
+            # Add more details from cfg_to_display as needed
         except AttributeError as e:
             self.log_display.add_message(f"Config item not found: {e}", "error")
         except Exception as e:
@@ -221,13 +220,11 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def show_manage_state(self, button: Optional[urwid.Button] = None) -> None:  # pragma: no cover
-        if self.is_task_running:
-            self.log_display.add_message("Task in progress. Cannot manage state now.", "warning")
-            return
+        if self.is_task_running: self.log_display.add_message("Task in progress. Cannot manage state now.",
+                                                              "warning"); return
         self.log_display.clear_logs()
         self.log_display.add_message("--- Manage State ---", "header")
         try:
-            # view_completed_steps expects AppSettings
             completed = view_completed_steps(app_settings=self.app_settings, current_logger=module_logger)
             if completed:
                 self.log_display.add_message("Completed steps:", "info")
@@ -243,11 +240,10 @@ class InstallerTUI:
     def _task_runner(self, tag: str, desc: str, func: StepFunctionType) -> None:  # pragma: no cover
         success = False
         try:
-            # Corrected call to execute_step: added self.app_settings
             success = execute_step(
                 tag,
                 desc,
-                func,  # func is the actual step function from defined_tasks
+                func,
                 self.app_settings,  # Pass the stored AppSettings instance
                 current_logger_instance=module_logger,
                 prompt_user_for_rerun=self._threaded_prompt_for_rerun,
@@ -301,10 +297,12 @@ class InstallerTUI:
         self._process_next_task_in_queue()
 
     def show_step_selection(self, button: Optional[urwid.Button] = None) -> None:  # pragma: no cover
-        if self.is_task_running: self.log_display.add_message("Task in progress. Cannot select new steps now.",
+        if self.is_task_running:
+            self.log_display.add_message("Task in progress. Cannot select new steps now.",
                                                               "warning")
-        return
-        items_to_run_for_queue: List[Tuple[str, str, StepFunctionType]] = []
+            return
+
+        items_to_run_for_queue: List[Tuple[str, str, StepFunctionType]] = []  # This line is reachable
 
         def on_checklist_change(checkbox: urwid.CheckBox, new_state: bool,
                                 step_data: Tuple[str, str, StepFunctionType]):
@@ -313,18 +311,14 @@ class InstallerTUI:
             else:
                 if step_data in items_to_run_for_queue: items_to_run_for_queue.remove(step_data)
 
-        checklist_items: List[urwid.Widget] = [
-            urwid.Text("No tasks available to select.")] if not self.defined_tasks else \
-            [urwid.AttrMap(
-                urwid.CheckBox(f"{desc} ({tag})", on_state_change=on_checklist_change, user_data=(tag, desc, func_ref)),
-                None, focus_map="checklist_focus")
-             for tag, desc, func_ref in self.defined_tasks]
-        run_button = urwid.AttrMap(urwid.Button("Run Selected", on_press=lambda b: do_run_selected(b)), "button",
-                                   focus_map="button_focus")
-        cancel_button = urwid.AttrMap(urwid.Button("Cancel (Back to Main Menu)", on_press=self.show_main_menu),
-                                      "button", focus_map="button_focus")
-        checklist_lb = urwid.ListBox(
-            urwid.SimpleFocusListWalker(checklist_items + [urwid.Divider(), run_button, cancel_button]))
+        checklist_items: List[urwid.Widget] = []
+        if not self.defined_tasks:
+            checklist_items.append(urwid.Text("No tasks available to select."))
+        else:
+            for tag, desc, func_ref in self.defined_tasks:
+                cb = urwid.CheckBox(f"{desc} ({tag})", on_state_change=on_checklist_change,
+                                    user_data=(tag, desc, func_ref))
+                checklist_items.append(urwid.AttrMap(cb, None, focus_map="checklist_focus"))
 
         def do_run_selected(_btn: urwid.Button):
             if self.is_task_running:
@@ -341,14 +335,19 @@ class InstallerTUI:
                 self.task_queue = list(items_to_run_for_queue)
                 self._process_next_task_in_queue()
 
+        run_button = urwid.AttrMap(urwid.Button("Run Selected", on_press=do_run_selected), "button",
+                                   focus_map="button_focus")
+        cancel_button = urwid.AttrMap(urwid.Button("Cancel (Back to Main Menu)", on_press=self.show_main_menu),
+                                      "button", focus_map="button_focus")
+        list_walker_items = checklist_items + [urwid.Divider(), run_button, cancel_button]
+        checklist_lb = urwid.ListBox(urwid.SimpleFocusListWalker(list_walker_items))
         self._update_interactive_pane(checklist_lb, title="Select Steps to Run")
         self.footer_text.set_text("Space to toggle, Enter on buttons. 'q' for main menu.")
 
     def _show_rerun_dialog_from_worker(self, _loop=None, _data=None) -> None:  # pragma: no cover
         if not self._dialog_prompt_message:
             module_logger.error("No prompt message for rerun dialog from worker.")
-            if self._dialog_event: self._dialog_result = False; self._dialog_event.set()
-            return
+            if self._dialog_event: self._dialog_result = False; self._dialog_event.set(); return
         dialog = YesNoDialog("Confirmation", self._dialog_prompt_message)
         original_top_widget = self.main_loop.widget
 
@@ -364,19 +363,17 @@ class InstallerTUI:
                                               valign="middle", height=("pack", None), min_width=40, min_height=8)
         self.main_loop.draw_screen()
 
-    def _threaded_prompt_for_rerun(self, prompt_message: str) -> bool:  # pragma: no cover
+    # This is the callback for execute_step's prompt_user_for_rerun
+    def _threaded_prompt_for_rerun(self, prompt_message: str, settings: AppSettings,
+                                   logger: Optional[logging.Logger]) -> bool:  # pragma: no cover
+        # Note: settings and logger from execute_step are not directly used here
+        # as the dialog uses self.app_settings implicitly if it needed to display richer info.
+        # For a simple Yes/No, only prompt_message is crucial.
         if threading.current_thread() is threading.main_thread():
-            module_logger.warning("_threaded_prompt_for_rerun called from main thread, using original.")
-            # When called by execute_step, it needs app_settings.
-            # The original tui_prompt_for_rerun doesn't take app_settings. This is a design inconsistency.
-            # For now, assuming the TUI's self.app_settings is the one to use for its own prompts.
-            return self.tui_prompt_for_rerun(prompt_message)  # This will use a new MainLoop for the prompt.
-            # This needs careful review if TUI is deeply nested.
-            # The execute_step's prompt_user_for_rerun callback expects:
-            # (prompt: str, app_settings: AppSettings, logger: Optional[logging.Logger]) -> bool
-            # Our self._threaded_prompt_for_rerun has sig (prompt_message: str) -> bool
-            # This mismatch needs to be harmonized.
-            # For now, _threaded_prompt_for_rerun directly calls tui_prompt_for_rerun.
+            (logger or module_logger).warning(
+                "_threaded_prompt_for_rerun called from main thread unexpectedly, using direct TUI prompt.")
+            return self.tui_prompt_for_rerun(prompt_message)  # Fallback to simpler prompt
+
         self._dialog_event = threading.Event()
         self._dialog_prompt_message = prompt_message
         self._dialog_result = None
@@ -386,11 +383,9 @@ class InstallerTUI:
         self._dialog_prompt_message = ""
         return self._dialog_result if self._dialog_result is not None else False
 
-    # This is the prompt function if called from the main TUI thread for its own purposes
     def tui_prompt_for_rerun(self, prompt_message: str) -> bool:  # pragma: no cover
-        # This version is for prompts originating from the TUI itself, not from execute_step's callback.
         if threading.current_thread() is not threading.main_thread():
-            module_logger.error("FATAL: tui_prompt_for_rerun (original) called from non-main thread!")
+            module_logger.error("FATAL: tui_prompt_for_rerun (direct) called from non-main thread!")
             return False
         original_main_loop_widget = self.main_loop.widget
         dialog = YesNoDialog("Confirmation", prompt_message)
@@ -432,13 +427,13 @@ class InstallerTUI:
 
     def run(self) -> None:
         self.tui_log_handler = TuiLogHandler(self.log_display, self.main_loop)
-        self.tui_log_handler.setLevel(logging.DEBUG)  # TUI handler catches all
+        self.tui_log_handler.setLevel(logging.DEBUG)
         root_logger = logging.getLogger()
         self._original_root_logger_level = root_logger.level
         self._original_root_handlers = list(root_logger.handlers)
         self._removed_handlers_by_tui.clear()
         self._root_logger_level_modified_by_tui = False
-        if root_logger.level == 0 or root_logger.level > logging.DEBUG:  # NOTSET or > DEBUG
+        if root_logger.level == 0 or root_logger.level > logging.DEBUG:
             root_logger.setLevel(logging.DEBUG)
             self._root_logger_level_modified_by_tui = True
             module_logger.debug(
@@ -474,8 +469,8 @@ class InstallerTUI:
 
 
 def run_tui_installer(
-        defined_tasks: List[Tuple[str, str, StepFunctionType]],  # Use StepFunctionType
-        app_settings: AppSettings  # Expect AppSettings here
+        defined_tasks: List[Tuple[str, str, StepFunctionType]],
+        app_settings: AppSettings
 ) -> None:  # pragma: no cover
     app = InstallerTUI(defined_tasks=defined_tasks, app_settings_instance=app_settings)
     app.run()
@@ -483,19 +478,19 @@ def run_tui_installer(
 
 if __name__ == "__main__":  # pragma: no cover
     print("Running TUI in standalone test mode...", file=sys.stderr)
-    if not logging.getLogger().handlers:
+    if not logging.getLogger().handlers:  # Basic logging for standalone test if not already set up
         logging.basicConfig(level=logging.DEBUG, stream=sys.stderr,
                             format="[TUI-STANDALONE-TEST] %(asctime)s %(levelname)s %(name)s: %(message)s")
         module_logger.info("TUI __main__: BasicConfig logging configured for standalone test.")
 
 
-    # Create a dummy AppSettings for standalone TUI testing
+    # Dummy AppSettings for standalone TUI testing
     class DummyAppSettings(AppSettings):
-        admin_group_ip: str = "192.168.1.0/24"
-        gtfs_feed_url: str = "http://example.com/gtfs.zip"
-        vm_ip_or_domain: str = "dummy.example.com"
-        # Populate other fields with defaults or dummy values as needed by TUI views or step functions
-        # For simplicity, many will use Pydantic defaults.
+        admin_group_ip: str = "192.168.1.0/24 (dummy)"
+        gtfs_feed_url: str = "http://example.com/gtfs.zip (dummy)"
+        vm_ip_or_domain: str = "dummy.example.com (dummy)"
+        # For simplicity, allow other fields to use Pydantic defaults.
+        # Ensure `symbols` is available.
         symbols: Dict[str, str] = SYMBOLS_DEFAULT.copy()
 
 
@@ -510,17 +505,17 @@ if __name__ == "__main__":  # pragma: no cover
         (cl or module_logger).info("Example Step Alpha finished.")
 
 
-    has_beta_failed_once = False
+    has_beta_failed_once_tui_test = False  # Make it specific to this test scope
 
 
     def example_step_beta_fails_and_reruns(settings: AppSettings, cl: Optional[logging.Logger]):
-        global has_beta_failed_once
+        global has_beta_failed_once_tui_test
         (cl or module_logger).info(
             f"Executing Example Step Beta (will fail first time) for domain: {settings.vm_ip_or_domain}...")
         import time
         time.sleep(1)
-        if not has_beta_failed_once:
-            has_beta_failed_once = True
+        if not has_beta_failed_once_tui_test:
+            has_beta_failed_once_tui_test = True
             (cl or module_logger).error("Something went wrong in Beta!")
             raise ValueError("Beta step simulated failure (1st time)")
         (cl or module_logger).info("Example Step Beta (rerun) finished successfully.")
@@ -532,15 +527,13 @@ if __name__ == "__main__":  # pragma: no cover
         ("GAMMA_STEP", "Run Example Step Gamma (OK, 2s)", example_step_alpha),
     ]
 
-    _original_real_execute_step = execute_step  # Keep a reference to the real one
+    _original_real_execute_step_tui = execute_step
 
 
-    # Monkey patch execute_step for the TUI standalone test to simulate its behavior
-    # This dummy version now matches the real signature
     def dummy_execute_step_for_tui_test(
             tag: str, desc: str,
-            func: StepFunctionType,  # Callable[[AppSettings, Optional[logging.Logger]], Any]
-            app_settings_param: AppSettings,  # Matches real execute_step
+            func: StepFunctionType,
+            app_settings_param: AppSettings,
             current_logger_instance: Optional[logging.Logger],
             prompt_user_for_rerun_cb: Callable[[str, AppSettings, Optional[logging.Logger]], bool],
     ) -> bool:
@@ -548,15 +541,11 @@ if __name__ == "__main__":  # pragma: no cover
         effective_logger.info(
             f"[DummyTUI Exec] Attempting: {desc} with app_settings.domain = {app_settings_param.vm_ip_or_domain}")
         try:
-            func(app_settings_param, effective_logger)  # Call func with app_settings and logger
+            func(app_settings_param, effective_logger)
             effective_logger.info(f"[DummyTUI Exec] Completed: {desc}")
             return True
         except Exception as e:
             effective_logger.error(f"[DummyTUI Exec] FAILED: {desc} with {e}")
-            # The prompt_user_for_rerun_cb is self._threaded_prompt_for_rerun
-            # which now calls self.tui_prompt_for_rerun (which is a simple Yes/No without AppSettings)
-            # This part of the dummy needs to align with how prompt is actually called by real execute_step.
-            # For simplicity, let's make the dummy prompt always use the passed logger.
             if prompt_user_for_rerun_cb(f"'{desc}' failed. Rerun?", app_settings_param, effective_logger):
                 effective_logger.info(f"[DummyTUI Exec] User chose to rerun: {desc}")
                 try:
@@ -571,24 +560,24 @@ if __name__ == "__main__":  # pragma: no cover
                 return False
 
 
-    execute_step = dummy_execute_step_for_tui_test  # Monkey patch
+    execute_step = dummy_execute_step_for_tui_test
 
-    _original_view_completed_steps = view_completed_steps
+    _original_view_completed_steps_tui = view_completed_steps
 
 
     def dummy_view_completed_steps_for_tui(app_settings_param: AppSettings,
                                            current_logger_param: Optional[logging.Logger]) -> List[str]:
         (current_logger_param or module_logger).info(
-            f"[Dummy State] Viewing completed steps for domain {app_settings_param.vm_ip_or_domain}.")
+            f"[Dummy State] Viewing completed steps for config with domain '{app_settings_param.vm_ip_or_domain}'.")
         return ["PREVIOUS_DUMMY_STEP_1", "PREVIOUS_DUMMY_STEP_2"]
 
 
-    view_completed_steps = dummy_view_completed_steps_for_tui  # Monkey patch
+    view_completed_steps = dummy_view_completed_steps_for_tui
 
     try:
         run_tui_installer(defined_tasks=DUMMY_TASKS_FOR_STANDALONE, app_settings=dummy_app_settings)
     finally:
-        execute_step = _original_real_execute_step  # Restore real execute_step
-        view_completed_steps = _original_view_completed_steps  # Restore
-        has_beta_failed_once = False  # Reset global for dummy step
+        execute_step = _original_real_execute_step_tui
+        view_completed_steps = _original_view_completed_steps_tui
+        has_beta_failed_once_tui_test = False  # Reset test global
         print("Standalone TUI test finished.", file=sys.stderr)
