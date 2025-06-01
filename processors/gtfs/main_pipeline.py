@@ -97,7 +97,7 @@ def run_full_gtfs_etl_pipeline() -> bool:
         module_logger.info("--- Step 2: Reading Feed with gtfs-kit ---")
         feed = gtfs_kit.read_feed(str(TEMP_EXTRACT_PATH), dist_units="km")
         module_logger.info(
-            f"Feed loaded. Detected tables: {list(feed.list_fields().keys())}"
+            f"Feed loaded. Detected tables: {list(feed.list_fields().keys())}" # type: ignore[attr-defined]
         )
         module_logger.warning(
             "--- Feed Validation Responsibility --- This pipeline assumes input GTFS data has been validated. Proceeding."
@@ -183,8 +183,8 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
                 df_transformed: pd.DataFrame
                 if table_base_name == "stops":
-                    if feed.stops is not None and not feed.stops.empty:
-                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops)
+                    if feed.stops is not None and not feed.stops.empty:  # type: ignore[attr-defined]
+                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops)  # type: ignore[attr-defined]
                         df_transformed = (
                             stops_gdf.copy()
                             if stops_gdf is not None
@@ -199,9 +199,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
                         table_base_name == "shapes"
                         and gtfs_filename_key == "shapes.txt"
                 ):
-                    if feed.shapes is not None and not feed.shapes.empty:
+                    if feed.shapes is not None and not feed.shapes.empty:  # type: ignore[attr-defined]
                         shapes_lines_gdf = gtfs_kit.geometrize_shapes(
-                            feed.shapes
+                            feed.shapes  # type: ignore[attr-defined]
                         )
                         if (
                                 shapes_lines_gdf is not None
