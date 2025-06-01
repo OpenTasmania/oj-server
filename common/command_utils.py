@@ -21,10 +21,13 @@ def log_map_server(
         level: str = "info",
         current_logger: Optional[logging.Logger] = None,
         app_settings: Optional[AppSettings] = None,
+        exc_info: bool = False,  # Add exc_info parameter, default to False
+        # Alternative for exc_info type: exc_info: Any = False, to match logging's flexibility
 ) -> None:
     """
     Log a message using the provided logger or a default module logger.
     Uses symbols from app_settings if provided, otherwise default symbols.
+    Can also log exception information if exc_info is True.
     """
     effective_logger = current_logger if current_logger else module_logger
 
@@ -36,21 +39,19 @@ def log_map_server(
     ):
         symbols_to_use = app_settings.symbols
 
-    # Note: Actual symbol insertion into the message string is assumed to be done by the caller
-    # or specific log messages. This function primarily handles routing to the correct log level.
-    # If automatic prefixing with a symbol based on level was intended, that logic would go here.
-    # For now, it respects the message as given.
+    # Note: Actual symbol insertion into the message string is assumed to be done by the caller.
+    # This function primarily handles routing to the correct log level and passing exc_info.
 
     if level == "warning":
-        effective_logger.warning(message)
+        effective_logger.warning(message, exc_info=exc_info)
     elif level == "error":
-        effective_logger.error(message)
+        effective_logger.error(message, exc_info=exc_info) # Pass exc_info here
     elif level == "critical":
-        effective_logger.critical(message)
+        effective_logger.critical(message, exc_info=exc_info) # Pass exc_info here
     elif level == "debug":
-        effective_logger.debug(message)
+        effective_logger.debug(message, exc_info=exc_info) # Generally not used for exc_info, but possible
     else:  # Default to info
-        effective_logger.info(message)
+        effective_logger.info(message, exc_info=exc_info) # Generally not used for exc_info, but possible
 
 
 def _get_elevated_command_prefix() -> List[str]:
