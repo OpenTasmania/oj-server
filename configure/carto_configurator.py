@@ -222,6 +222,70 @@ def compile_osm_carto_stylesheet(
         os.chdir(original_cwd)
 
 
+def deploy_mapnik_stylesheet(
+        compiled_xml_path_str: str,
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
+) -> None:
+    """Deploys the compiled Mapnik XML stylesheet."""
+    logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
+    log_map_server(
+        f"{symbols.get('step', '➡️')} Deploying compiled mapnik.xml...",
+        "info",
+        logger_to_use,
+        app_settings,
+    )
+
+    if not compiled_xml_path_str:  # Check if path is None or empty
+        log_map_server(
+            f"{symbols.get('error', '❌')} Compiled mapnik.xml path is not provided. Cannot deploy.",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        raise ValueError("Compiled XML path is required for deployment.")
+
+    source_mapnik_xml = Path(compiled_xml_path_str)
+    if (
+            not source_mapnik_xml.is_file()
+            or source_mapnik_xml.stat().st_size == 0
+    ):
+        log_map_server(
+            f"{symbols.get('error', '❌')} Compiled mapnik.xml at {source_mapnik_xml} is missing or empty. Cannot deploy.",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        raise FileNotFoundError(
+            f"Valid mapnik.xml not found at {source_mapnik_xml} for deployment."
+        )
+
+    target_dir = Path(MAPNIK_STYLE_TARGET_DIR_CONFIG)
+    target_xml_path = target_dir / "mapnik.xml"  # Standard name in target dir
+
+    run_elevated_command(
+        ["mkdir", "-p", str(target_dir)],
+        app_settings,
+        current_logger=logger_to_use,
+    )
+    run_elevated_command(
+        ["cp", str(source_mapnik_xml), str(target_xml_path)],
+        app_settings,
+        current_logger=logger_to_use,
+    )
+    run_elevated_command(
+        ["chmod", "644", str(target_xml_path)],
+        app_settings,
+        current_logger=logger_to_use,
+    )  # Standard read permissions
+    log_map_server(
+        f"{symbols.get('success', '✅')} mapnik.xml copied to {target_xml_path}",
+        "success",
+        logger_to_use,
+        app_settings,
+    )
+
 def finalize_carto_directory_processing(
         app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
