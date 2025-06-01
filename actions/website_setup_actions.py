@@ -9,13 +9,12 @@ from pathlib import Path  # For path handling
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
+from common.system_utils import get_current_script_hash
 from setup import (
     config as static_config,  # For SCRIPT_VERSION if used in {script_version_short}
 )
 from setup.config_models import AppSettings  # For type hinting
-from setup.state_manager import (
-    get_current_script_hash,  # For {script_hash} if preferred
-)
+
 
 module_logger = logging.getLogger(__name__)
 

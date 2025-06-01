@@ -13,7 +13,7 @@ from common.command_utils import (
     run_elevated_command,
 )
 from common.file_utils import backup_file
-from common.system_utils import systemd_reload
+from common.system_utils import systemd_reload,get_current_script_hash
 # Import static_config for fixed paths or truly static values
 from setup import config as static_config
 # Import AppSettings for type hinting
@@ -21,7 +21,6 @@ from setup.config_models import (  # For default comparison
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
 )
-from setup.state_manager import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 

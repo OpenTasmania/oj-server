@@ -7,7 +7,7 @@ Handles Command Line Interface (CLI) interactions for the map server setup.
 import datetime
 import logging
 from typing import Optional
-
+from common.system_utils import get_current_script_hash
 from common.command_utils import log_map_server
 # get_current_script_hash is now in common.system_utils, state_manager imports it
 # Import static_config for OSM_PROJECT_ROOT, STATE_FILE_PATH, SCRIPT_VERSION
@@ -101,9 +101,8 @@ def view_configuration(
     config_text += (
         f"  State File Path (static):      {static_config.STATE_FILE_PATH}\n"
     )
-    # common_get_current_script_hash needs app_settings for its internal logging too
     current_hash = (
-            common_get_current_script_hash(
+            get_current_script_hash(
                 project_root_dir=static_config.OSM_PROJECT_ROOT,
                 app_settings=app_config,
                 current_logger=logger_to_use,

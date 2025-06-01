@@ -18,7 +18,7 @@ from common.file_utils import backup_file
 from common.network_utils import validate_cidr
 from setup import config as static_config
 from setup.config_models import AppSettings
-from setup.state_manager import get_current_script_hash
+from common.system_utils import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 

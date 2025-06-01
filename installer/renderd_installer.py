@@ -6,7 +6,7 @@ and systemd service file definition.
 """
 import logging
 from typing import Optional
-
+from pathlib import Path
 from common.command_utils import (
     check_package_installed,
     log_map_server,
@@ -16,7 +16,7 @@ from setup import (
     config as static_config,  # For SCRIPT_VERSION via get_current_script_hash indirectly
 )
 from setup.config_models import AppSettings  # For type hinting
-from setup.state_manager import get_current_script_hash
+from common.system_utils import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 
