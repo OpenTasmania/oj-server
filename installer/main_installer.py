@@ -856,24 +856,19 @@ def systemd_reload_step_group(
 def run_full_gtfs_module_wrapper(
         app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
 ):
-    db_p = {
-        "PGHOST": app_cfg.pg.host,
-        "PGPORT": str(app_cfg.pg.port),
-        "PGDATABASE": app_cfg.pg.database,
-        "PGUSER": app_cfg.pg.user,
-        "PGPASSWORD": app_cfg.pg.password,
-    }
-    gtfs_app_log_file = "/var/log/gtfs_processor_app.log"
-    cron_job_output_log_file = "/var/log/gtfs_cron_output.log"
+    """
+    Wrapper to call the main GTFS processing and setup orchestrator.
+    The orchestrator `process_and_setup_gtfs` will use app_cfg to derive
+    all its necessary configurations (GTFS URL, DB params, paths, etc.).
+    """
+    # The explicit construction of db_params, log file paths, etc., here
+    # is no longer needed for the call to process_and_setup_gtfs, as it
+    # will source these from the app_cfg (AppSettings) object directly
+    # or use defaults defined within its own modules if not specified in AppSettings.
+
     process_and_setup_gtfs(
-        gtfs_feed_url=str(app_cfg.gtfs_feed_url),
-        db_params=db_p,
-        project_root=Path(static_config.OSM_PROJECT_ROOT),
-        gtfs_app_log_file=gtfs_app_log_file,
-        cron_run_user=app_cfg.pg.user,
-        cron_job_output_log_file=cron_job_output_log_file,
-        orchestrator_logger=calling_logger,
         app_settings=app_cfg,
+        orchestrator_logger=calling_logger
     )
 
 
