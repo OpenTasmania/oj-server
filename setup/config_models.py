@@ -479,27 +479,6 @@ class NginxSettings(BaseSettings):
     )
 
 
-class PgTileservSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PGTS_", extra="ignore")
-    http_host: str = Field(
-        default="0.0.0.0", description="Host pg_tileserv binds to."
-    )
-    http_port: int = Field(
-        default=7800, description="Port pg_tileserv listens on."
-    )
-    default_max_features: int = Field(default=10000)
-    publish_schemas: str = Field(
-        default="public,gtfs",
-        description="Comma-separated list of schemas to publish.",
-    )
-    uri_prefix: str = Field(
-        default="/vector",
-        description="Base URI prefix for tile requests (used in Nginx proxy).",
-    )
-    development_mode: bool = Field(default=False)
-    allow_function_sources: bool = Field(default=True)
-    # config_template: Optional[str] = Field(default=None, description="Full template for pg_tileserv config.toml. If None, one is generated.")
-
 
 class OsrmServiceSettings(
     BaseSettings
