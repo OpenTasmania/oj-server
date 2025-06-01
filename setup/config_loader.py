@@ -21,7 +21,7 @@ import yaml  # PyYAML - ensure this is in dependencies
 
 # Assuming your Pydantic models are in setup.config_models
 # Adjust import if structure is different
-from .config_models import AppSettings, PostgresSettings
+from .config_models import AppSettings
 
 
 def _deep_update(source: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:

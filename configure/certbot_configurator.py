@@ -9,7 +9,10 @@ import subprocess
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from setup.config_models import AppSettings, VM_IP_OR_DOMAIN_DEFAULT  # For type hinting & default comparison
+from setup.config_models import (  # For type hinting & default comparison
+    VM_IP_OR_DOMAIN_DEFAULT,
+    AppSettings,
+)
 
 # from setup import config as static_config # Not needed if symbols come from app_settings
 

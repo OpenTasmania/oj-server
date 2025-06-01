@@ -7,8 +7,10 @@ Actual package installation is expected to be done by a core prerequisite step.
 import logging
 from typing import Optional
 
-from common.command_utils import log_map_server, check_package_installed
-from setup import config  # For SYMBOLS and package list reference (config.POSTGRES_PACKAGES)
+from common.command_utils import check_package_installed, log_map_server
+from setup import (
+    config,  # For SYMBOLS and package list reference (config.POSTGRES_PACKAGES)
+)
 
 module_logger = logging.getLogger(__name__)
 

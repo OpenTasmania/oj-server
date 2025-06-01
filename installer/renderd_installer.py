@@ -8,10 +8,14 @@ import logging
 from typing import Optional
 
 from common.command_utils import (
-    log_map_server, run_elevated_command, check_package_installed
+    check_package_installed,
+    log_map_server,
+    run_elevated_command,
+)
+from setup import (
+    config as static_config,  # For SCRIPT_VERSION via get_current_script_hash indirectly
 )
 from setup.config_models import AppSettings  # For type hinting
-from setup import config as static_config  # For SCRIPT_VERSION via get_current_script_hash indirectly
 from setup.state_manager import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)

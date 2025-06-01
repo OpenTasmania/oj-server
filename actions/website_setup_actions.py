@@ -4,15 +4,18 @@
 Handles deployment of the static test website page.
 """
 import logging
-import os
 import re  # For IP check
 from pathlib import Path  # For path handling
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
+from setup import (
+    config as static_config,  # For SCRIPT_VERSION if used in {script_version_short}
+)
 from setup.config_models import AppSettings  # For type hinting
-from setup import config as static_config  # For SCRIPT_VERSION if used in {script_version_short}
-from setup.state_manager import get_current_script_hash  # For {script_hash} if preferred
+from setup.state_manager import (
+    get_current_script_hash,  # For {script_hash} if preferred
+)
 
 module_logger = logging.getLogger(__name__)
 
@@ -55,8 +58,8 @@ def deploy_test_website_content(
 
     # If Certbot has run and Nginx is configured for SSL, scheme should be https
     # This is a simplified check; a more robust way is needed if Certbot state isn't directly in AppSettings
-    if not (app_settings.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT or \
-            bool(re.fullmatch(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", app_settings.vm_ip_or_domain)) or \
+    if not (app_settings.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT or 
+            bool(re.fullmatch(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", app_settings.vm_ip_or_domain)) or 
             app_settings.vm_ip_or_domain.lower() == "localhost"):
         # If it's a proper domain, assume Certbot might have run or will run
         # A better way would be to check if Nginx is listening on 443 or if certs exist

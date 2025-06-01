@@ -5,7 +5,7 @@ Handles the execution of the GTFS ETL pipeline and subsequent data verification.
 """
 import logging
 import os
-from typing import Optional, Dict
+from typing import Optional
 
 from common.command_utils import log_map_server, run_command
 from setup.config_models import AppSettings  # Import AppSettings

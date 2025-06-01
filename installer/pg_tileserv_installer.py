@@ -13,11 +13,14 @@ from pathlib import Path  # Added Path
 from typing import Optional
 
 from common.command_utils import (
-    command_exists, log_map_server, run_command, run_elevated_command,
+    command_exists,
+    log_map_server,
+    run_command,
+    run_elevated_command,
 )
-from setup.config_models import AppSettings
-from setup import config as static_config
 from common.system_utils import get_current_script_hash
+from setup import config as static_config
+from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
 

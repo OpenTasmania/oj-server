@@ -9,11 +9,11 @@ from pathlib import Path
 from pwd import getpwnam
 from shutil import which
 from tempfile import NamedTemporaryFile
-from typing import Optional, Dict
+from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from setup.config_models import AppSettings  # Import AppSettings
 from setup import config as static_config  # For OSM_PROJECT_ROOT
+from setup.config_models import AppSettings  # Import AppSettings
 
 module_logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ def configure_gtfs_update_cronjob(
         final_content = "\n".join(new_lines) + "\n"
 
         with NamedTemporaryFile(mode="w", delete=False, prefix="gtfscron_") as temp_f:
-            temp_f.write(final_content);
+            temp_f.write(final_content)
             temp_cron_file = temp_f.name
 
         install_cmd = ["crontab"]

@@ -17,7 +17,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import psycopg
-from psycopg import Connection as PgConnection, Cursor as PgCursor
+from psycopg import Connection as PgConnection
+from psycopg import Cursor as PgCursor
 from psycopg import sql
 
 module_logger = logging.getLogger(__name__)

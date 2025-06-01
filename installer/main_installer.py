@@ -10,101 +10,132 @@ import argparse
 import logging
 import os
 import sys
-from typing import Any, Callable, Dict, List, Optional, Tuple
 from pathlib import Path
-
-# New configuration system imports
-from setup.config_models import (
-    AppSettings,
-    ADMIN_GROUP_IP_DEFAULT, GTFS_FEED_URL_DEFAULT, VM_IP_OR_DOMAIN_DEFAULT,
-    PG_TILESERV_BINARY_LOCATION_DEFAULT, LOG_PREFIX_DEFAULT,
-    PGHOST_DEFAULT, PGPORT_DEFAULT, PGDATABASE_DEFAULT, PGUSER_DEFAULT, PGPASSWORD_DEFAULT,
-    CONTAINER_RUNTIME_COMMAND_DEFAULT, OSRM_IMAGE_TAG_DEFAULT, APACHE_LISTEN_PORT_DEFAULT
-)
-from setup.config_loader import load_app_settings
-
-# Static constants and core setup utilities
-from setup import config as static_config
-from setup.cli_handler import cli_prompt_for_rerun, view_configuration
-from setup.core_prerequisites import (
-    core_prerequisites_group,
-    boot_verbosity as prereq_boot_verbosity,
-    core_conflict_removal
-)
-from setup.state_manager import (
-    clear_state_file, initialize_state_system, view_completed_steps,
-
-)
-from setup.step_executor import execute_step
-from common.system_utils import get_current_script_hash
-
-# Common utilities (now refactored to accept AppSettings)
-from common.command_utils import log_map_server
-from common.pgpass_utils import setup_pgpass
-from common.system_utils import systemd_reload
-from common.core_utils import setup_logging as common_setup_logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Import all individual step functions
 # (These are assumed to be refactored to accept (app_settings, logger))
 from actions.website_setup_actions import deploy_test_website_content
 
+# Common utilities (now refactored to accept AppSettings)
+from common.command_utils import log_map_server
+from common.core_utils import setup_logging as common_setup_logging
+from common.pgpass_utils import setup_pgpass
+from common.system_utils import get_current_script_hash, systemd_reload
 from configure.apache_configurator import (
-    configure_apache_ports, create_mod_tile_config, create_apache_tile_site_config,
-    manage_apache_modules_and_sites, activate_apache_service
+    activate_apache_service,
+    configure_apache_ports,
+    create_apache_tile_site_config,
+    create_mod_tile_config,
+    manage_apache_modules_and_sites,
 )
 from configure.carto_configurator import (
-    compile_osm_carto_stylesheet, deploy_mapnik_stylesheet, finalize_carto_directory_processing,
-    update_font_cache
+    compile_osm_carto_stylesheet,
+    deploy_mapnik_stylesheet,
+    finalize_carto_directory_processing,
+    update_font_cache,
 )
 from configure.certbot_configurator import run_certbot_nginx
 from configure.nginx_configurator import (
-    create_nginx_proxy_site_config, manage_nginx_sites, test_nginx_configuration,
-    activate_nginx_service
+    activate_nginx_service,
+    create_nginx_proxy_site_config,
+    manage_nginx_sites,
+    test_nginx_configuration,
 )
 from configure.osrm_configurator import (
-    create_osrm_routed_service_file, activate_osrm_routed_service
+    activate_osrm_routed_service,
+    create_osrm_routed_service_file,
 )
 from configure.pg_tileserv_configurator import (
-    create_pg_tileserv_config_file, activate_pg_tileserv_service
+    activate_pg_tileserv_service,
+    create_pg_tileserv_config_file,
 )
 from configure.postgres_configurator import (
-    create_postgres_user_and_db, enable_postgres_extensions, set_postgres_permissions,
-    customize_postgresql_conf, customize_pg_hba_conf, restart_and_enable_postgres_service
+    create_postgres_user_and_db,
+    customize_pg_hba_conf,
+    customize_postgresql_conf,
+    enable_postgres_extensions,
+    restart_and_enable_postgres_service,
+    set_postgres_permissions,
 )
 from configure.renderd_configurator import (
-    create_renderd_conf_file, activate_renderd_service
+    activate_renderd_service,
+    create_renderd_conf_file,
 )
-from configure.ufw_configurator import apply_ufw_rules, activate_ufw_service
-
-from dataproc.osrm_data_processor import extract_regional_pbfs_with_osmium, build_osrm_graphs_for_region
-from dataproc.raster_processor import raster_tile_prerender
+from configure.ufw_configurator import activate_ufw_service, apply_ufw_rules
 from dataproc.data_processing import data_prep_group
-
+from dataproc.osrm_data_processor import (
+    build_osrm_graphs_for_region,
+    extract_regional_pbfs_with_osmium,
+)
+from dataproc.raster_processor import raster_tile_prerender
 from installer.apache_installer import ensure_apache_packages_installed
 from installer.carto_installer import (
-    install_carto_cli, setup_osm_carto_repository, prepare_carto_directory_for_processing,
-    fetch_carto_external_data
+    fetch_carto_external_data,
+    install_carto_cli,
+    prepare_carto_directory_for_processing,
+    setup_osm_carto_repository,
 )
 from installer.certbot_installer import install_certbot_packages
 from installer.docker_installer import install_docker_engine
 from installer.nginx_installer import ensure_nginx_package_installed
 from installer.nodejs_installer import install_nodejs_lts
 from installer.osrm_installer import (
-    ensure_osrm_dependencies, setup_osrm_data_directories, download_base_pbf,
-    prepare_region_boundaries
+    download_base_pbf,
+    ensure_osrm_dependencies,
+    prepare_region_boundaries,
+    setup_osrm_data_directories,
 )
 from installer.pg_tileserv_installer import (
-    download_and_install_pg_tileserv_binary, create_pg_tileserv_system_user,
-    setup_pg_tileserv_binary_permissions, create_pg_tileserv_systemd_service_file
+    create_pg_tileserv_system_user,
+    create_pg_tileserv_systemd_service_file,
+    download_and_install_pg_tileserv_binary,
+    setup_pg_tileserv_binary_permissions,
 )
-from installer.postgres_installer import ensure_postgres_packages_are_installed
+from installer.postgres_installer import (
+    ensure_postgres_packages_are_installed,
+)
 from installer.renderd_installer import (
-    ensure_renderd_packages_installed, create_renderd_directories,
-    create_renderd_systemd_service_file
+    create_renderd_directories,
+    create_renderd_systemd_service_file,
+    ensure_renderd_packages_installed,
 )
 from installer.ufw_installer import ensure_ufw_package_installed
-
 from processors.gtfs.orchestrator import process_and_setup_gtfs
+
+# Static constants and core setup utilities
+from setup import config as static_config
+from setup.cli_handler import cli_prompt_for_rerun, view_configuration
+from setup.config_loader import load_app_settings
+
+# New configuration system imports
+from setup.config_models import (
+    ADMIN_GROUP_IP_DEFAULT,
+    APACHE_LISTEN_PORT_DEFAULT,
+    CONTAINER_RUNTIME_COMMAND_DEFAULT,
+    GTFS_FEED_URL_DEFAULT,
+    LOG_PREFIX_DEFAULT,
+    OSRM_IMAGE_TAG_DEFAULT,
+    PG_TILESERV_BINARY_LOCATION_DEFAULT,
+    PGDATABASE_DEFAULT,
+    PGHOST_DEFAULT,
+    PGPASSWORD_DEFAULT,
+    PGPORT_DEFAULT,
+    PGUSER_DEFAULT,
+    VM_IP_OR_DOMAIN_DEFAULT,
+    AppSettings,
+)
+from setup.core_prerequisites import boot_verbosity as prereq_boot_verbosity
+from setup.core_prerequisites import (
+    core_conflict_removal,
+    core_prerequisites_group,
+)
+from setup.state_manager import (
+    clear_state_file,
+    initialize_state_system,
+    view_completed_steps,
+)
+from setup.step_executor import execute_step
 
 logger = logging.getLogger(__name__)
 APP_CONFIG: Optional[AppSettings] = None  # Global APP_CONFIG, populated in main_map_server_entry
@@ -305,7 +336,7 @@ def certbot_full_setup_sequence(app_cfg: AppSettings, current_logger: Optional[l
     for tag, desc, func in steps:
         if not execute_step(tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun):
             log_map_server(f"{app_cfg.symbols.get('warning', '!')} Certbot step '{desc}' failed/skipped.", "warning",
-                           logger_to_use, app_cfg);
+                           logger_to_use, app_cfg)
             break
     log_map_server(f"--- {app_cfg.symbols.get('success', '✅')} Certbot Full Setup Attempted ---", "success",
                    logger_to_use, app_cfg)
@@ -476,7 +507,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     group_flags_grp.add_argument("--systemd-reload", dest="group_systemd_reload_flag", action="store_true",
                                  help="Run systemd reload (as a group action).")
 
-    dev_grp = parser.add_argument_group("Developer Options");
+    dev_grp = parser.add_argument_group("Developer Options")
     dev_grp.add_argument("--dev-override-unsafe-password", action="store_true", dest="dev_override_unsafe_password")
 
     parsed_cli_args = parser.parse_args(cli_args_list if cli_args_list is not None else sys.argv[1:])
@@ -553,7 +584,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "osrm": ("OSRM_FULL_SETUP", "OSRM Full Setup"),
     })
 
-    overall_success = True;
+    overall_success = True
     action_taken = False
     tasks_to_run: List[Dict[str, Any]] = []
 
@@ -567,8 +598,8 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
 
     if parsed_cli_args.run_all_core_prerequisites and not any(
             t['tag'] == ALL_CORE_PREREQUISITES_GROUP_TAG for t in tasks_to_run):
-        action_taken = True;
-        tag, desc = cli_flag_to_task_details["run_all_core_prerequisites"];
+        action_taken = True
+        tag, desc = cli_flag_to_task_details["run_all_core_prerequisites"]
         func = defined_tasks_callable_map["run_all_core_prerequisites"]
         tasks_to_run.insert(0, {"tag": tag, "desc": desc, "func": func})
 
@@ -606,12 +637,12 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                                                    APP_CONFIG); continue
             log_map_server(f"--- Executing: {desc} ({tag}) ---", "info", logger, APP_CONFIG)
             if not execute_step(tag, desc, phase_func, APP_CONFIG, logger, cli_prompt_for_rerun):
-                overall_success = False;
-                log_map_server(f"Phase '{desc}' failed.", "error", logger, APP_CONFIG);
+                overall_success = False
+                log_map_server(f"Phase '{desc}' failed.", "error", logger, APP_CONFIG)
                 break
 
     elif parsed_cli_args.services:
-        action_taken = True;
+        action_taken = True
         log_map_server(f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running All Service Setups", "info", logger,
                        APP_CONFIG)
         service_orchestrator_cli_keys = ["ufw", "postgres", "pgtileserv", "carto", "renderd", "osrm", "apache", "nginx",
@@ -627,7 +658,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                                 cli_prompt_for_rerun): overall_success = False
 
     elif parsed_cli_args.data:  # data_prep_group orchestrates this
-        action_taken = True;
+        action_taken = True
         log_map_server(f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Data Tasks (via data_prep_group)", "info",
                        logger, APP_CONFIG)
         # The data_prep_group itself can be a single step with its own tag if desired, or call its components
@@ -645,7 +676,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             parsed_cli_args.view_config or parsed_cli_args.view_state or parsed_cli_args.clear_state):
         log_map_server(f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No action specified. Displaying help.", "info", logger,
                        APP_CONFIG)
-        parser.print_help(sys.stderr);
+        parser.print_help(sys.stderr)
         return 2
 
     if not overall_success: log_map_server(f"{APP_CONFIG.symbols.get('critical', '🔥')} One or more steps failed.",

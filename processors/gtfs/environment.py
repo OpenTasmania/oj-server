@@ -8,7 +8,7 @@ import logging
 import os
 from getpass import getuser
 from grp import getgrgid
-from typing import Optional, Dict
+from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
 from common.core_utils import setup_logging as common_setup_logging

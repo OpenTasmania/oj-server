@@ -4,10 +4,13 @@
 Handles the installation of Node.js LTS (Long Term Support).
 """
 import logging
-import sys  # For sys.executable
 from typing import Optional
 
-from common.command_utils import log_map_server, run_command, run_elevated_command
+from common.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)

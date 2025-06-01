@@ -13,10 +13,10 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
+# Import static_config for OSM_PROJECT_ROOT, as it's a fixed project path
 # Import AppSettings for type hinting
 from setup.config_models import AppSettings
-# Import static_config for OSM_PROJECT_ROOT, as it's a fixed project path
-from setup import config as static_config
+
 # Import command utilities that now also expect app_settings
 from .command_utils import log_map_server, run_command, run_elevated_command
 

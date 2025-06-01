@@ -6,21 +6,27 @@ package installations, Docker, and Node.js.
 """
 import getpass
 import logging
-import os
 from typing import Optional
 
-from common.command_utils import log_map_server, run_elevated_command
 # check_package_installed is in common.command_utils and now takes app_settings
-from common.command_utils import check_package_installed
+from common.command_utils import (
+    check_package_installed,
+    log_map_server,
+    run_elevated_command,
+)
 from common.file_utils import backup_file
-from setup.config_models import AppSettings
-from setup import config as static_config  # For package lists, static paths
-from setup.cli_handler import cli_prompt_for_rerun  # cli_prompt_for_rerun now takes app_settings
-from setup.step_executor import execute_step  # execute_step now takes app_settings
 
 # installer functions for Docker and Node.js already accept app_settings
 from installer.docker_installer import install_docker_engine
 from installer.nodejs_installer import install_nodejs_lts
+from setup import config as static_config  # For package lists, static paths
+from setup.cli_handler import (
+    cli_prompt_for_rerun,  # cli_prompt_for_rerun now takes app_settings
+)
+from setup.config_models import AppSettings
+from setup.step_executor import (
+    execute_step,  # execute_step now takes app_settings
+)
 
 module_logger = logging.getLogger(__name__)
 
@@ -137,7 +143,7 @@ def install_python_system_packages(app_settings: AppSettings, current_logger: Op
                        app_settings)
     except Exception as e:
         log_map_server(f"{symbols.get('error', '❌')} Failed to install Python system packages: {e}", "error",
-                       logger_to_use, app_settings, exc_info=True);
+                       logger_to_use, app_settings, exc_info=True)
         raise
 
 
@@ -150,7 +156,7 @@ def install_postgres_packages(app_settings: AppSettings, current_logger: Optiona
     pg_pkgs = static_config.POSTGRES_PACKAGES
     if not pg_pkgs:
         log_map_server(f"{symbols.get('info', 'ℹ️')} No PostgreSQL packages listed.", "info", logger_to_use,
-                       app_settings);
+                       app_settings)
         return
     log_map_server(
         f"{symbols.get('package', '📦')} Installing PostgreSQL packages (for configured v{pg_version}): {', '.join(pg_pkgs)}...",
@@ -161,7 +167,7 @@ def install_postgres_packages(app_settings: AppSettings, current_logger: Optiona
                        app_settings)
     except Exception as e:
         log_map_server(f"{symbols.get('error', '❌')} Failed to install PostgreSQL packages: {e}", "error",
-                       logger_to_use, app_settings, exc_info=True);
+                       logger_to_use, app_settings, exc_info=True)
         raise
 
 
@@ -169,12 +175,12 @@ def install_mapping_and_font_packages(app_settings: AppSettings,
                                       current_logger: Optional[logging.Logger] = None) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
-    map_pkgs = static_config.MAPPING_PACKAGES;
+    map_pkgs = static_config.MAPPING_PACKAGES
     font_pkgs = static_config.FONT_PACKAGES
     pkgs_to_install = map_pkgs + font_pkgs
     if not pkgs_to_install:
         log_map_server(f"{symbols.get('info', 'ℹ️')} No mapping or font packages listed.", "info", logger_to_use,
-                       app_settings);
+                       app_settings)
         return
     log_map_server(f"{symbols.get('package', '📦')} Installing mapping and font packages...", "info", logger_to_use,
                    app_settings)
@@ -186,7 +192,7 @@ def install_mapping_and_font_packages(app_settings: AppSettings,
                        app_settings)
     except Exception as e:
         log_map_server(f"{symbols.get('error', '❌')} Failed to install mapping/font packages: {e}", "error",
-                       logger_to_use, app_settings, exc_info=True);
+                       logger_to_use, app_settings, exc_info=True)
         raise
 
 

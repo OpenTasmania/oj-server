@@ -9,14 +9,13 @@ It utilizes Pydantic for data validation and settings management.
 """
 
 from pathlib import Path
-from typing import Dict, Union, Optional, List
+from typing import Dict, Optional, Union
 
 from pydantic import (
-    BaseModel,
-    Field,
-    HttpUrl,
     DirectoryPath,
-    FilePath  # Added FilePath
+    Field,
+    FilePath,  # Added FilePath
+    HttpUrl,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -42,7 +41,7 @@ OSRM_BASE_PBF_URL_DEFAULT: str = "https://download.geofabrik.de/australia-oceani
 OSRM_BASE_PBF_FILENAME_DEFAULT: str = "australia-latest.osm.pbf"
 OSRM_CAR_PROFILE_PORT_DEFAULT: int = 5000
 OSRM_MAX_TABLE_SIZE_ROUTED_DEFAULT: int = 8000
-OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT: str = "/opt/car.lua" # Default car profile in OSRM container
+OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT: str = "/opt/car.lua"  # Default car profile in OSRM container
 APACHE_LISTEN_PORT_DEFAULT: int = 8080
 POSTGRES_VERSION_DEFAULT: str = "17"
 
@@ -182,10 +181,10 @@ TILESIZE=256
 
 # Default paths and values for Renderd
 RENDERD_TILE_CACHE_DIR_DEFAULT = "/var/lib/mod_tile"
-RENDERD_RUN_DIR_DEFAULT = "/var/run/renderd" # For socket and stats
+RENDERD_RUN_DIR_DEFAULT = "/var/run/renderd"  # For socket and stats
 RENDERD_SOCKET_PATH_DEFAULT = "/var/run/renderd/renderd.sock"
-MAPNIK_XML_STYLESHEET_PATH_DEFAULT = "/usr/local/share/maps/style/openstreetmap-carto/mapnik.xml" # Standard deployment path for our style
-RENDERD_URI_PATH_SEGMENT_DEFAULT = "hot" # Matches Apache AddTileConfig and Nginx location /raster/hot/
+MAPNIK_XML_STYLESHEET_PATH_DEFAULT = "/usr/local/share/maps/style/openstreetmap-carto/mapnik.xml"  # Standard deployment path for our style
+RENDERD_URI_PATH_SEGMENT_DEFAULT = "hot"  # Matches Apache AddTileConfig and Nginx location /raster/hot/
 
 
 PG_TILESERV_CONFIG_TEMPLATE_DEFAULT: str = """\
@@ -362,7 +361,6 @@ SYMBOLS_DEFAULT: Dict[str, str] = {
 }
 
 
-
 class PgTileservSettings(BaseSettings):
     """pg_tileserv specific settings."""
     model_config = SettingsConfigDict(env_prefix='PGTS_', extra='ignore')
@@ -391,6 +389,7 @@ class PgTileservSettings(BaseSettings):
                                  description="Template for the pg_tileserv config.toml file.")
     systemd_template: str = Field(default=PG_TILESERV_SYSTEMD_TEMPLATE_DEFAULT,
                                   description="Template for the pg_tileserv systemd service file.")
+
 
 class PostgresSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='PG_', extra='ignore')
@@ -435,7 +434,7 @@ class PgTileservSettings(BaseSettings):
     # config_template: Optional[str] = Field(default=None, description="Full template for pg_tileserv config.toml. If None, one is generated.")
 
 
-class OsrmServiceSettings(BaseSettings): # Renamed from OsrmSettings to avoid conflict
+class OsrmServiceSettings(BaseSettings):  # Renamed from OsrmSettings to avoid conflict
     """OSRM runtime service specific settings (ports, image for running service)."""
     model_config = SettingsConfigDict(env_prefix='OSRM_SERVICE_', extra='ignore')
     # Defines a base port for OSRM services. If multiple regions/profiles are run,
@@ -447,6 +446,7 @@ class OsrmServiceSettings(BaseSettings): # Renamed from OsrmSettings to avoid co
     image_tag: str = Field(default=OSRM_IMAGE_TAG_DEFAULT, description="Docker image for OSRM backend (e.g., osrm/osrm-backend:latest).")
     extra_routed_args: str = Field(default="", description="Extra arguments for osrm-routed command, e.g. '--max-matching-size 1000'.")
     systemd_template: str = Field(default=OSRM_SYSTEMD_TEMPLATE_DEFAULT, description="Template for OSRM systemd service files.")
+
 
 class OsrmDataSettings(BaseSettings):
     """OSRM data processing paths, URLs, and parameters."""

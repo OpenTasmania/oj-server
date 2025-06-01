@@ -7,9 +7,13 @@ import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
-from common.command_utils import log_map_server, run_elevated_command, run_command
+from common.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)

@@ -7,7 +7,11 @@ import logging
 import subprocess
 from typing import Optional
 
-from common.command_utils import log_map_server, run_elevated_command, check_package_installed
+from common.command_utils import (
+    check_package_installed,
+    log_map_server,
+    run_elevated_command,
+)
 from setup import config  # For SYMBOLS
 
 module_logger = logging.getLogger(__name__)

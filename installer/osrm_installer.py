@@ -11,10 +11,14 @@ from pathlib import Path
 from typing import Optional
 
 from common.command_utils import (
-    log_map_server, run_elevated_command, check_package_installed, command_exists, run_command
+    check_package_installed,
+    command_exists,
+    log_map_server,
+    run_command,
+    run_elevated_command,
 )
-from setup.config_models import AppSettings
 from setup import config as static_config  # For OSM_PROJECT_ROOT
+from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
 

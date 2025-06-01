@@ -8,13 +8,15 @@ import datetime
 import logging
 from typing import Optional
 
-from setup.config_models import AppSettings, PGPASSWORD_DEFAULT  # For type hinting and default comparison
 from common.command_utils import log_map_server
+
 # get_current_script_hash is now in common.system_utils, state_manager imports it
-from common.system_utils import get_current_script_hash
-from .state_manager import clear_state_file, view_completed_steps
 # Import static_config for OSM_PROJECT_ROOT, STATE_FILE_PATH, SCRIPT_VERSION
 from setup import config as static_config
+from setup.config_models import (  # For type hinting and default comparison
+    PGPASSWORD_DEFAULT,
+    AppSettings,
+)
 
 module_logger = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ def view_configuration(
     config_text += f"  Container Runtime Command:     {app_config.container_runtime_command}\n"
     config_text += f"  OSRM Image Tag:                {app_config.osrm_image_tag}\n\n"
 
-    config_text += f"  PostgreSQL Settings (pg.*):\n"
+    config_text += "  PostgreSQL Settings (pg.*):\n"
     config_text += f"    Host:                        {app_config.pg.host}\n"
     config_text += f"    Port:                        {app_config.pg.port}\n"
     config_text += f"    Database:                    {app_config.pg.database}\n"

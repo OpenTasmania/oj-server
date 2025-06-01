@@ -5,15 +5,16 @@ Handles configuration of pg_tileserv, including its config file,
 and service activation.
 """
 import logging
-import os
 from pathlib import Path  # Added Path
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from common.system_utils import systemd_reload,get_current_script_hash
-
-from setup.config_models import AppSettings, PGPASSWORD_DEFAULT  # For type hinting and default comparison
+from common.system_utils import get_current_script_hash, systemd_reload
 from setup import config as static_config
+from setup.config_models import (  # For type hinting and default comparison
+    PGPASSWORD_DEFAULT,
+    AppSettings,
+)
 
 module_logger = logging.getLogger(__name__)
 

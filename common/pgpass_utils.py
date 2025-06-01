@@ -9,7 +9,8 @@ import logging
 import os
 from typing import List, Optional
 
-from setup.config_models import AppSettings, PGPASSWORD_DEFAULT
+from setup.config_models import PGPASSWORD_DEFAULT, AppSettings
+
 from .command_utils import log_map_server
 
 module_logger = logging.getLogger(__name__)

@@ -12,10 +12,11 @@ successful execution.
 import logging
 from typing import Callable, Optional
 
-# Import AppSettings for type hinting
-from setup.config_models import AppSettings
 # log_map_server and state_manager functions now expect AppSettings
 from common.command_utils import log_map_server
+
+# Import AppSettings for type hinting
+from setup.config_models import AppSettings
 from setup.state_manager import is_step_completed, mark_step_completed
 
 # from setup import config as static_config # Not strictly needed here if symbols come from app_settings

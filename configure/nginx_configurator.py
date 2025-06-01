@@ -8,12 +8,19 @@ import os
 import subprocess
 from typing import Optional
 
-from common.command_utils import log_map_server, run_elevated_command, elevated_command_exists
-from common.system_utils import systemd_reload,get_current_script_hash
-
-from setup.config_models import AppSettings, VM_IP_OR_DOMAIN_DEFAULT  # For default comparison
-from setup import config as static_config  # For fixed paths if any, or SCRIPT_VERSION
-
+from common.command_utils import (
+    elevated_command_exists,
+    log_map_server,
+    run_elevated_command,
+)
+from common.system_utils import get_current_script_hash, systemd_reload
+from setup import (
+    config as static_config,  # For fixed paths if any, or SCRIPT_VERSION
+)
+from setup.config_models import (  # For default comparison
+    VM_IP_OR_DOMAIN_DEFAULT,
+    AppSettings,
+)
 
 module_logger = logging.getLogger(__name__)
 
@@ -131,7 +138,7 @@ def test_nginx_configuration(app_settings: AppSettings, current_logger: Optional
         run_elevated_command(["nginx", "-t"], app_settings, current_logger=logger_to_use, check=True)
         log_map_server(f"{symbols.get('success', '✅')} Nginx configuration test successful.", "success", logger_to_use,
                        app_settings)
-    except subprocess.CalledProcessError as e:  # check=True will raise this on failure
+    except subprocess.CalledProcessError:  # check=True will raise this on failure
         # Error already logged by run_elevated_command
         # log_map_server(f"{symbols.get('error','❌')} Nginx configuration test FAILED. Output: {e.stderr or e.stdout}", "error", logger_to_use, app_settings)
         raise  # Propagate failure, this is critical

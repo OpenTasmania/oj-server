@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from common.system_utils import systemd_reload,get_current_script_hash
-from setup.config_models import AppSettings
+from common.system_utils import get_current_script_hash, systemd_reload
 from setup import config as static_config
+from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
 

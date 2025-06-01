@@ -11,21 +11,22 @@ and calls the main map server setup script, passing along all arguments.
 import getpass
 import logging  # Keep logging import
 import os
+
 # import shutil # No longer directly needed
 import subprocess
 import sys
-from typing import List, Optional
 
 # Common utility imports
 from common.command_utils import (
     command_exists,
+    log_map_server,  # Import log_map_server
     run_command,
     run_elevated_command,
-    log_map_server,  # Import log_map_server
-    _get_elevated_command_prefix,
+)
+from common.core_utils import (
+    setup_logging as common_setup_logging,  # New import
 )
 from common.system_utils import get_debian_codename
-from common.core_utils import setup_logging as common_setup_logging  # New import
 
 MAP_SERVER_INSTALLER_NAME = "installer.main_installer"
 VENV_DIR = ".venv"

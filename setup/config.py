@@ -12,11 +12,12 @@ is now handled by 'setup/config_models.py' and 'setup/config_loader.py'.
 """
 
 from pathlib import Path
+
 # Removed 'from os import environ' as we are no longer setting environment variables here.
 
 # --- Static Project Definitions ---
 # Represents the version of the setup script logic (used in comments, state file).
-SCRIPT_VERSION: str = "1.4" # Or a new version number reflecting these changes
+SCRIPT_VERSION: str = "1.4"  # Or a new version number reflecting these changes
 
 # Define the root directory of the 'osm' project.
 # This assumes config.py is in setup/

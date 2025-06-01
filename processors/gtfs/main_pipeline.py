@@ -20,9 +20,10 @@ from common.db_utils import get_db_connection
 from common.file_utils import cleanup_directory
 from processors.gtfs import download, load, transform
 from processors.gtfs import schema_definitions as schemas
+
 from .db_setup import (
-    create_tables_from_schema,
     add_foreign_keys_from_schema,
+    create_tables_from_schema,
 )
 from .pipeline_definitions import GTFS_LOAD_ORDER
 

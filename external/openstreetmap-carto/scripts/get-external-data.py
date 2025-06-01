@@ -13,24 +13,24 @@ Some implicit assumptions are
 - Usage patterns will be similar to typical map rendering
 '''
 
-import yaml
-from urllib.parse import urlparse
+import argparse
+import io
+import logging
 import os
 import re
-import argparse
 import shutil
-
-# modules for getting data
-import zipfile
-import requests
-import io
 
 # modules for converting and postgres loading
 import subprocess
-import psycopg  # Changed from psycopg2
-from psycopg import sql  # Added for safe SQL identifier formatting
 
-import logging
+# modules for getting data
+import zipfile
+from urllib.parse import urlparse
+
+import psycopg  # Changed from psycopg2
+import requests
+import yaml
+from psycopg import sql  # Added for safe SQL identifier formatting
 
 
 def database_setup(conn, temp_schema, schema, metadata_table):

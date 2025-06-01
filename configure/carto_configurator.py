@@ -10,11 +10,19 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from common.command_utils import log_map_server, run_command, run_elevated_command
+from common.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
+
 # Import AppSettings for type hinting
-from setup.config_models import AppSettings, PGPASSWORD_DEFAULT  # For PGPASSWORD_DEFAULT comparison
+from setup.config_models import (  # For PGPASSWORD_DEFAULT comparison
+    PGPASSWORD_DEFAULT,
+    AppSettings,
+)
 
 # Import static_config for truly static paths if needed
 # from setup import config as static_config
@@ -109,7 +117,7 @@ def compile_osm_carto_stylesheet(app_settings: AppSettings, current_logger: Opti
         original_lines = mml_content_original_text.splitlines(keepends=False)
         output_lines_collector: List[str] = []
         processed_datasource_block = False
-        ds_anchor_pattern = re.compile(rf"^( *)(%s.*)$" % re.escape(PRIMARY_DATASOURCE_ANCHOR_LINE_START_CONFIG))
+        ds_anchor_pattern = re.compile(r"^( *)(%s.*)$" % re.escape(PRIMARY_DATASOURCE_ANCHOR_LINE_START_CONFIG))
         kv_extract_pattern = re.compile(r"^\s*([\w-]+):\s*(?:\"([^\"]*)\"|([^#\s\"']+))")
         line_idx = 0
 

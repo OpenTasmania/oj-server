@@ -10,12 +10,17 @@ from pathlib import Path  # Changed from os.path import isdir
 from typing import Optional
 
 from common.command_utils import (
-    log_map_server, run_command, run_elevated_command, command_exists
+    command_exists,
+    log_map_server,
+    run_command,
+    run_elevated_command,
 )
-from common.system_utils import systemd_reload, get_current_script_hash
-
-from setup.config_models import AppSettings, VM_IP_OR_DOMAIN_DEFAULT  # For type hinting and default comparison
+from common.system_utils import get_current_script_hash, systemd_reload
 from setup import config as static_config  # For OSM_PROJECT_ROOT
+from setup.config_models import (  # For type hinting and default comparison
+    VM_IP_OR_DOMAIN_DEFAULT,
+    AppSettings,
+)
 
 module_logger = logging.getLogger(__name__)
 

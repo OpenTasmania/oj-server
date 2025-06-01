@@ -406,9 +406,9 @@ class InstallerTUI:
 
         def do_run_selected(btn: urwid.Button) -> None:
             if self.is_task_running:
-                self.log_display.add_message("A task is already in progress.", "warning");
+                self.log_display.add_message("A task is already in progress.", "warning")
                 return
-            self.log_display.clear_logs();
+            self.log_display.clear_logs()
             self.log_display.add_message("--- Queuing Selected Steps ---", "header")
             if not items_to_run_for_queue:
                 self.log_display.add_message("No steps were selected to run.", "warning")
@@ -416,7 +416,7 @@ class InstallerTUI:
                                               title="Status")
                 self.footer_text.set_text("No steps selected. Press 'q' for main menu.")
             else:
-                self.task_queue = list(items_to_run_for_queue);
+                self.task_queue = list(items_to_run_for_queue)
                 self._process_next_task_in_queue()
 
         run_button = urwid.AttrMap(urwid.Button("Run Selected", on_press=do_run_selected), "button",
@@ -452,12 +452,12 @@ class InstallerTUI:
         if threading.current_thread() is threading.main_thread():
             module_logger.warning("_threaded_prompt_for_rerun called from main thread, using original.")
             return self.tui_prompt_for_rerun(prompt_message)
-        self._dialog_event = threading.Event();
-        self._dialog_prompt_message = prompt_message;
+        self._dialog_event = threading.Event()
+        self._dialog_prompt_message = prompt_message
         self._dialog_result = None
         self.main_loop.alarm(0, self._show_rerun_dialog_from_worker)
         self._dialog_event.wait()
-        self._dialog_event = None;
+        self._dialog_event = None
         self._dialog_prompt_message = ""
         return self._dialog_result if self._dialog_result is not None else False
 
@@ -576,16 +576,13 @@ if __name__ == "__main__":  # pragma: no cover
         )
         module_logger.info("TUI __main__: BasicConfig logging configured for standalone test.")
 
-
     class DummyConfig:
         SYMBOLS = {"info": "ℹ>", "step": "->", "success": "✓ ", "error": "✗ "}
         ADMIN_GROUP_IP = "192.168.1.100/24 (dummy)"
         GTFS_FEED_URL = "http://example.com/dummy_gtfs.zip"
         # PBF_PLANET_URL = "http://example.com/dummy_planet.pbf" # Example if needed
 
-
     app_config = DummyConfig()  # Make app_config available for TUI's use if it imports it directly.
-
 
     def _dummy_log(msg: str, lvl: str, logger_instance: Optional[logging.Logger]):
         actual_logger = logger_instance or module_logger
@@ -596,26 +593,23 @@ if __name__ == "__main__":  # pragma: no cover
         else:
             actual_logger.debug(msg)
 
-
     def example_step_alpha(cl: Optional[logging.Logger]):
         _dummy_log("Executing Example Step Alpha...", "info", cl)
-        import time;
+        import time
         time.sleep(2)
         _dummy_log("Example Step Alpha finished.", "info", cl)
         _dummy_log("This is a debug message from Alpha.", "debug", cl)
 
-
     def example_step_beta_fails_and_reruns(cl: Optional[logging.Logger]):
         _dummy_log("Executing Example Step Beta (will fail first time)...", "info", cl)
         _dummy_log("Beta debug: Preparing to potentially fail.", "debug", cl)
-        import time;
+        import time
         time.sleep(1)
         if not getattr(example_step_beta_fails_and_reruns, 'has_failed_once', False):
             example_step_beta_fails_and_reruns.has_failed_once = True
             _dummy_log("Something went wrong in Beta!", "error", cl)
             raise ValueError("Beta step simulated failure (1st time)")
         _dummy_log("Example Step Beta (rerun) finished successfully.", "info", cl)
-
 
     DUMMY_TASKS_FOR_STANDALONE: List[Tuple[str, str, Callable]] = [
         ("ALPHA_STEP", "Run Example Step Alpha (OK, 2s)", example_step_alpha),
@@ -624,14 +618,13 @@ if __name__ == "__main__":  # pragma: no cover
     ]
     _original_execute_step = execute_step
 
-
     def dummy_execute_step_tui_threaded(tag: str, desc: str, func: Callable, current_logger_instance: logging.Logger,
                                         prompt_user_for_rerun: Callable[[str], bool]) -> bool:
         current_logger_instance.info(f"[DummyTh Exec] Attempting: {desc}")
         current_logger_instance.debug(f"[DummyTh Exec DEBUG] Details for {tag}")
         try:
-            func(current_logger_instance);
-            current_logger_instance.info(f"[DummyTh Exec] Completed: {desc}");
+            func(current_logger_instance)
+            current_logger_instance.info(f"[DummyTh Exec] Completed: {desc}")
             return True
         except Exception as e:
             current_logger_instance.error(f"[DummyTh Exec] FAILED: {desc} with {e}")
@@ -645,17 +638,14 @@ if __name__ == "__main__":  # pragma: no cover
             else:
                 current_logger_instance.info(f"[DummyTh Exec] User chose NOT to rerun: {desc}"); return False
 
-
     execute_step = dummy_execute_step_tui_threaded  # Monkey patch for standalone test
 
     _original_view_completed = view_completed_steps
-
 
     def dummy_view_completed_steps_tui(current_logger_instance) -> List[str]:  # Renamed param for clarity
         current_logger_instance.info("[Dummy State] Viewing completed steps.")
         current_logger_instance.debug("[Dummy State DEBUG] No actual state file read.")
         return ["PREVIOUS_DUMMY_STEP_1", "PREVIOUS_DUMMY_STEP_2"]
-
 
     view_completed_steps = dummy_view_completed_steps_tui  # Monkey patch
 

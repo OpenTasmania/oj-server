@@ -5,7 +5,7 @@ Handles database schema setup for GTFS processing, including table creation
 and foreign key management.
 """
 import logging
-from typing import List, Tuple  # Added Tuple
+from typing import List  # Added Tuple
 
 import psycopg  # Keep psycopg for PgConnection
 from psycopg import Connection as PgConnection  # Keep specific import
@@ -13,7 +13,7 @@ from psycopg import sql
 
 # Import definitions from other GTFS modules
 from . import schema_definitions as schemas  # For GTFS_FILE_SCHEMAS
-from .pipeline_definitions import GTFS_LOAD_ORDER, GTFS_FOREIGN_KEYS
+from .pipeline_definitions import GTFS_FOREIGN_KEYS, GTFS_LOAD_ORDER
 
 module_logger = logging.getLogger(__name__)
 
