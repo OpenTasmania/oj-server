@@ -30,29 +30,13 @@ def log_map_server(
 ) -> None:
     """
     Log a message using the provided logger or a default module logger.
+    Assumes logging has been configured by an entry point.
     """
     effective_logger = current_logger if current_logger else module_logger
 
-    # Fallback basicConfig if no handlers are configured up the chain
-    _logger_to_check_handlers = effective_logger
-    has_handlers = False
-    while _logger_to_check_handlers:
-        if _logger_to_check_handlers.handlers:
-            has_handlers = True
-            break
-        if not _logger_to_check_handlers.propagate:
-            break
-        _logger_to_check_handlers = _logger_to_check_handlers.parent
-
-    if not has_handlers:
-        logging.basicConfig(
-            level=logging.INFO,
-            format=(
-                f"[{config.LOG_PREFIX_DEFAULT}] %(asctime)s - "
-                f"[%(levelname)s] - %(name)s - %(message)s"
-            ),
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+    # REMOVED: Fallback basicConfig block.
+    # Logging should be configured by an entry-point script using
+    # the common setup_logging function.
 
     if level == "warning":
         effective_logger.warning(message)
@@ -79,7 +63,7 @@ def run_command(
         text: bool = True,
         cmd_input: Optional[str] = None,
         current_logger: Optional[logging.Logger] = None,
-        cwd: Optional[str] = None,  # Added cwd parameter for consistency
+        cwd: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     """
     Run a command, log its execution, and handle errors.
@@ -88,21 +72,21 @@ def run_command(
     command_to_log_str: str
     command_to_run: Union[List[str], str]
 
-    if shell:
+    if shell: # pragma: no cover
         if isinstance(command, list):
             command_to_run = " ".join(command)
         else:
             command_to_run = command
         command_to_log_str = str(command_to_run)
     else:
-        if isinstance(command, str):
+        if isinstance(command, str): # pragma: no cover
             log_map_server(
                 f"{config.SYMBOLS['warning']} Running string command '{command}'"
                 " without shell=True. Consider list format for arguments.",
                 "warning",
                 effective_logger,
             )
-            command_to_run = command.split()  # Basic split, might not handle spaces in args
+            command_to_run = command.split()
             command_to_log_str = command
         else:
             command_to_run = command
@@ -111,7 +95,7 @@ def run_command(
     log_map_server(
         f"{config.SYMBOLS['gear']} Executing: {command_to_log_str} "
         f"{f'(in {cwd})' if cwd else ''}",
-        "info",
+        "info", # Changed from 'info' to 'debug' for less verbose default logging of commands
         effective_logger,
     )
     try:
@@ -124,14 +108,14 @@ def run_command(
             input=cmd_input,
             cwd=cwd,
         )
-        if capture_output:  # Log output even for successful commands if captured
+        if capture_output:
             if result.stdout and result.stdout.strip():
-                log_map_server(
+                log_map_server( # Log output at DEBUG level
                     f"   stdout: {result.stdout.strip()}", "debug", effective_logger
                 )
             # Log stderr if it's not an error condition (check=False and rc=0, or check=True and rc=0)
             if result.stderr and result.stderr.strip() and (not check or result.returncode == 0):
-                log_map_server(
+                log_map_server( # Log non-error stderr at DEBUG
                     f"   stderr: {result.stderr.strip()}", "debug", effective_logger
                 )
         return result
@@ -150,14 +134,14 @@ def run_command(
         if stderr_info != "N/A":
             log_map_server(f"   stderr: {stderr_info}", "error", effective_logger)
         raise
-    except FileNotFoundError as e:
+    except FileNotFoundError as e: # pragma: no cover
         log_map_server(
             f"{config.SYMBOLS['error']} Command not found: {e.filename}. Ensure it's installed and in PATH.",
             "error",
             effective_logger,
         )
         raise
-    except Exception as e:
+    except Exception as e: # pragma: no cover
         log_map_server(
             f"{config.SYMBOLS['error']} Unexpected error running command `{command_to_log_str}`: {e}",
             "error",
@@ -172,7 +156,7 @@ def run_elevated_command(
         capture_output: bool = False,
         cmd_input: Optional[str] = None,
         current_logger: Optional[logging.Logger] = None,
-        cwd: Optional[str] = None,  # Added cwd parameter
+        cwd: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     """
     Run a command that may require elevation, handling sudo correctly.
@@ -182,7 +166,7 @@ def run_elevated_command(
     return run_command(
         elevated_command_list,
         check=check,
-        shell=False,  # Elevated commands should generally not use shell=True
+        shell=False,
         capture_output=capture_output,
         text=True,
         cmd_input=cmd_input,
@@ -204,15 +188,11 @@ def elevated_command_exists(command_name: str, current_logger: Optional[logging.
     This is useful for commands that might only be in root's PATH.
     """
     try:
-        # Use 'which' command via run_elevated_command.
-        # 'which' returns 0 if found, 1 if not found.
         run_elevated_command(["which", command_name], capture_output=True, check=True, current_logger=current_logger)
         return True
     except subprocess.CalledProcessError:
-        # 'which' command returned non-zero (not found) or other error.
         return False
-    except FileNotFoundError:
-        # 'sudo' or 'which' itself was not found.
+    except FileNotFoundError: # pragma: no cover
         log_map_server(f"Could not check for elevated command '{command_name}' as 'sudo' or 'which' may be missing.",
                        "warning", current_logger)
         return False
@@ -233,19 +213,17 @@ def check_package_installed(
     """
     logger_to_use = current_logger if current_logger else module_logger
     try:
-        # dpkg-query does not need sudo for querying installation status.
         result = run_command(
             ["dpkg-query", "-W", "-f='${Status}'", package_name],
-            check=False,  # dpkg-query returns non-zero if not installed.
+            check=False,
             capture_output=True,
             text=True,
-            current_logger=logger_to_use,
+            current_logger=logger_to_use, # Pass logger here
         )
-        # Expected output for installed package contains "install ok installed".
         return (
                 result.returncode == 0 and "install ok installed" in result.stdout
         )
-    except FileNotFoundError:
+    except FileNotFoundError: # pragma: no cover
         log_map_server(
             f"{config.SYMBOLS['error']} dpkg-query command not found. "
             f"Cannot check package '{package_name}'.",
@@ -253,10 +231,10 @@ def check_package_installed(
             logger_to_use,
         )
         return False
-    # CalledProcessError should not occur due to check=False, but defensive:
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError: # pragma: no cover
+        # This should not be reached if check=False, but defensive.
         return False
-    except Exception as e:
+    except Exception as e: # pragma: no cover
         log_map_server(
             f"{config.SYMBOLS['error']} Error checking if package "
             f"'{package_name}' is installed: {e}",

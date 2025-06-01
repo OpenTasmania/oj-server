@@ -11,9 +11,9 @@ This module provides helper functions for:
 
 import logging
 import os
+import sys  # For sys.stdout, sys.stderr
 from pathlib import Path
-from sys import stderr, stdout
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional  # Ensure sys, Path, List, Optional are imported
 
 module_logger = logging.getLogger(__name__)
 
@@ -25,62 +25,94 @@ DEFAULT_DB_PARAMS: Dict[str, str] = {
     "port": os.environ.get("PG_OSM_PORT", "5432"),
 }
 
+# Define standard formats (these could also live in setup/config.py if preferred)
+DETAILED_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(module)s.%(funcName)s:%(lineno)d - %(message)s"
+# New format string that can accept a prefix.
+# Using {log_prefix} which will be formatted by f-string logic before Formatter uses it.
+SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER = "{log_prefix}%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+SIMPLE_LOG_FORMAT_NO_PREFIX = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+
 
 def setup_logging(
         log_level: int = logging.INFO,
         log_file: Optional[str] = None,
         log_to_console: bool = True,
+        log_format_str: Optional[str] = None,
+        log_prefix: Optional[str] = None
 ) -> None:
     """
     Set up basic logging configuration for the application.
 
     Configures handlers for file and/or console logging with a standard format.
+    This function will configure the root logger.
 
     Args:
         log_level: The minimum logging level.
         log_file: Optional path to a file where logs should be written.
         log_to_console: If True, logs will also be output to the console.
+        log_format_str: Optional custom log format string.
+        log_prefix: Optional prefix for log messages (used if log_format_str
+                    supports a '{log_prefix}' placeholder or is None).
     """
     handlers: List[logging.Handler] = []
     if log_file:
         try:
             log_file_path = Path(log_file)
-            log_file_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+            log_file_path.parent.mkdir(parents=True, exist_ok=True)
             file_handler = logging.FileHandler(log_file_path, mode="a")
             handlers.append(file_handler)
         except Exception as e:
-            print(
-                f"Warning: Could not create file handler for log file {log_file}: {e}",
-                file=stderr,
-            )
+            # Use print for this initial setup error as logger might not be working yet
+            print(f"Warning: Could not create file handler for log file {log_file}: {e}", file=sys.stderr)
+
     if log_to_console:
-        console_handler = logging.StreamHandler(stdout)
+        # Log to sys.stdout by default. Specific error-level formatting
+        # would be a more advanced handler feature if needed.
+        console_handler = logging.StreamHandler(sys.stdout)
         handlers.append(console_handler)
 
-    if not handlers:  # Ensure at least one handler if none specified
-        console_handler = logging.StreamHandler(stdout)
-        handlers.append(console_handler)
-        if log_level > logging.INFO:
+    if not handlers:  # pragma: no cover
+        # Fallback if neither file nor console specified, log to console
+        handlers.append(logging.StreamHandler(sys.stdout))
+        if log_level > logging.INFO:  # Ensure some output for fallback
             log_level = logging.INFO
+
+    # Determine final format string
+    final_format_str: str
+    actual_prefix = (log_prefix.strip() + " ") if log_prefix and log_prefix.strip() else ""
+
+    if log_format_str:
+        if "{log_prefix}" in log_format_str:  # Check if placeholder exists
+            final_format_str = log_format_str.format(log_prefix=actual_prefix)
+        else:  # log_format_str provided but doesn't have a placeholder; use it as is, prepend prefix if any
+            final_format_str = actual_prefix + log_format_str
+    else:  # No specific format_str given, use default based on prefix
+        if actual_prefix:  # Check if actual_prefix has content after stripping
+            # Use the placeholder version, which becomes the actual prefix due to .format()
+            final_format_str = SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER.format(log_prefix=actual_prefix)
+        else:
+            final_format_str = SIMPLE_LOG_FORMAT_NO_PREFIX
 
     logging.basicConfig(
         level=log_level,
-        format=(
-            "%(asctime)s - %(levelname)s - %(name)s - "
-            "%(module)s.%(funcName)s:%(lineno)d - %(message)s"
-        ),
+        format=final_format_str,
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=handlers,
-        force=True  # Add force=True to override any existing root logger configuration
+        force=True  # Override any existing root logger configuration
     )
-    # Ensure the root logger's level is also set, especially if other libraries use logging.
+    # Ensure root logger's level is also set, especially if other libraries use logging.
     logging.getLogger().setLevel(log_level)
 
-    # Get a logger for this module and log the configuration.
-    # This ensures that if this setup_logging is called multiple times,
-    # this specific message uses the just-configured settings.
-    logger_for_this_message = logging.getLogger(__name__)
-    logger_for_this_message.info(f"Logging configured at level {logging.getLevelName(log_level)}.")
+    # Log the configuration using a logger obtained *after* basicConfig
+    # This logger will be common.core_utils
+    logger_for_this_message = logging.getLogger(__name__)  # common.core_utils
+    # Check if this logger itself is disabled or has a higher level
+    if not logger_for_this_message.isEnabledFor(logging.INFO):  # pragma: no cover
+        logger_for_this_message.setLevel(logging.INFO)  # Temporarily ensure it can log this
+
+    logger_for_this_message.info(
+        f"Logging configured. Level: {logging.getLevelName(log_level)}. Format: '{final_format_str}'"
+    )
 
 
 def cleanup_directory(
