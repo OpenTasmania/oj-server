@@ -5,22 +5,23 @@ Handles database schema setup for GTFS processing, including table creation
 and foreign key management.
 """
 import logging
-from typing import List, Tuple # Added Tuple
+from typing import List, Tuple  # Added Tuple
 
-import psycopg # Keep psycopg for PgConnection
-from psycopg import Connection as PgConnection # Keep specific import
+import psycopg  # Keep psycopg for PgConnection
+from psycopg import Connection as PgConnection  # Keep specific import
 from psycopg import sql
 
 # Import definitions from other GTFS modules
-from . import schema_definitions as schemas # For GTFS_FILE_SCHEMAS
-from .pipeline_definitions import GTFS_LOAD_ORDER, GTFS_FOREIGN_KEYS # Import from new file
+from . import schema_definitions as schemas  # For GTFS_FILE_SCHEMAS
+from .pipeline_definitions import GTFS_LOAD_ORDER, GTFS_FOREIGN_KEYS
 
 module_logger = logging.getLogger(__name__)
 
-# sanitize_identifier function would be here (or removed if fully replaced by sql.Identifier)
-def sanitize_identifier(name: str) -> str:
-    """Sanitize SQL identifiers (table/column names) by quoting them."""
-    return '"' + name.replace('"', '""').strip() + '"'
+
+# REMOVE sanitize_identifier function as it will no longer be used.
+# def sanitize_identifier(name: str) -> str:
+#     """Sanitize SQL identifiers (table/column names) by quoting them."""
+#     return '"' + name.replace('"', '""').strip() + '"'
 
 
 def create_tables_from_schema(conn: PgConnection) -> None:
@@ -30,35 +31,50 @@ def create_tables_from_schema(conn: PgConnection) -> None:
     """
     module_logger.info("Setting up database schema based on schema_definitions.GTFS_FILE_SCHEMAS...")
     with conn.cursor() as cursor:
-        for filename_key in GTFS_LOAD_ORDER: # Uses imported GTFS_LOAD_ORDER
+        for filename_key in GTFS_LOAD_ORDER:
             details = schemas.GTFS_FILE_SCHEMAS.get(filename_key)
             if not details:
-                if filename_key not in ["gtfs_shapes_lines.txt"]:
+                if filename_key not in ["gtfs_shapes_lines.txt"]:  # pragma: no cover
                     module_logger.debug(
                         f"No schema definition for '{filename_key}', skipping table creation in this loop.")
                 continue
 
             table_name = details["db_table_name"]
-            cols_defs_str_list: List[str] = []
+            # Changed from List[str] to List[sql.Composed]
+            cols_defs_sql_list: List[sql.Composed] = []
 
             db_columns_def = details.get("columns", {})
-            if not isinstance(db_columns_def, dict):
+            if not isinstance(db_columns_def, dict):  # pragma: no cover
                 module_logger.error(f"Columns definition for {table_name} is not a dictionary. Skipping.")
                 continue
 
             for col_name, col_props in db_columns_def.items():
-                col_type = col_props.get("type", "TEXT")
-                col_constraints = ""
-                # sanitize_identifier will be refactored later as discussed
-                cols_defs_str_list.append(
-                    f"{sanitize_identifier(col_name)} {col_type} {col_constraints}".strip()
-                )
+                col_type_str = col_props.get("type", "TEXT")  # e.g., "TEXT", "INTEGER", "GEOMETRY(Point, 4326)"
 
-            if not cols_defs_str_list:
+                # Start building the column definition with name and type
+                # sql.Identifier handles quoting for col_name
+                # sql.SQL treats col_type_str as a literal SQL snippet (e.g., a type)
+                column_definition_parts = [
+                    sql.Identifier(col_name),
+                    sql.SQL(col_type_str)
+                ]
+
+                # Example: Add other constraints if defined in col_props
+                # This part depends on how you might extend schema_definitions.py
+                # For instance, if you had a 'constraints' key in col_props:
+                # if "constraints" in col_props and col_props["constraints"]:
+                #     column_definition_parts.append(sql.SQL(col_props["constraints"]))
+
+                # Join parts for this column definition (e.g., "column_name TEXT")
+                cols_defs_sql_list.append(sql.SQL(" ").join(column_definition_parts))
+
+            if not cols_defs_sql_list:  # pragma: no cover
                 module_logger.warning(f"No columns to define for table {table_name}. Skipping creation.")
                 continue
 
-            cols_sql_segment = sql.SQL(", ").join(map(sql.SQL, cols_defs_str_list))
+            # Join all column definitions with a comma
+            cols_sql_segment = sql.SQL(", ").join(cols_defs_sql_list)
+
             create_sql = sql.SQL("CREATE TABLE IF NOT EXISTS {} ({});").format(
                 sql.Identifier(table_name),
                 cols_sql_segment,
@@ -66,7 +82,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             try:
                 module_logger.debug(f"Executing SQL for table {table_name}: {create_sql.as_string(conn)}")
                 cursor.execute(create_sql)
-            except psycopg.Error as e: # pragma: no cover
+            except psycopg.Error as e:  # pragma: no cover
                 module_logger.error(
                     f"Error creating table {table_name}: {e.diag.message_primary if e.diag else str(e)}")
                 raise
@@ -76,7 +92,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                 sanitized_pk_cols = [sql.Identifier(col) for col in pk_column_names]
                 pk_cols_sql_segment = sql.SQL(", ").join(sanitized_pk_cols)
                 constraint_name_str = f"pk_{table_name.replace('gtfs_', '')}"
-                if len(constraint_name_str) > 63: # pragma: no cover
+                if len(constraint_name_str) > 63:  # pragma: no cover
                     constraint_name_str = constraint_name_str[:63]
                 pk_constraint_name = sql.Identifier(constraint_name_str)
 
@@ -90,7 +106,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                         f"Attempting to add PRIMARY KEY to {table_name} on ({', '.join(pk_column_names)})")
                     cursor.execute(alter_pk_sql)
                     module_logger.info(f"Added PRIMARY KEY to {table_name} on ({', '.join(pk_column_names)}).")
-                except psycopg.Error as e_pk: # pragma: no cover
+                except psycopg.Error as e_pk:  # pragma: no cover
                     module_logger.error(
                         f"Failed to add PRIMARY KEY to {table_name}: {e_pk.diag.message_primary if e_pk.diag else str(e_pk)}")
                     raise e_pk
@@ -99,11 +115,21 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             cursor.execute(
                 sql.SQL("""
                         CREATE TABLE IF NOT EXISTS gtfs_shapes_lines
-                        (shape_id TEXT PRIMARY KEY, geom GEOMETRY(LineString, 4326));
+                        (
+                            shape_id
+                            TEXT
+                            PRIMARY
+                            KEY,
+                            geom
+                            GEOMETRY
+                        (
+                            LineString,
+                            4326
+                        ));
                         """)
             )
             module_logger.info("Table 'gtfs_shapes_lines' ensured.")
-        except psycopg.Error as e: # pragma: no cover
+        except psycopg.Error as e:  # pragma: no cover
             module_logger.error(
                 f"Error creating table gtfs_shapes_lines: {e.diag.message_primary if e.diag else str(e)}")
             raise
@@ -111,12 +137,30 @@ def create_tables_from_schema(conn: PgConnection) -> None:
         try:
             cursor.execute(sql.SQL("""
                                    CREATE TABLE IF NOT EXISTS gtfs_dlq
-                                   (id SERIAL PRIMARY KEY, gtfs_filename TEXT, original_row_data TEXT,
-                                    error_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                    error_reason TEXT, notes TEXT);
+                                   (
+                                       id
+                                       SERIAL
+                                       PRIMARY
+                                       KEY,
+                                       gtfs_filename
+                                       TEXT,
+                                       original_row_data
+                                       TEXT,
+                                       error_timestamp
+                                       TIMESTAMP
+                                       WITH
+                                       TIME
+                                       ZONE
+                                       DEFAULT
+                                       CURRENT_TIMESTAMP,
+                                       error_reason
+                                       TEXT,
+                                       notes
+                                       TEXT
+                                   );
                                    """))
             module_logger.info("Generic DLQ table 'gtfs_dlq' ensured.")
-        except psycopg.Error as e: # pragma: no cover
+        except psycopg.Error as e:  # pragma: no cover
             module_logger.error(
                 f"Error creating generic DLQ table gtfs_dlq: {e.diag.message_primary if e.diag else str(e)}")
             # Not raising, as DLQ might be non-critical
@@ -124,7 +168,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
     module_logger.info("Database schema setup/verification complete.")
 
 
-def add_foreign_keys_from_schema(conn: PgConnection) -> None: # pragma: no cover
+def add_foreign_keys_from_schema(conn: PgConnection) -> None:  # pragma: no cover
     """
     Add foreign keys based on GTFS_FOREIGN_KEYS definitions.
     This function expects to be run within an existing transaction.
@@ -137,7 +181,7 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None: # pragma: no cover
                 to_table,
                 to_cols_list,
                 fk_name,
-        ) in GTFS_FOREIGN_KEYS: # Uses imported GTFS_FOREIGN_KEYS
+        ) in GTFS_FOREIGN_KEYS:
             try:
                 cursor.execute("SELECT to_regclass(%s);", (f"public.{from_table}",))
                 if not cursor.fetchone()[0]:
@@ -180,11 +224,11 @@ def add_foreign_keys_from_schema(conn: PgConnection) -> None: # pragma: no cover
     module_logger.info("Foreign key application process finished (pending commit of parent transaction).")
 
 
-def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None: # pragma: no cover
+def drop_all_gtfs_foreign_keys(conn: PgConnection) -> None:  # pragma: no cover
     """Drop all defined GTFS foreign keys using Psycopg 3."""
     module_logger.info("Dropping existing GTFS foreign keys...")
     with conn.cursor() as cursor:
-        for from_table, _, _, _, fk_name in reversed(GTFS_FOREIGN_KEYS): # Uses imported GTFS_FOREIGN_KEYS
+        for from_table, _, _, _, fk_name in reversed(GTFS_FOREIGN_KEYS):
             try:
                 cursor.execute("SELECT to_regclass(%s);", (f"public.{from_table}",))
                 if not cursor.fetchone()[0]:
