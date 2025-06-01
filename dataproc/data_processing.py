@@ -4,15 +4,14 @@
 Orchestrates data preparation tasks like GTFS processing and raster tile pre-rendering.
 """
 import logging
-from pathlib import Path # Keep Path if used, though project_root is no longer constructed here for the GTFS call
-from typing import Optional # Removed Dict as db_params_dict is removed
+from typing import Optional  # Removed Dict as db_params_dict is removed
 
 from common.command_utils import log_map_server
 from dataproc.raster_processor import raster_tile_prerender
 from processors.gtfs.orchestrator import (
     process_and_setup_gtfs,
 )
-from setup import config as static_config # Used by main_installer for OSM_PROJECT_ROOT, potentially for tags
+from setup import config as static_config  # Used by main_installer for OSM_PROJECT_ROOT, potentially for tags
 from setup.cli_handler import cli_prompt_for_rerun
 from setup.config_models import AppSettings
 from setup.step_executor import execute_step
