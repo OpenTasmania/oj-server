@@ -185,7 +185,7 @@ def load_dataframe_to_db(
                 module_logger.info(
                     f"Attempting to load {len(data_tuples)} records into {table_name} using executemany..."
                 )
-                cursor.executemany(insert_query_string, data_tuples)
+                cursor.executemany(insert_query_string, data_tuples) # type: ignore[arg-type]
                 successful_loads = (
                     cursor.rowcount
                     if cursor.rowcount != -1
@@ -256,7 +256,7 @@ def log_to_dlq(
     # A check for table existence or dynamic creation of DLQ tables might be needed.
 
     dlq_insert_stmt = sql.SQL(
-        "INSERT INTO {} (original_row_data, error_reason, notes, error_timestamp) "
+        "INSERT INTO {} (original_row_data, error_reason, notes, error_timestamp) " # type: ignore[misc] # psycoph3 linter confusion
         "VALUES (%s, %s, %s, %s);"
     ).format(
         sql.Identifier(dlq_table_name)

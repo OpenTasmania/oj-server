@@ -145,7 +145,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             cursor.execute(
                 sql.SQL(
                     """
-                    CREATE TABLE IF NOT EXISTS gtfs_shapes_lines
+                    CREATE TABLE IF NOT EXISTS gtfs_shapes_lines # psycoph3 linter confusion
                     (
                         shape_id
                         TEXT
@@ -248,7 +248,7 @@ def add_foreign_keys_from_schema(
                 )
 
                 alter_sql = sql.SQL(
-                    "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) "
+                    "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) " # type: ignore[misc] # psycoph3 linter confusion
                     "REFERENCES {} ({}) DEFERRABLE INITIALLY DEFERRED;"
                 ).format(
                     sql.Identifier(from_table),
