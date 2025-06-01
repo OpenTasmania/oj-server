@@ -194,14 +194,16 @@ class InstallerTUI:
 
     def show_main_menu(self, button: Optional[urwid.Button] = None) -> None:
         if self.is_task_running:  # pragma: no cover
-            self.log_display.add_message("Task in progress. Cannot show main menu now.", "warning");
+            self.log_display.add_message("Task in progress. Cannot show main menu now.", "warning")
             return
         self._update_interactive_pane(self.main_menu_listbox, title="Main Menu")
         self.footer_text.set_text("Ctrl-C to Exit | Keys: Up, Down, Enter, Esc | 'q' to Main Menu")
 
     def show_view_configuration(self, button: Optional[urwid.Button] = None) -> None:  # pragma: no cover
-        if self.is_task_running: self.log_display.add_message("Task in progress. Cannot view configuration now.",
-                                                              "warning"); return
+        if self.is_task_running:
+            self.log_display.add_message("Task in progress. Cannot view configuration now.",
+                                                              "warning")
+            return
         self.log_display.clear_logs()
         self.log_display.add_message("--- Current Configuration ---", "header")
         # In a real app, self.app_settings would be AppSettings. Here, using the dummy app_config for display.
@@ -219,8 +221,9 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def show_manage_state(self, button: Optional[urwid.Button] = None) -> None:  # pragma: no cover
-        if self.is_task_running: self.log_display.add_message("Task in progress. Cannot manage state now.",
-                                                              "warning"); return
+        if self.is_task_running:
+            self.log_display.add_message("Task in progress. Cannot manage state now.", "warning")
+            return
         self.log_display.clear_logs()
         self.log_display.add_message("--- Manage State ---", "header")
         try:
@@ -232,8 +235,8 @@ class InstallerTUI:
             else:
                 self.log_display.add_message("No steps recorded as completed.", "info")
         except Exception as e:
-            self.log_display.add_message(f"Error viewing state: {e}", "error"); module_logger.exception(
-                "Error in show_manage_state")
+            self.log_display.add_message(f"Error viewing state: {e}", "error")
+            module_logger.exception("Error in show_manage_state")
         self.footer_text.set_text("State information in Logs. Press 'q' to return to main menu.")
         self.main_loop.draw_screen()
 
@@ -267,15 +270,15 @@ class InstallerTUI:
     def _process_next_task_in_queue(self) -> None:  # pragma: no cover
         if self.is_task_running: return
         if not self.task_queue:
-            self.is_task_running = False;
+            self.is_task_running = False
             self.current_task_info = None
             self.footer_text.set_text("All queued tasks finished. Press 'q' for main menu.")
             self.log_display.add_message("--- All queued tasks complete ---", "info")
-            self._update_interactive_pane(self.main_menu_listbox, title="Main Menu");
+            self._update_interactive_pane(self.main_menu_listbox, title="Main Menu")
             return
 
         tag, desc, func = self.task_queue.pop(0)
-        self.is_task_running = True;
+        self.is_task_running = True
         self.current_task_info = {"tag": tag, "desc": desc}
         status_message = f"Running Task:\n\n{desc} ({tag})\n\nLogs appear on the right..."
         self._update_interactive_pane(urwid.Filler(urwid.Text(status_message, align="center"), valign="middle"),
@@ -284,20 +287,23 @@ class InstallerTUI:
         self.execute_installer_step(tag, desc, func)
 
     def run_full_installation(self, button: Optional[urwid.Button] = None) -> None:  # pragma: no cover
-        if self.is_task_running: self.log_display.add_message("A task or sequence is already in progress.",
-                                                              "warning"); return
-        self.log_display.clear_logs();
+        if self.is_task_running:
+            self.log_display.add_message("A task or sequence is already in progress.",
+                                                              "warning")
+            return
+        self.log_display.clear_logs()
         self.log_display.add_message("--- Queuing Full Installation ---", "header")
         if not self.defined_tasks:
             self.log_display.add_message("No installation tasks defined.", "warning")
-            self._update_interactive_pane(urwid.Filler(urwid.Text("No tasks to run.", align="center")), title="Status");
+            self._update_interactive_pane(urwid.Filler(urwid.Text("No tasks to run.", align="center")), title="Status")
             return
         self.task_queue = list(self.defined_tasks)
         self._process_next_task_in_queue()
 
     def show_step_selection(self, button: Optional[urwid.Button] = None) -> None:  # pragma: no cover
         if self.is_task_running: self.log_display.add_message("Task in progress. Cannot select new steps now.",
-                                                              "warning"); return
+                                                              "warning")
+        return
         items_to_run_for_queue: List[Tuple[str, str, StepFunctionType]] = []
 
         def on_checklist_change(checkbox: urwid.CheckBox, new_state: bool,
@@ -321,8 +327,10 @@ class InstallerTUI:
             urwid.SimpleFocusListWalker(checklist_items + [urwid.Divider(), run_button, cancel_button]))
 
         def do_run_selected(_btn: urwid.Button):
-            if self.is_task_running: self.log_display.add_message("A task is already in progress.", "warning"); return
-            self.log_display.clear_logs();
+            if self.is_task_running:
+                self.log_display.add_message("A task is already in progress.", "warning")
+                return
+            self.log_display.clear_logs()
             self.log_display.add_message("--- Queuing Selected Steps ---", "header")
             if not items_to_run_for_queue:
                 self.log_display.add_message("No steps were selected to run.", "warning")
@@ -374,7 +382,7 @@ class InstallerTUI:
         self._dialog_result = None
         self.main_loop.alarm(0, self._show_rerun_dialog_from_worker)  # type: ignore[attr-defined]
         self._dialog_event.wait()
-        self._dialog_event = None;
+        self._dialog_event = None
         self._dialog_prompt_message = ""
         return self._dialog_result if self._dialog_result is not None else False
 
@@ -382,7 +390,7 @@ class InstallerTUI:
     def tui_prompt_for_rerun(self, prompt_message: str) -> bool:  # pragma: no cover
         # This version is for prompts originating from the TUI itself, not from execute_step's callback.
         if threading.current_thread() is not threading.main_thread():
-            module_logger.error("FATAL: tui_prompt_for_rerun (original) called from non-main thread!");
+            module_logger.error("FATAL: tui_prompt_for_rerun (original) called from non-main thread!")
             return False
         original_main_loop_widget = self.main_loop.widget
         dialog = YesNoDialog("Confirmation", prompt_message)
@@ -428,20 +436,20 @@ class InstallerTUI:
         root_logger = logging.getLogger()
         self._original_root_logger_level = root_logger.level
         self._original_root_handlers = list(root_logger.handlers)
-        self._removed_handlers_by_tui.clear();
+        self._removed_handlers_by_tui.clear()
         self._root_logger_level_modified_by_tui = False
         if root_logger.level == 0 or root_logger.level > logging.DEBUG:  # NOTSET or > DEBUG
-            root_logger.setLevel(logging.DEBUG);
+            root_logger.setLevel(logging.DEBUG)
             self._root_logger_level_modified_by_tui = True
             module_logger.debug(
                 f"TUI temporarily set root logger level to DEBUG (was {self._original_root_logger_level})")
         for handler in list(root_logger.handlers):
             if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr):
-                module_logger.debug(f"TUI temporarily removing console handler: {handler}");
-                root_logger.removeHandler(handler);
+                module_logger.debug(f"TUI temporarily removing console handler: {handler}")
+                root_logger.removeHandler(handler)
                 self._removed_handlers_by_tui.append(handler)
         if self.tui_log_handler not in root_logger.handlers:
-            root_logger.addHandler(self.tui_log_handler);
+            root_logger.addHandler(self.tui_log_handler)
             module_logger.debug(f"TUI added TuiLogHandler: {self.tui_log_handler}")
         self.log_display.add_message("Installer TUI Initialized. Welcome!", "info")
         try:
@@ -453,14 +461,14 @@ class InstallerTUI:
         finally:
             module_logger.debug("TUI shutting down. Restoring original logging setup...")
             if self.tui_log_handler and self.tui_log_handler in root_logger.handlers:
-                root_logger.removeHandler(self.tui_log_handler);
+                root_logger.removeHandler(self.tui_log_handler)
                 module_logger.debug(f"TUI removed TuiLogHandler: {self.tui_log_handler}")
             for handler_to_restore in self._removed_handlers_by_tui:
                 if handler_to_restore not in root_logger.handlers:
-                    root_logger.addHandler(handler_to_restore);
+                    root_logger.addHandler(handler_to_restore)
                     module_logger.debug(f"TUI restored console handler: {handler_to_restore}")
             if self._root_logger_level_modified_by_tui and self._original_root_logger_level is not None:
-                root_logger.setLevel(self._original_root_logger_level);
+                root_logger.setLevel(self._original_root_logger_level)
                 module_logger.debug(f"TUI restored root logger level to: {self._original_root_logger_level}")
             print("Installer TUI has shut down.", file=sys.stderr)
 
@@ -497,7 +505,7 @@ if __name__ == "__main__":  # pragma: no cover
     # Define dummy step functions that now accept AppSettings
     def example_step_alpha(settings: AppSettings, cl: Optional[logging.Logger]):
         (cl or module_logger).info(f"Executing Example Step Alpha with admin_ip: {settings.admin_group_ip}...")
-        import time;
+        import time
         time.sleep(2)
         (cl or module_logger).info("Example Step Alpha finished.")
 
@@ -509,11 +517,11 @@ if __name__ == "__main__":  # pragma: no cover
         global has_beta_failed_once
         (cl or module_logger).info(
             f"Executing Example Step Beta (will fail first time) for domain: {settings.vm_ip_or_domain}...")
-        import time;
+        import time
         time.sleep(1)
         if not has_beta_failed_once:
             has_beta_failed_once = True
-            (cl or module_logger).error("Something went wrong in Beta!");
+            (cl or module_logger).error("Something went wrong in Beta!")
             raise ValueError("Beta step simulated failure (1st time)")
         (cl or module_logger).info("Example Step Beta (rerun) finished successfully.")
 
