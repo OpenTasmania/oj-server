@@ -194,7 +194,8 @@ def fetch_carto_external_data(
             static_config.OSM_PROJECT_ROOT
             / "external/openstreetmap-carto/scripts/get-external-data.py"
     )
-    script_to_run_cmd: List[str] = []
+    # noinspection PyUnusedLocal
+    script_to_run_cmd: List[str] = [] # pylint: disable=unused-variable
 
     if custom_script_path.is_file():
         log_map_server(

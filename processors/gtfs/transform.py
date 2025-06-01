@@ -130,7 +130,8 @@ def transform_dataframe(
         return transformed_df
 
     geom_config = file_schema_info.get("geom_config")
-    db_geom_col_name: Optional[str] = None
+    # noinspection PyUnusedLocal
+    db_geom_col_name: Optional[str] = None # pylint: disable=unused-variable
 
     if geom_config:
         db_geom_col_name = geom_config.get("geom_col")

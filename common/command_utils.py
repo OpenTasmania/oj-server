@@ -31,17 +31,6 @@ def log_map_server(
     """
     effective_logger = current_logger if current_logger else module_logger
 
-    symbols_to_use = SYMBOLS_DEFAULT
-    if (
-            app_settings
-            and hasattr(app_settings, "symbols")
-            and app_settings.symbols
-    ):
-        symbols_to_use = app_settings.symbols
-
-    # Note: Actual symbol insertion into the message string is assumed to be done by the caller.
-    # This function primarily handles routing to the correct log level and passing exc_info.
-
     if level == "warning":
         effective_logger.warning(message, exc_info=exc_info)
     elif level == "error":

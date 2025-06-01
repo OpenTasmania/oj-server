@@ -106,7 +106,6 @@ def load_dataframe_to_db(
         schema_definition.get("columns", {}).keys()
     )
 
-    geom_col_name: Optional[str] = None
     geom_config = schema_definition.get("geom_config")
     if geom_config:
         geom_col_name = geom_config.get("geom_col")
