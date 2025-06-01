@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from pathlib import Path  # Added for project_root
 
 from actions.website_setup_actions import deploy_test_website_content
 from actions.ufw_setup_actions import enable_ufw_service
@@ -21,7 +22,6 @@ from common.pgpass_utils import setup_pgpass
 from common.system_utils import systemd_reload
 from common.core_utils import setup_logging as common_setup_logging
 
-# --- Configuration and Installer imports ---
 from configure.apache_configurator import (
     configure_apache_ports, create_mod_tile_config, create_apache_tile_site_config,
     manage_apache_modules_and_sites, activate_apache_service
@@ -31,7 +31,7 @@ from configure.carto_configurator import (
     finalize_carto_directory_processing, update_font_cache
 )
 from configure.certbot_configurator import run_certbot_nginx
-from configure.gtfs_automation_configurator import configure_gtfs_update_cronjob
+# REMOVE: from configure.gtfs_automation_configurator import configure_gtfs_update_cronjob
 from configure.nginx_configurator import (
     create_nginx_proxy_site_config, manage_nginx_sites,
     test_nginx_configuration, activate_nginx_service
@@ -52,15 +52,13 @@ from configure.renderd_configurator import (
 )
 from configure.ufw_configurator import apply_ufw_rules
 
-# --- Data Processing imports ---
-from dataproc.gtfs_processor_runner import run_gtfs_etl_pipeline_and_verify
-from dataproc.osrm_data_processor import (
+# REMOVE: from dataproc.gtfs_processor_runner import run_gtfs_etl_pipeline_and_verify
+from dataproc.osrm_data_processor import (  # OSRM data processing steps
     extract_regional_pbfs_with_osmium,
     build_osrm_graphs_for_region
 )
 from dataproc.raster_processor import raster_tile_prerender
 
-# --- Installer component imports ---
 from installer.apache_installer import ensure_apache_packages_installed
 from installer.carto_installer import (
     install_carto_cli, setup_osm_carto_repository,
@@ -81,36 +79,33 @@ from installer.renderd_installer import (
     ensure_renderd_packages_installed, create_renderd_directories,
     create_renderd_systemd_service_file
 )
-# Import new dedicated installers for Docker and Node.js
 from installer.docker_installer import install_docker_engine
 from installer.nodejs_installer import install_nodejs_lts
 
-# --- Setup phase module imports ---
 from setup import config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
-
-# Import the comprehensive prerequisite group and specific prerequisite functions
 from setup.core_prerequisites import (
     core_prerequisites_group,
-    boot_verbosity as prereq_boot_verbosity,  # Alias to avoid conflict if needed
-    core_conflict_removal as prereq_core_conflict_removal  # Alias
+    boot_verbosity as prereq_boot_verbosity,
+    core_conflict_removal as prereq_core_conflict_removal
 )
-# core_setup.py is now much leaner or potentially removed if all its functions are relocated.
-
-from setup.gtfs_environment_setup import setup_gtfs_logging_and_env_vars
+# REMOVE: from setup.gtfs_environment_setup import setup_gtfs_logging_and_env_vars
 from setup.state_manager import (
     clear_state_file, initialize_state_system, view_completed_steps,
     get_current_script_hash
 )
 from setup.step_executor import execute_step
 
+# Import the new GTFS orchestrator
+from processors.gtfs.orchestrator import process_and_setup_gtfs
+
 logger = logging.getLogger(__name__)
 
-# Updated INSTALLATION_GROUPS_ORDER
-ALL_CORE_PREREQUISITES_GROUP_TAG = "ALL_CORE_PREREQUISITES_GROUP"  # Define a tag for the group
+# Define a new tag for the comprehensive GTFS processing step
+GTFS_PROCESS_AND_SETUP_TAG = "GTFS_PROCESS_AND_SETUP"
+ALL_CORE_PREREQUISITES_GROUP_TAG = "ALL_CORE_PREREQUISITES_GROUP"
 
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
-    # "Core Conflict Removal" and "Prerequisites" are now handled by core_prerequisites_group
     {"name": "Comprehensive Prerequisites", "steps": [ALL_CORE_PREREQUISITES_GROUP_TAG]},
     {"name": "Firewall Service (UFW)", "steps": ["CONFIG_UFW_RULES", "SETUP_UFW_ENABLE_SERVICE"]},
     {"name": "Database Service (PostgreSQL)", "steps": [
@@ -145,29 +140,22 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     ]},
     {"name": "Certbot Service", "steps": ["SETUP_CERTBOT_PACKAGES", "CONFIG_CERTBOT_RUN"]},
     {"name": "Application Content", "steps": ["WEBSITE_CONTENT_DEPLOY"]},
-    {"name": "GTFS Data Pipeline", "steps": ["SETUP_GTFS_ENV", "DATAPROC_GTFS_ETL", "CONFIG_GTFS_CRON"]},
+    # Updated GTFS Data Pipeline group
+    {"name": "GTFS Data Pipeline", "steps": [GTFS_PROCESS_AND_SETUP_TAG]},
     {"name": "Raster Tile Pre-rendering", "steps": ["RASTER_PREP"]},
     {"name": "Systemd Reload", "steps": ["SYSTEMD_RELOAD_TASK"]},
 ]
 
-# task_execution_details_lookup needs to be updated for the new structure
 task_execution_details_lookup: Dict[str, Tuple[str, int]] = {}
 for group_idx, group_info in enumerate(INSTALLATION_GROUPS_ORDER):
     group_name = group_info["name"]
     for step_idx, task_tag in enumerate(group_info["steps"]):
         task_execution_details_lookup[task_tag] = (group_name, step_idx + 1)
 
-# Add entries for individual flags that might be run standalone and map to core_prerequisites functions
-# These tags should match what's used in defined_tasks_map
-task_execution_details_lookup["PREREQ_BOOT_VERBOSITY_TAG"] = ("Comprehensive Prerequisites", 1)  # Example sub-step
-task_execution_details_lookup["PREREQ_CORE_CONFLICTS_TAG"] = ("Comprehensive Prerequisites", 2)  # Example sub-step
-task_execution_details_lookup["PREREQ_DOCKER_ENGINE_TAG"] = ("Comprehensive Prerequisites",
-                                                             8)  # Example sub-step (order might vary)
-task_execution_details_lookup["PREREQ_NODEJS_LTS_TAG"] = ("Comprehensive Prerequisites", 9)  # Example sub-step
-
-# Add entries for service groups (as before)
+# Add entries for orchestrator groups if they can be called standalone via flags
+task_execution_details_lookup[ALL_CORE_PREREQUISITES_GROUP_TAG] = ("Comprehensive Prerequisites",
+                                                                   0)  # Main group orchestrator
 task_execution_details_lookup["UFW_FULL_SETUP"] = ("Firewall Service (UFW)", 0)
-# ... (other service group lookups remain similar)
 task_execution_details_lookup["POSTGRES_FULL_SETUP"] = ("Database Service (PostgreSQL)", 0)
 task_execution_details_lookup["CARTO_FULL_SETUP"] = ("Carto Service", 0)
 task_execution_details_lookup["RENDERD_FULL_SETUP"] = ("Renderd Service", 0)
@@ -176,7 +164,9 @@ task_execution_details_lookup["PGTILESERV_FULL_SETUP"] = ("pg_tileserv Service",
 task_execution_details_lookup["OSRM_FULL_SETUP"] = ("OSRM Service & Data Processing", 0)
 task_execution_details_lookup["APACHE_FULL_SETUP"] = ("Apache Service", 0)
 task_execution_details_lookup["CERTBOT_FULL_SETUP"] = ("Certbot Service", 0)
-task_execution_details_lookup["GTFS_FULL_SETUP"] = ("GTFS Data Pipeline", 0)
+# The GTFS_PROCESS_AND_SETUP_TAG is already in INSTALLATION_GROUPS_ORDER,
+# so it will get its details from the loop above.
+# If gtfs_prep flag directly calls an orchestrator, its tag needs to be in defined_tasks_map.
 
 group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
@@ -185,25 +175,299 @@ group_order_lookup: Dict[str, int] = {
 
 
 def get_dynamic_help(base_help: str, task_tag: str) -> str:
+    # ... (implementation as before) ...
     details = task_execution_details_lookup.get(task_tag)
-    if details and details[1] > 0:  # Indicates a sub-step of a group
+    if details and details[1] > 0:
         return f"{base_help} (Part of: '{details[0]}', Sub-step: {details[1]})"
-    elif details and details[1] == 0:  # Indicates a full group orchestrator
+    elif details and details[1] == 0:  # pragma: no cover
         return f"{base_help} (Orchestrates: '{details[0]}')"
-    # Fallback for tasks not explicitly in a group's "steps" list but runnable standalone
     return f"{base_help} (Standalone or specific task)"
 
 
 # --- Orchestrator sequences for services (ufw_full_setup_sequence, etc.) remain unchanged ---
-# ...
+# ... (ufw_full_setup_sequence, postgres_full_setup_sequence, etc. as before)
+def ufw_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting UFW Full Setup & Config Sequence ---", "info", logger_to_use)
+    if not execute_step("CONFIG_UFW_RULES", "Configure UFW Rules", apply_ufw_rules, logger_to_use,
+                        cli_prompt_for_rerun):
+        raise RuntimeError("UFW rule configuration failed.")  # pragma: no cover
+    if not execute_step("SETUP_UFW_ENABLE_SERVICE", "Enable UFW Service", enable_ufw_service, logger_to_use,
+                        cli_prompt_for_rerun):
+        raise RuntimeError("UFW service enabling failed.")  # pragma: no cover
+    log_map_server(f"--- {config.SYMBOLS['success']} UFW Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
+def postgres_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting PostgreSQL Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    pg_steps_to_execute = [
+        ("SETUP_POSTGRES_PKG_CHECK", "Check PostgreSQL Package Installation", ensure_postgres_packages_are_installed),
+        ("CONFIG_POSTGRES_USER_DB", "Create PostgreSQL User and Database", create_postgres_user_and_db),
+        ("CONFIG_POSTGRES_EXTENSIONS", "Enable PostgreSQL Extensions", enable_postgres_extensions),
+        ("CONFIG_POSTGRES_PERMISSIONS", "Set PostgreSQL Database Permissions", set_postgres_permissions),
+        ("CONFIG_POSTGRESQL_CONF", "Customize postgresql.conf", customize_postgresql_conf),
+        ("CONFIG_PG_HBA_CONF", "Customize pg_hba.conf", customize_pg_hba_conf),
+        ("SERVICE_POSTGRES_RESTART_ENABLE", "Restart & Enable PostgreSQL Service", restart_and_enable_postgres_service),
+    ]
+    for tag, description, func_ref in pg_steps_to_execute:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun):
+            raise RuntimeError(f"PostgreSQL setup step '{description}' ({tag}) failed.")  # pragma: no cover
+    log_map_server(f"--- {config.SYMBOLS['success']} PostgreSQL Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
+def carto_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting Carto Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    compiled_xml_path_holder = {"path": None}
+    carto_steps = [
+        ("SETUP_CARTO_CLI", "Install Carto CSS Compiler", install_carto_cli),
+        ("SETUP_CARTO_REPO", "Setup OSM-Carto Repository", setup_osm_carto_repository),
+        ("SETUP_CARTO_PREPARE_DIR", "Prepare Carto Directory", prepare_carto_directory_for_processing),
+        ("SETUP_CARTO_FETCH_DATA", "Fetch External Data for Carto", fetch_carto_external_data),
+        ("CONFIG_CARTO_COMPILE", "Compile OSM Carto Stylesheet",
+         lambda cl: compiled_xml_path_holder.update({"path": compile_osm_carto_stylesheet(cl)})),
+        ("CONFIG_CARTO_DEPLOY_XML", "Deploy Mapnik Stylesheet",
+         lambda cl: deploy_mapnik_stylesheet(compiled_xml_path_holder["path"], cl) if compiled_xml_path_holder[
+             "path"] else (_ for _ in ()).throw(RuntimeError("Compiled XML path not set"))),
+        ("CONFIG_CARTO_FINALIZE_DIR", "Finalize Carto Directory", finalize_carto_directory_processing),
+        ("CONFIG_SYSTEM_FONT_CACHE", "Update System Font Cache", update_font_cache),
+    ]
+    try:
+        for tag, description, func_ref in carto_steps:
+            if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun):
+                raise RuntimeError(f"Carto setup step '{description}' ({tag}) failed.")  # pragma: no cover
+    except Exception as e:  # pragma: no cover
+        log_map_server(f"{config.SYMBOLS['error']} Error in Carto sequence: {e}. Attempting to finalize directory.",
+                       "error", logger_to_use)
+        try:
+            finalize_carto_directory_processing(logger_to_use)
+        except Exception as e_finalize:
+            log_map_server(
+                f"{config.SYMBOLS['error']} Error during Carto directory finalization after failure: {e_finalize}",
+                "error", logger_to_use)
+        raise
+    log_map_server(f"--- {config.SYMBOLS['success']} Carto Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
+def renderd_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting Renderd Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    setup_steps = [
+        ("SETUP_RENDERD_PKG_CHECK", "Check Renderd Package Installation", ensure_renderd_packages_installed),
+        ("SETUP_RENDERD_DIRS", "Create Renderd Directories", create_renderd_directories),
+        ("SETUP_RENDERD_SYSTEMD_FILE", "Create Renderd Systemd Service File", create_renderd_systemd_service_file),
+    ];
+    config_steps = [
+        ("CONFIG_RENDERD_CONF_FILE", "Create renderd.conf File", create_renderd_conf_file),
+        ("SERVICE_RENDERD_ACTIVATE", "Activate Renderd Service", activate_renderd_service),
+    ]
+    for tag, description, func_ref in setup_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"Renderd setup step '{description}' ({tag}) failed.")  # pragma: no cover
+    for tag, description, func_ref in config_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"Renderd configuration step '{description}' ({tag}) failed.")  # pragma: no cover
+    log_map_server(f"--- {config.SYMBOLS['success']} Renderd Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
+def nginx_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting Nginx Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    nginx_steps = [
+        ("SETUP_NGINX_PKG_CHECK", "Check Nginx Package Installation", ensure_nginx_package_installed),
+        ("CONFIG_NGINX_PROXY_SITE", "Create Nginx Proxy Site Configuration", create_nginx_proxy_site_config),
+        ("CONFIG_NGINX_MANAGE_SITES", "Enable Proxy Site & Disable Default", manage_nginx_sites),
+        ("CONFIG_NGINX_TEST_CONFIG", "Test Nginx Configuration", test_nginx_configuration),
+        ("SERVICE_NGINX_ACTIVATE", "Activate Nginx Service", activate_nginx_service),
+    ]
+    for tag, description, func_ref in nginx_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"Nginx setup step '{description}' ({tag}) failed.")  # pragma: no cover
+    log_map_server(f"--- {config.SYMBOLS['success']} Nginx Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
+def pg_tileserv_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting pg_tileserv Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    setup_steps = [
+        ("SETUP_PGTS_DOWNLOAD_BINARY", "Download & Install pg_tileserv Binary",
+         download_and_install_pg_tileserv_binary),
+        ("SETUP_PGTS_CREATE_USER", "Create pg_tileserv System User", create_pg_tileserv_system_user),
+        ("SETUP_PGTS_BINARY_PERMS", "Set pg_tileserv Binary Permissions", setup_pg_tileserv_binary_permissions),
+        ("SETUP_PGTS_SYSTEMD_FILE", "Create pg_tileserv Systemd Service File", create_pg_tileserv_systemd_service_file),
+    ];
+    config_steps = [
+        ("CONFIG_PGTS_CONFIG_FILE", "Create pg_tileserv config.toml", create_pg_tileserv_config_file),
+        ("SERVICE_PGTS_ACTIVATE", "Activate pg_tileserv Service", activate_pg_tileserv_service),
+    ]
+    for tag, description, func_ref in setup_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"pg_tileserv setup step '{description}' ({tag}) failed.")  # pragma: no cover
+    for tag, description, func_ref in config_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"pg_tileserv configuration step '{description}' ({tag}) failed.")  # pragma: no cover
+    log_map_server(f"--- {config.SYMBOLS['success']} pg_tileserv Full Setup & Config Sequence Completed ---", "success",
+                   logger_to_use)
+
+
+def osrm_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    # ... (implementation as before) ...
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting OSRM Full Setup, Processing & Config Sequence ---", "info",
+                   logger_to_use)
+    base_pbf_path_holder = {"path": None};
+    regional_pbf_paths_holder = {"paths_map": {}};
+    processed_regions_holder = {"names": []}
+    infra_steps = [
+        ("SETUP_OSRM_DEPS", "Ensure OSRM Dependencies", ensure_osrm_dependencies),
+        ("SETUP_OSRM_DIRS", "Setup OSRM Data Directories", setup_osrm_data_directories),
+        ("SETUP_OSRM_DOWNLOAD_PBF", "Download Base PBF for OSRM",
+         lambda cl: base_pbf_path_holder.update({"path": download_base_pbf(cl)})),
+        ("SETUP_OSRM_REGION_BOUNDARIES", "Prepare Region Boundary Files", prepare_region_boundaries),
+    ]
+    log_map_server("--- Phase: OSRM Infrastructure & Base Data ---", "info", logger_to_use)
+    for tag, desc, func in infra_steps:
+        if not execute_step(tag, desc, func, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"OSRM infra step '{desc}' failed.")  # pragma: no cover
+    base_pbf_path = base_pbf_path_holder["path"]
+    if not base_pbf_path: raise RuntimeError("Base PBF path not set for OSRM.")  # pragma: no cover
+    log_map_server("--- Phase: OSRM Regional PBF Extraction (Osmium) ---", "info", logger_to_use)
+    if not execute_step("DATAPROC_OSMIUM_EXTRACT_REGIONS", "Extract Regional PBFs (Osmium)",
+                        lambda cl: regional_pbf_paths_holder.update(
+                                {"paths_map": extract_regional_pbfs_with_osmium(base_pbf_path, cl)}), logger_to_use,
+                        cli_prompt_for_rerun):
+        raise RuntimeError("Osmium regional PBF extraction failed.")  # pragma: no cover
+    regional_pbf_map = regional_pbf_paths_holder["paths_map"]
+    if not regional_pbf_map: log_map_server(f"{config.SYMBOLS['warning']} No regional PBFs for OSRM graph building.",
+                                            "warning", logger_to_use); return  # pragma: no cover
+    log_map_server("--- Phase: OSRM Graph Building (Docker) ---", "info", logger_to_use)
+    for region_name, regional_pbf_path in regional_pbf_map.items():
+        if not execute_step(f"DATAPROC_OSRM_BUILD_GRAPH_{region_name.upper()}", f"Build OSRM Graphs for {region_name}",
+                            lambda cl, rn=region_name, rpp=regional_pbf_path: build_osrm_graphs_for_region(rn, rpp, cl),
+                            logger_to_use, cli_prompt_for_rerun):  # pragma: no cover
+            log_map_server(f"{config.SYMBOLS['error']} Failed to build OSRM graphs for {region_name}.", "error",
+                           logger_to_use)
+        else:
+            processed_regions_holder["names"].append(region_name)
+    successfully_processed_regions = processed_regions_holder["names"]
+    if not successfully_processed_regions: log_map_server(
+        f"{config.SYMBOLS['warning']} No OSRM graphs successfully built.", "warning",
+        logger_to_use); return  # pragma: no cover
+    log_map_server("--- Phase: OSRM Service Configuration & Activation ---", "info", logger_to_use)
+    for region_name in successfully_processed_regions:
+        if not execute_step(f"SETUP_OSRM_SYSTEMD_SERVICE_{region_name.upper()}",
+                            f"Create OSRM Systemd Service for {region_name}",
+                            lambda cl, rn=region_name: create_osrm_routed_service_file(rn, cl), logger_to_use,
+                            cli_prompt_for_rerun):  # pragma: no cover
+            log_map_server(f"{config.SYMBOLS['error']} Failed to create OSRM systemd service for {region_name}.",
+                           "error", logger_to_use);
+            continue
+        if not execute_step(f"CONFIG_OSRM_ACTIVATE_SERVICE_{region_name.upper()}",
+                            f"Activate OSRM Service for {region_name}",
+                            lambda cl, rn=region_name: activate_osrm_routed_service(rn, cl), logger_to_use,
+                            cli_prompt_for_rerun):  # pragma: no cover
+            log_map_server(f"{config.SYMBOLS['error']} Failed to activate OSRM service for {region_name}.", "error",
+                           logger_to_use)
+    log_map_server(f"--- {config.SYMBOLS['success']} OSRM Full Setup, Processing & Config Sequence Completed ---",
+                   "success", logger_to_use)
+
+
+def apache_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    # ... (implementation as before) ...
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting Apache & mod_tile Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    apache_steps = [
+        ("SETUP_APACHE_PKG_CHECK", "Check Apache Package Installation", ensure_apache_packages_installed),
+        ("CONFIG_APACHE_PORTS", "Configure Apache Listening Ports", configure_apache_ports),
+        ("CONFIG_APACHE_MOD_TILE_CONF", "Create mod_tile Apache Configuration", create_mod_tile_config),
+        ("CONFIG_APACHE_TILE_SITE_CONF", "Create Apache Tile Serving Site", create_apache_tile_site_config),
+        ("CONFIG_APACHE_MODULES_SITES", "Enable Apache Modules and Sites", manage_apache_modules_and_sites),
+        ("SERVICE_APACHE_ACTIVATE", "Activate Apache Service", activate_apache_service),
+    ]
+    for tag, description, func_ref in apache_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun): raise RuntimeError(
+            f"Apache setup step '{description}' ({tag}) failed.")  # pragma: no cover
+    log_map_server(f"--- {config.SYMBOLS['success']} Apache & mod_tile Full Setup & Config Sequence Completed ---",
+                   "success", logger_to_use)
+
+
+def certbot_full_setup_sequence(current_logger: Optional[logging.Logger] = None) -> None:
+    # ... (implementation as before) ...
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(f"--- {config.SYMBOLS['step']} Starting Certbot Full Setup & Config Sequence ---", "info",
+                   logger_to_use)
+    certbot_steps = [
+        ("SETUP_CERTBOT_PACKAGES", "Install Certbot Packages", install_certbot_packages),
+        ("CONFIG_CERTBOT_RUN", "Run Certbot for Nginx SSL/TLS Certificates", run_certbot_nginx),
+    ]
+    for tag, description, func_ref in certbot_steps:
+        if not execute_step(tag, description, func_ref, logger_to_use, cli_prompt_for_rerun):  # pragma: no cover
+            log_map_server(
+                f"{config.SYMBOLS['warning']} Certbot step '{description}' ({tag}) did not complete successfully. SSL may not be configured.",
+                "warning", logger_to_use)
+            break
+    log_map_server(f"--- {config.SYMBOLS['success']} Certbot Full Setup & Config Sequence Attempted ---", "success",
+                   logger_to_use)
+
+
+# REMOVE: gtfs_full_setup_sequence function. It's replaced by a single orchestrator call.
+
+def systemd_reload_step_group(current_logger_instance: Optional[logging.Logger] = None) -> bool:  # pragma: no cover
+    # ... (implementation as before) ...
+    logger_to_use = current_logger_instance if current_logger_instance else logger
+    return execute_step("SYSTEMD_RELOAD_MAIN", "Reload Systemd Daemon (Group Action)",
+                        lambda lp: systemd_reload(current_logger=lp), logger_to_use, cli_prompt_for_rerun)
+
+
+# Define a wrapper function for the GTFS orchestrator to be used in defined_tasks_map
+def run_full_gtfs_module_wrapper(calling_logger: Optional[logging.Logger]):
+    """Wrapper to call the main GTFS orchestrator with config parameters."""
+    db_params_dict = {
+        "PGHOST": config.PGHOST,
+        "PGPORT": str(config.PGPORT),
+        "PGDATABASE": config.PGDATABASE,
+        "PGUSER": config.PGUSER,
+        "PGPASSWORD": config.PGPASSWORD
+    }
+    # Define default paths for log files for the GTFS module
+    # These could eventually be moved to a GTFS-specific section in setup.config if desired
+    default_gtfs_app_log = "/var/log/gtfs_processor_app.log"
+    default_cron_output_log = "/var/log/gtfs_cron_output.log"
+
+    process_and_setup_gtfs(
+        gtfs_feed_url=config.GTFS_FEED_URL,
+        db_params=db_params_dict,
+        project_root=Path(config.OSM_PROJECT_ROOT),  # Ensure OSM_PROJECT_ROOT is a Path
+        gtfs_app_log_file=default_gtfs_app_log,
+        # gtfs_app_log_level=logging.INFO, # Default handled by orchestrator
+        # gtfs_app_log_prefix="[GTFS-ETL]",  # Default handled by orchestrator
+        cron_run_user=config.PGUSER,  # Default user for cron
+        cron_job_output_log_file=default_cron_output_log,
+        # python_executable_for_cron=None, # Default handled by orchestrator
+        orchestrator_logger=calling_logger  # Pass the logger from execute_step
+    )
+
 
 def main_map_server_entry(args: Optional[List[str]] = None) -> int:
+    # ... (Argparse setup as previously refactored for prerequisite changes) ...
+    # Key changes will be in task_flags_definitions and defined_tasks_map for GTFS.
     parser = argparse.ArgumentParser(
         description="Map Server Installer Script. Automates installation and configuration.",
-        epilog="Example: python3 ./installer/main_installer.py --full -v mymap.example.com",  # Corrected path
+        epilog="Example: python3 ./installer/main_installer.py --full -v mymap.example.com",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter, add_help=False,
     )
-    # ... (standard help, --full, --view-config, --view-state, --clear-state args as before) ...
     parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS,
                         help="Show this help message and exit.")
     parser.add_argument("--full", action="store_true", help="Run full installation process (all groups in sequence).")
@@ -213,7 +477,6 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
     parser.add_argument("--clear-state", action="store_true", help="Clear all progress state from state file and exit.")
 
     config_group = parser.add_argument_group("Configuration Overrides")
-    # ... (config_group args as before, using config defaults) ...
     config_group.add_argument("-a", "--admin-group-ip", default=config.ADMIN_GROUP_IP_DEFAULT,
                               help="Admin group IP range (CIDR) for firewall and DB access.")
     config_group.add_argument("-f", "--gtfs-feed-url", default=config.GTFS_FEED_URL_DEFAULT,
@@ -226,7 +489,6 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
                               help="Prefix for log messages from this script.")
 
     pg_group = parser.add_argument_group("PostgreSQL Connection Overrides")
-    # ... (pg_group args as before, using config defaults) ...
     pg_group.add_argument("-H", "--pghost", default=config.PGHOST_DEFAULT, help="PostgreSQL host.")
     pg_group.add_argument("-P", "--pgport", default=config.PGPORT_DEFAULT, help="PostgreSQL port.")
     pg_group.add_argument("-D", "--pgdatabase", default=config.PGDATABASE_DEFAULT, help="PostgreSQL database name.")
@@ -235,12 +497,9 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
                           help="PostgreSQL password. IMPORTANT: Change this default for security!")
 
     task_group = parser.add_argument_group("Individual Task Flags")
-    # Updated task flags definitions
-    # Tags should be unique and match keys in defined_tasks_map
     task_flags_definitions: List[Tuple[str, str, str]] = [
         ("boot-verbosity", "PREREQ_BOOT_VERBOSITY_TAG", "Run boot verbosity setup only."),
         ("core-conflicts", "PREREQ_CORE_CONFLICTS_TAG", "Run core conflict removal only."),
-        # ("core-install" flag removed as its logic is now part of the comprehensive prereq group)
         ("docker-install", "PREREQ_DOCKER_ENGINE_TAG", "Run Docker installation only."),
         ("nodejs-install", "PREREQ_NODEJS_LTS_TAG", "Run Node.js installation only."),
         ("ufw", "UFW_FULL_SETUP", "Run UFW full setup and configuration."),
@@ -252,7 +511,8 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         ("osrm", "OSRM_FULL_SETUP", "Run OSRM full setup, data processing & service activation."),
         ("apache", "APACHE_FULL_SETUP", "Run Apache & mod_tile full setup and configuration."),
         ("certbot", "CERTBOT_FULL_SETUP", "Run Certbot full setup and configuration."),
-        ("gtfs-prep", "GTFS_FULL_SETUP", "Run GTFS full setup, data processing, and automation."),
+        # Updated GTFS flag
+        ("gtfs-prep", GTFS_PROCESS_AND_SETUP_TAG, "Run Full GTFS Setup, Processing, and Automation."),
         ("raster-prep", "RASTER_PREP", "Run raster tile pre-rendering only."),
         ("website-setup", "WEBSITE_CONTENT_DEPLOY", "Deploy test website content."),
         ("task-systemd-reload", "SYSTEMD_RELOAD_TASK", "Run systemd reload as a single task."),
@@ -262,26 +522,22 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
                                 help=get_dynamic_help(base_desc, task_tag))
 
     group_task_flags = parser.add_argument_group("Group Task Flags")
-    # --conflicts-removed now points to the specific function via defined_tasks_map
     group_task_flags.add_argument("--conflicts-removed", dest="core_conflicts", action="store_true",
-                                  # Use dest matching a task_flag_definition
                                   help="Run core conflict removal step only.")
-    # --prereqs now points to the comprehensive group via defined_tasks_map
     group_task_flags.add_argument("--prereqs", dest="run_all_core_prerequisites", action="store_true",
                                   help="Run comprehensive prerequisites installation group.")
     group_task_flags.add_argument("--services", action="store_true", help="Run setup for ALL services.")
-    group_task_flags.add_argument("--data", action="store_true", help="Run all data preparation and processing tasks.")
+    group_task_flags.add_argument("--data", action="store_true",
+                                  help="Run all data preparation and processing tasks.")  # This will be updated
     group_task_flags.add_argument("--systemd-reload", dest="group_systemd_reload_flag", action="store_true",
                                   help="Run systemd reload (as a group action).")
 
     dev_group = parser.add_argument_group("Developer and Advanced Options")
-    # ... (dev_group args as before) ...
     dev_group.add_argument("--dev-override-unsafe-password", "--im-a-developer-get-me-out-of-here", action="store_true",
                            dest="dev_override_unsafe_password",
                            help="DEV FLAG: Allow using default PGPASSWORD for .pgpass. USE WITH CAUTION.")
 
     # --- Argument Parsing and Config Update ---
-    # ... (same as before) ...
     try:
         if args is None and ("-h" in sys.argv or "--help" in sys.argv):  # pragma: no cover
             parser.print_help(sys.stderr);
@@ -290,24 +546,23 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
     except SystemExit as e:  # pragma: no cover
         return e.code
 
-    config.ADMIN_GROUP_IP = parsed_args.admin_group_ip
-    config.GTFS_FEED_URL = parsed_args.gtfs_feed_url
-    config.VM_IP_OR_DOMAIN = parsed_args.vm_ip_or_domain
-    config.PG_TILESERV_BINARY_LOCATION = parsed_args.pg_tileserv_binary_location
-    config.LOG_PREFIX = parsed_args.log_prefix
-    config.PGHOST = parsed_args.pghost
-    config.PGPORT = parsed_args.pgport
-    config.PGDATABASE = parsed_args.pgdatabase
-    config.PGUSER = parsed_args.pguser
-    config.PGPASSWORD = parsed_args.pgpassword
+    # ... (config updates from parsed_args as before) ...
+    config.ADMIN_GROUP_IP = parsed_args.admin_group_ip;
+    config.GTFS_FEED_URL = parsed_args.gtfs_feed_url;
+    config.VM_IP_OR_DOMAIN = parsed_args.vm_ip_or_domain;
+    config.PG_TILESERV_BINARY_LOCATION = parsed_args.pg_tileserv_binary_location;
+    config.LOG_PREFIX = parsed_args.log_prefix;
+    config.PGHOST = parsed_args.pghost;
+    config.PGPORT = parsed_args.pgport;
+    config.PGDATABASE = parsed_args.pgdatabase;
+    config.PGUSER = parsed_args.pguser;
+    config.PGPASSWORD = parsed_args.pgpassword;
     config.DEV_OVERRIDE_UNSAFE_PASSWORD = parsed_args.dev_override_unsafe_password
 
-    # Centralized logging setup call (as refactored previously)
+    # Centralized logging setup
     level_str_main = os.environ.get("LOGLEVEL", "INFO").upper()
     log_level_main = getattr(logging, level_str_main, logging.INFO)
-    if not isinstance(log_level_main, int):  # pragma: no cover
-        print(f"Warning: Invalid LOGLEVEL string '{level_str_main}'. Defaulting to INFO.", file=sys.stderr)
-        log_level_main = logging.INFO
+    if not isinstance(log_level_main, int): log_level_main = logging.INFO  # pragma: no cover
     common_setup_logging(log_level=log_level_main, log_to_console=True, log_prefix=config.LOG_PREFIX)
 
     log_map_server(
@@ -316,19 +571,19 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
 
     # ... (PGPASSWORD warning, root check, initialize_state_system, setup_pgpass as before) ...
     if (
-            config.PGPASSWORD == config.PGPASSWORD_DEFAULT and not parsed_args.view_config and not config.DEV_OVERRIDE_UNSAFE_PASSWORD):  # pragma: no cover
-        log_map_server(f"{config.SYMBOLS['warning']} WARNING: Using default PostgreSQL password. This is INSECURE.",
-                       "warning", current_logger=logger)
-    if os.geteuid() != 0:  # pragma: no cover
+            config.PGPASSWORD == config.PGPASSWORD_DEFAULT and not parsed_args.view_config and not config.DEV_OVERRIDE_UNSAFE_PASSWORD): log_map_server(
+        f"{config.SYMBOLS['warning']} WARNING: Using default PostgreSQL password. This is INSECURE.", "warning",
+        current_logger=logger)  # pragma: no cover
+    if os.geteuid() != 0:
         log_map_server(f"{config.SYMBOLS['info']} Script not run as root. 'sudo' will be used for elevated commands.",
-                       "info", current_logger=logger)
+                       "info", current_logger=logger)  # pragma: no cover
     else:
         log_map_server(f"{config.SYMBOLS['info']} Script is running as root.", "info", current_logger=logger)
     initialize_state_system(current_logger=logger)
     setup_pgpass(pg_host=config.PGHOST, pg_port=config.PGPORT, pg_database=config.PGDATABASE, pg_user=config.PGUSER,
                  pg_password=config.PGPASSWORD, pg_password_default=config.PGPASSWORD_DEFAULT,
                  allow_default_for_dev=config.DEV_OVERRIDE_UNSAFE_PASSWORD, current_logger=logger)
-    if parsed_args.view_config: view_configuration(current_logger=logger); return 0
+    if parsed_args.view_config: view_configuration(current_logger=logger); return 0  # pragma: no cover
     if parsed_args.view_state:  # pragma: no cover
         completed_steps_list = view_completed_steps(current_logger=logger)
         if completed_steps_list:
@@ -346,17 +601,14 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
 
     # --- Updated Task Definitions ---
     defined_tasks_map: Dict[str, Tuple[str, str, Callable]] = {
-        # Individual prerequisite tasks now point to their new homes
         "boot_verbosity": ("PREREQ_BOOT_VERBOSITY_TAG", "Improve Boot Verbosity", prereq_boot_verbosity),
         "core_conflicts": ("PREREQ_CORE_CONFLICTS_TAG", "Remove Core Conflicts", prereq_core_conflict_removal),
         "docker_install": ("PREREQ_DOCKER_ENGINE_TAG", "Install Docker Engine", install_docker_engine),
         "nodejs_install": ("PREREQ_NODEJS_LTS_TAG", "Install Node.js LTS", install_nodejs_lts),
 
-        # Orchestrator for the comprehensive prerequisite group (for --prereqs flag)
         "run_all_core_prerequisites": (ALL_CORE_PREREQUISITES_GROUP_TAG, "Run Comprehensive Prerequisites Group",
                                        core_prerequisites_group),
 
-        # Service setup sequences (remain as before)
         "ufw": ("UFW_FULL_SETUP", "Run UFW full setup", ufw_full_setup_sequence),
         "postgres": ("POSTGRES_FULL_SETUP", "Run PostgreSQL full setup", postgres_full_setup_sequence),
         "carto": ("CARTO_FULL_SETUP", "Run Carto full setup", carto_full_setup_sequence),
@@ -366,7 +618,11 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         "osrm": ("OSRM_FULL_SETUP", "Run OSRM full setup & data processing", osrm_full_setup_sequence),
         "apache": ("APACHE_FULL_SETUP", "Run Apache & mod_tile full setup", apache_full_setup_sequence),
         "certbot": ("CERTBOT_FULL_SETUP", "Run Certbot full setup", certbot_full_setup_sequence),
-        "gtfs_prep": ("GTFS_FULL_SETUP", "Run GTFS full pipeline", gtfs_full_setup_sequence),
+
+        # Updated GTFS entry to use the wrapper
+        "gtfs_prep": (GTFS_PROCESS_AND_SETUP_TAG, "Run Full GTFS Setup, Processing, and Automation",
+                      run_full_gtfs_module_wrapper),
+
         "raster_prep": ("RASTER_PREP", "Pre-render Raster Tiles", raster_tile_prerender),
         "website_setup": ("WEBSITE_CONTENT_DEPLOY", "Deploy Test Website Content", deploy_test_website_content),
         "task_systemd_reload": ("SYSTEMD_RELOAD_TASK", "Reload Systemd Daemon (Task)",
@@ -377,30 +633,25 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
     action_taken = False
 
     tasks_to_run_from_flags: List[Dict[str, Any]] = []
-    # Check flags corresponding to keys in defined_tasks_map
-    # Note: This includes the dest for --prereqs ("run_all_core_prerequisites")
-    # and --conflicts-removed (which is now "core_conflicts" via its dest)
     for arg_dest_name_key in defined_tasks_map.keys():
-        # Map argparse dest (e.g., parsed_args.boot_verbosity) to defined_tasks_map key (e.g., "boot_verbosity")
-        # For group flags, the dest in argparse should match a key here.
-        # Example: --prereqs has dest="run_all_core_prerequisites"
-        if getattr(parsed_args, arg_dest_name_key, False):
+        if getattr(parsed_args, arg_dest_name_key.replace("-", "_"), False) or \
+                (arg_dest_name_key == "run_all_core_prerequisites" and parsed_args.run_all_core_prerequisites) or \
+                (
+                        arg_dest_name_key == "core_conflicts" and parsed_args.core_conflicts):  # Special handling for group flags' dest
             action_taken = True
             tag, desc, func_ref = defined_tasks_map[arg_dest_name_key]
             tasks_to_run_from_flags.append({"tag": tag, "desc": desc, "func": func_ref})
 
-    # ... (rest of task execution logic, e.g., sorting tasks_to_run_from_flags, then executing) ...
+    # ... (task execution logic as before, handling tasks_to_run_from_flags, --full, etc.) ...
     if tasks_to_run_from_flags:
         log_map_server(f"{config.SYMBOLS['rocket']}====== Running Specified Individual Task(s)/Group(s) ======", "info",
                        current_logger=logger)
-        # Sorting logic for tasks_to_run_from_flags (as before, if needed, ensuring tags are in task_execution_details_lookup)
-        # ...
+        # Sorting logic might need adjustment if tags/grouping changed significantly.
+        # For now, assuming simple execution or prior sorting method is sufficient.
         for task_info in tasks_to_run_from_flags:
-            if not overall_success:  # pragma: no cover
-                log_map_server(
-                    f"{config.SYMBOLS['warning']} Skipping task '{task_info['desc']}' due to previous failure.",
-                    "warning", logger);
-                continue
+            if not overall_success: log_map_server(
+                f"{config.SYMBOLS['warning']} Skipping task '{task_info['desc']}' due to previous failure.", "warning",
+                logger); continue  # pragma: no cover
             if not execute_step(task_info["tag"], task_info["desc"], task_info["func"], logger, cli_prompt_for_rerun):
                 overall_success = False  # pragma: no cover
 
@@ -408,7 +659,6 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
         action_taken = True
         log_map_server(f"{config.SYMBOLS['rocket']}====== Starting Full Installation Process ======", "info",
                        current_logger=logger)
-        # Updated all_setup_and_config_phases to use the new comprehensive prerequisite group tag
         all_setup_and_config_phases = [
             (ALL_CORE_PREREQUISITES_GROUP_TAG, "Comprehensive Core Prerequisites", core_prerequisites_group),
             ("UFW_FULL_SETUP", "Full UFW Setup & Configuration", ufw_full_setup_sequence),
@@ -421,19 +671,22 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
             ("NGINX_FULL_SETUP", "Full Nginx Setup & Configuration", nginx_full_setup_sequence),
             ("CERTBOT_FULL_SETUP", "Full Certbot Setup & Configuration", certbot_full_setup_sequence),
             ("WEBSITE_CONTENT_DEPLOY", "Deploy Test Website Content", deploy_test_website_content),
-            ("SYSTEMD_RELOAD_GROUP", "Systemd Reload After All Services", systemd_reload_step_group),
-            # Assuming this is a callable group function
-            ("GTFS_FULL_SETUP", "Full GTFS Data Pipeline Setup", gtfs_full_setup_sequence),
+            # Updated GTFS step in full install
+            (GTFS_PROCESS_AND_SETUP_TAG, "Full GTFS Data Pipeline Setup", run_full_gtfs_module_wrapper),
             ("RASTER_PREP", "Raster Tile Pre-rendering", raster_tile_prerender),
+            ("SYSTEMD_RELOAD_GROUP", "Systemd Reload After All Services", systemd_reload_step_group),
         ]
         for tag, desc, phase_func_ref in all_setup_and_config_phases:
             if not overall_success: log_map_server(
                 f"{config.SYMBOLS['warning']} Skipping '{desc}' due to previous failure.", "warning", logger); continue
             log_map_server(f"--- {config.SYMBOLS['info']} Executing: {desc} ({tag}) ---", "info", logger)
             current_phase_success = True
-            # Check if it's a group function that returns bool or a step to be run via execute_step
-            # Assuming group functions like core_prerequisites_group and systemd_reload_step_group are called directly.
-            if tag == ALL_CORE_PREREQUISITES_GROUP_TAG or "GROUP" in tag.upper():  # Heuristic for group orchestrators
+            # Heuristic for group orchestrators (like core_prerequisites_group) vs steps needing execute_step
+            if "GROUP_TAG" in tag.upper() or "GROUP" == tag.split('_')[
+                -1].upper() and tag != "SYSTEMD_RELOAD_GROUP":  # Adjust heuristic if needed
+                if not phase_func_ref(
+                    logger): current_phase_success = False  # Assumes group orchestrators take logger and return bool
+            elif tag == "SYSTEMD_RELOAD_GROUP":  # systemd_reload_step_group calls execute_step internally
                 if not phase_func_ref(logger): current_phase_success = False
             else:  # Standard step
                 if not execute_step(tag, desc, phase_func_ref, logger,
@@ -441,54 +694,45 @@ def main_map_server_entry(args: Optional[List[str]] = None) -> int:
             if not current_phase_success: overall_success = False; log_map_server(
                 f"{config.SYMBOLS['error']} Phase/Task '{desc}' failed.", "error", logger); break
 
-    # Individual group flags like --services, --data, --systemd-reload are processed here
-    # These might also need adjustment if their constituent steps have changed or moved.
-    # For example, if --prereqs is now handled by defined_tasks_map key "run_all_core_prerequisites",
-    # the explicit elif for parsed_args.prereqs might not be needed if tasks_to_run_from_flags handles it.
-    # However, keeping them for clarity if they represent distinct user intentions for grouped actions.
-
+    # Group flags like --services, --data etc.
     elif parsed_args.services:  # pragma: no cover
         action_taken = True;
         log_map_server(f"{config.SYMBOLS['rocket']}====== Running All Service Setups & Configurations ======", "info",
                        current_logger=logger)
-        all_service_related_sequences = [
-            ("UFW_FULL_SETUP", "Full UFW Setup", ufw_full_setup_sequence),
-            ("POSTGRES_FULL_SETUP", "Full PostgreSQL Setup", postgres_full_setup_sequence),
-            # ... (other services)
-            ("WEBSITE_CONTENT_DEPLOY", "Deploy Test Website Content", deploy_test_website_content),
-        ]
-        for tag, desc, func in all_service_related_sequences:
+        # Ensure this list is correct based on defined_tasks_map for service sequences
+        all_service_related_sequences_keys = ["ufw", "postgres", "pgtileserv", "carto", "renderd", "osrm", "apache",
+                                              "nginx", "certbot", "website_setup"]
+        for task_key in all_service_related_sequences_keys:
             if not overall_success: break
+            tag, desc, func = defined_tasks_map[task_key]
             if not execute_step(tag, desc, func, logger, cli_prompt_for_rerun): overall_success = False
         if overall_success: overall_success = systemd_reload_step_group(logger)
 
     elif parsed_args.data:  # pragma: no cover
         action_taken = True;
         log_map_server(f"{config.SYMBOLS['rocket']}====== Running Data Tasks ======", "info", current_logger=logger)
-        data_tasks_for_group_flag = [
-            ("GTFS_FULL_SETUP", "Full GTFS Pipeline Setup", gtfs_full_setup_sequence),
-            ("RASTER_PREP", "Raster Tile Pre-rendering", raster_tile_prerender),
-        ]
-        for tag, desc, func in data_tasks_for_group_flag:
+        # Use the defined_tasks_map for consistency
+        data_tasks_keys = ["gtfs_prep", "raster_prep"]
+        for task_key in data_tasks_keys:
             if not overall_success: break
+            tag, desc, func = defined_tasks_map[task_key]
             if not execute_step(tag, desc, func, logger, cli_prompt_for_rerun): overall_success = False
 
     elif parsed_args.group_systemd_reload_flag:  # pragma: no cover
         action_taken = True
-        overall_success = systemd_reload_step_group(logger)
+        overall_success = systemd_reload_step_group(logger)  # This already calls execute_step
 
+    # Final checks and return
     if not action_taken and not (
             parsed_args.view_config or parsed_args.view_state or parsed_args.clear_state):  # pragma: no cover
         log_map_server(f"{config.SYMBOLS['info']} No installation action specified. Displaying help.", "info",
                        current_logger=logger)
         parser.print_help(file=sys.stderr)
         return 2
-
     if not overall_success:  # pragma: no cover
         log_map_server(f"{config.SYMBOLS['critical']} One or more steps failed.", "critical", current_logger=logger)
         return 1
     else:
-        # Ensure a message is logged if only view/clear state was done and was successful
         if action_taken or parsed_args.view_config or parsed_args.view_state or parsed_args.clear_state:
             log_map_server(f"{config.SYMBOLS['sparkles']} All requested operations completed successfully.", "success",
                            current_logger=logger)

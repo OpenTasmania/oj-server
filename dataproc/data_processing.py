@@ -1,36 +1,33 @@
-# setup/data_processing.py
+# dataproc/data_processing.py
 # -*- coding: utf-8 -*-
 """
 Orchestrates data preparation tasks like GTFS processing and raster tile pre-rendering.
 """
 import logging
-from typing import Optional  # Added Optional
+from typing import Optional, Dict # Added Dict
+from pathlib import Path        # Added Path
 
-# Assuming common.command_utils for log_map_server
 from common.command_utils import log_map_server
-from configure.gtfs_automation_configurator import configure_gtfs_update_cronjob
-from dataproc.gtfs_processor_runner import run_gtfs_etl_pipeline_and_verify
-# Import the refactored raster_tile_prerender
+# Import the new GTFS orchestrator
+from processors.gtfs.orchestrator import process_and_setup_gtfs
+# Import for raster pre-rendering (remains as is)
 from dataproc.raster_processor import raster_tile_prerender
-from setup import config  # For SYMBOLS
+from setup import config  # For SYMBOLS and config values
 from setup.cli_handler import cli_prompt_for_rerun
-# Import the new granular GTFS functions
-from setup.gtfs_environment_setup import setup_gtfs_logging_and_env_vars
 from setup.step_executor import execute_step
 
-# No longer need detailed GTFS imports here, as they are in their respective modules.
-# We will import the new granular functions for the data_prep_group.
+# REMOVE old GTFS-specific imports:
+# from configure.gtfs_automation_configurator import configure_gtfs_update_cronjob
+# from dataproc.gtfs_processor_runner import run_gtfs_etl_pipeline_and_verify
+# from setup.gtfs_environment_setup import setup_gtfs_logging_and_env_vars
 
-module_logger = logging.getLogger(__name__)  # Added module_logger definition
+module_logger = logging.getLogger(__name__)
 
-
-# The old monolithic gtfs_data_prep function is now removed,
-# its logic is split into the three imported GTFS functions above.
 
 def data_prep_group(current_logger: Optional[logging.Logger] = None) -> bool:
     """
-    Run all data preparation steps as a group. This now calls the
-    refactored granular steps for GTFS processing and raster pre-rendering.
+    Run all data preparation steps as a group.
+    GTFS processing is now handled by a single call to the GTFS orchestrator.
     """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -40,19 +37,50 @@ def data_prep_group(current_logger: Optional[logging.Logger] = None) -> bool:
     )
     overall_success = True
 
-    # Define the sequence of data preparation steps
-    # These now point to the more granular functions or their orchestrators
-    step_definitions_in_group = [
-        # GTFS Processing Sequence
-        ("SETUP_GTFS_ENV", "Setup GTFS Environment (Logging & Env Vars)", setup_gtfs_logging_and_env_vars),
-        ("DATAPROC_GTFS_ETL", "Run GTFS ETL Pipeline and Verify Data", run_gtfs_etl_pipeline_and_verify),
-        ("CONFIG_GTFS_CRON", "Configure GTFS Update Cron Job", configure_gtfs_update_cronjob),
+    # Construct db_params from global config for the GTFS orchestrator
+    db_parameters_for_gtfs: Dict[str, str] = {
+        "PGHOST": config.PGHOST,
+        "PGPORT": str(config.PGPORT), # Ensure port is a string
+        "PGDATABASE": config.PGDATABASE,
+        "PGUSER": config.PGUSER,
+        "PGPASSWORD": config.PGPASSWORD
+    }
 
-        # Raster Tile Pre-rendering
+    # Define a wrapper function or lambda to call the GTFS orchestrator
+    # This allows it to fit into the execute_step pattern
+    def run_gtfs_orchestrator(cl: Optional[logging.Logger]):
+        # Define default paths for log files if not globally configured elsewhere for GTFS specifically
+        # These paths are specific to the GTFS module's operation.
+        default_gtfs_app_log = "/var/log/gtfs_processor_app.log"
+        default_gtfs_cron_log = "/var/log/gtfs_cron_output.log"
+
+        process_and_setup_gtfs(
+            gtfs_feed_url=config.GTFS_FEED_URL,
+            db_params=db_parameters_for_gtfs,
+            project_root=config.OSM_PROJECT_ROOT, # Assuming config.OSM_PROJECT_ROOT is a Path object
+            gtfs_app_log_file=default_gtfs_app_log, # Or from a new GTFS specific config
+            # gtfs_app_log_level=logging.INFO, # Default in orchestrator
+            # gtfs_app_log_prefix="[GTFS-ETL]", # Default in orchestrator
+            cron_run_user=config.PGUSER, # Default user for cron
+            cron_job_output_log_file=default_gtfs_cron_log, # Or from new GTFS specific config
+            # python_executable_for_cron=None, # Let orchestrator/automation find it
+            orchestrator_logger=cl # Pass the logger from execute_step
+        )
+
+    # Define the sequence of data preparation steps
+    step_definitions_in_group = [
+        # GTFS Processing Sequence is now a single orchestrated step
         (
-            "RASTER_PREP",  # This is the existing tag for raster pre-rendering
+            "GTFS_PROCESSING_AND_SETUP", # New, single tag for all GTFS operations
+            "Process GTFS Data and Configure Automation",
+            run_gtfs_orchestrator # Wrapper function that calls the main GTFS orchestrator
+        ),
+
+        # Raster Tile Pre-rendering (remains as before)
+        (
+            "RASTER_PREP",
             "Pre-render Raster Tiles",
-            raster_tile_prerender,  # From dataproc.raster_processor
+            raster_tile_prerender,
         ),
     ]
 
@@ -61,7 +89,7 @@ def data_prep_group(current_logger: Optional[logging.Logger] = None) -> bool:
                 tag,
                 desc,
                 func_ref,
-                logger_to_use,
+                logger_to_use, # This logger is for execute_step itself
                 prompt_user_for_rerun=cli_prompt_for_rerun,
         ):
             overall_success = False
