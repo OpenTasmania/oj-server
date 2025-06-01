@@ -10,7 +10,6 @@ from typing import Optional
 from common.command_utils import log_map_server, run_elevated_command
 from common.network_utils import validate_cidr
 from common.system_utils import systemd_reload  # For activate_ufw_service
-
 # Import AppSettings for type hinting
 from setup.config_models import AppSettings
 
@@ -21,7 +20,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def apply_ufw_rules(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Applies the defined UFW rules (default policies and allows).
@@ -38,9 +37,9 @@ def apply_ufw_rules(
     )
 
     if not validate_cidr(
-        admin_group_ip,
-        current_logger=logger_to_use,
-        app_settings=app_settings,
+            admin_group_ip,
+            current_logger=logger_to_use,
+            app_settings=app_settings,
     ):  # Pass app_settings
         msg = (
             f"UFW rule application aborted: Invalid ADMIN_GROUP_IP CIDR format "
@@ -157,7 +156,7 @@ def apply_ufw_rules(
 
 
 def activate_ufw_service(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Ensures UFW package is installed (via check) and enables the UFW service if currently inactive.
@@ -191,8 +190,8 @@ def activate_ufw_service(
 
         # ufw status can return non-zero if inactive, so check output primarily
         if (
-            status_result.stdout
-            and "inactive" in status_result.stdout.lower()
+                status_result.stdout
+                and "inactive" in status_result.stdout.lower()
         ):
             log_map_server(
                 f"{symbols.get('warning', '')} UFW is inactive. Enabling now. "
@@ -217,8 +216,8 @@ def activate_ufw_service(
                 logger_to_use,
             )
         elif (
-            "inactive" not in status_result.stdout.lower()
-            and status_result.returncode == 0
+                "inactive" not in status_result.stdout.lower()
+                and status_result.returncode == 0
         ):
             log_map_server(
                 f"{symbols.get('info', '')} UFW is already active.",

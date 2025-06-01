@@ -21,10 +21,10 @@ DEFAULT_CRON_GTFS_STDOUT_LOG_FILE = "/var/log/gtfs_cron_output.log"
 
 
 def configure_gtfs_update_cronjob(
-    app_settings: AppSettings,  # Changed to accept AppSettings
-    # project_root_path, feed_url, db_params will be sourced from app_settings
-    # cron_user_name, cron_output_log_file, python_executable_override can also be part of AppSettings.gtfs or AppSettings.automation
-    current_logger: Optional[logging.Logger] = None,
+        app_settings: AppSettings,  # Changed to accept AppSettings
+        # project_root_path, feed_url, db_params will be sourced from app_settings
+        # cron_user_name, cron_output_log_file, python_executable_override can also be part of AppSettings.gtfs or AppSettings.automation
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -164,15 +164,15 @@ def configure_gtfs_update_cronjob(
             line
             for line in existing_content.splitlines()
             if not (
-                update_script_module_path in line
-                and str(project_root_path) in line
+                    update_script_module_path in line
+                    and str(project_root_path) in line
             )
         ]
         new_lines.extend([cron_comment_id, cron_job_line])
         final_content = "\n".join(new_lines) + "\n"
 
         with NamedTemporaryFile(
-            mode="w", delete=False, prefix="gtfscron_"
+                mode="w", delete=False, prefix="gtfscron_"
         ) as temp_f:
             temp_f.write(final_content)
             temp_cron_file = temp_f.name

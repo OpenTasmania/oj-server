@@ -32,7 +32,7 @@ RENDERD_SYSTEM_GROUP = (
 
 
 def get_mapnik_plugin_dir(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> str:
     """Determines the Mapnik plugins directory. Uses override from app_settings if provided."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -112,18 +112,18 @@ def get_mapnik_plugin_dir(
 
 
 def create_renderd_conf_file(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the /etc/renderd.conf file using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            app_settings=app_settings,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
+            get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                app_settings=app_settings,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH"
     )
 
     log_map_server(
@@ -166,7 +166,7 @@ def create_renderd_conf_file(
 
     renderd_host_val = app_settings.vm_ip_or_domain
     if (
-        renderd_host_val == VM_IP_OR_DOMAIN_DEFAULT
+            renderd_host_val == VM_IP_OR_DOMAIN_DEFAULT
     ):  # Compare with imported default
         renderd_host_val = "localhost"
 
@@ -235,7 +235,7 @@ def create_renderd_conf_file(
 
 
 def activate_renderd_service(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reloads systemd, enables and restarts the renderd service."""
     logger_to_use = current_logger if current_logger else module_logger

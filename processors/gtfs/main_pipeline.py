@@ -20,7 +20,6 @@ from common.db_utils import get_db_connection
 from common.file_utils import cleanup_directory
 from processors.gtfs import download, load, transform
 from processors.gtfs import schema_definitions as schemas
-
 from .db_setup import (
     add_foreign_keys_from_schema,
     create_tables_from_schema,
@@ -80,14 +79,14 @@ def run_full_gtfs_etl_pipeline() -> bool:
             "--- Step 1: Downloading and Extracting GTFS Feed ---"
         )
         if not download.download_gtfs_feed(
-            current_gtfs_feed_url, TEMP_DOWNLOAD_PATH
+                current_gtfs_feed_url, TEMP_DOWNLOAD_PATH
         ):
             module_logger.critical(
                 "Failed to download GTFS feed. Pipeline aborted."
             )
             return False
         if not download.extract_gtfs_feed(
-            TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH
+                TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH
         ):
             module_logger.critical(
                 "Failed to extract GTFS feed. Pipeline aborted."
@@ -135,15 +134,15 @@ def run_full_gtfs_etl_pipeline() -> bool:
 
                 if df_original is None or df_original.empty:
                     if (
-                        table_base_name == "shapes"
-                        and gtfs_filename_key == "shapes.txt"
+                            table_base_name == "shapes"
+                            and gtfs_filename_key == "shapes.txt"
                     ):
                         module_logger.info(
                             "Table 'shapes' (points data from shapes.txt) not found or empty. If lines are derived, this might be fine."
                         )
                     elif (
-                        table_base_name == "gtfs_shapes_lines"
-                        and gtfs_filename_key == "gtfs_shapes_lines.txt"
+                            table_base_name == "gtfs_shapes_lines"
+                            and gtfs_filename_key == "gtfs_shapes_lines.txt"
                     ):
                         module_logger.info(
                             "Conceptual table 'gtfs_shapes_lines' - actual data processing happens under 'shapes.txt' key."
@@ -197,16 +196,16 @@ def run_full_gtfs_etl_pipeline() -> bool:
                         )
                         df_transformed = df_for_processing.copy()
                 elif (
-                    table_base_name == "shapes"
-                    and gtfs_filename_key == "shapes.txt"
+                        table_base_name == "shapes"
+                        and gtfs_filename_key == "shapes.txt"
                 ):
                     if feed.shapes is not None and not feed.shapes.empty:
                         shapes_lines_gdf = gtfs_kit.geometrize_shapes(
                             feed.shapes
                         )
                         if (
-                            shapes_lines_gdf is not None
-                            and not shapes_lines_gdf.empty
+                                shapes_lines_gdf is not None
+                                and not shapes_lines_gdf.empty
                         ):
                             module_logger.info(
                                 f"Processing {len(shapes_lines_gdf)} shape geometries into 'gtfs_shapes_lines'."
@@ -252,9 +251,9 @@ def run_full_gtfs_etl_pipeline() -> bool:
                     df_transformed = df_for_processing.copy()
 
                 if (
-                    df_transformed.empty
-                    and table_base_name == "shapes"
-                    and gtfs_filename_key == "shapes.txt"
+                        df_transformed.empty
+                        and table_base_name == "shapes"
+                        and gtfs_filename_key == "shapes.txt"
                 ):
                     module_logger.info(
                         f"Skipping loading for '{table_base_name}' as df_transformed is empty."
@@ -344,7 +343,7 @@ if __name__ == "__main__":
         )
 
     if DB_PARAMS.get(
-        "password"
+            "password"
     ) == "yourStrongPasswordHere" and not os.environ.get("PG_OSM_PASSWORD"):
         module_logger.warning(
             "CRITICAL: PostgreSQL password is a placeholder. Set PG_OSM_PASSWORD or update DB_PARAMS."

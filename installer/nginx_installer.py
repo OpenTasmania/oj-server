@@ -22,7 +22,7 @@ NGINX_PACKAGE_NAME = "nginx"  # Nginx package name is static
 
 
 def ensure_nginx_package_installed(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Confirms that the Nginx package is present.
@@ -40,7 +40,7 @@ def ensure_nginx_package_installed(
 
     # elevated_command_exists and check_package_installed now take app_settings
     if elevated_command_exists(
-        "nginx", app_settings, current_logger=logger_to_use
+            "nginx", app_settings, current_logger=logger_to_use
     ) and check_package_installed(
         NGINX_PACKAGE_NAME,
         app_settings=app_settings,

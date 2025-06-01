@@ -34,18 +34,18 @@ NGINX_SITES_ENABLED_DIR = "/etc/nginx/sites-enabled"
 
 
 def create_nginx_proxy_site_config(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the Nginx site configuration file for reverse proxying using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            app_settings=app_settings,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
+            get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                app_settings=app_settings,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH"
     )
 
     proxy_conf_filename = (
@@ -68,7 +68,7 @@ def create_nginx_proxy_site_config(
 
     server_name_val = app_settings.vm_ip_or_domain
     if (
-        server_name_val == VM_IP_OR_DOMAIN_DEFAULT
+            server_name_val == VM_IP_OR_DOMAIN_DEFAULT
     ):  # Compare with imported default
         server_name_val = "_"  # Catch-all if default example.com is used
 
@@ -116,7 +116,7 @@ def create_nginx_proxy_site_config(
 
 
 def manage_nginx_sites(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Enables the new Nginx proxy site and disables the default site."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -171,9 +171,9 @@ def manage_nginx_sites(
         # Check if 'default' symlink exists in sites-enabled
         # elevated_command_exists was refactored
         if elevated_command_exists(
-            f"test -L {default_nginx_symlink}",
-            app_settings,
-            current_logger=logger_to_use,
+                f"test -L {default_nginx_symlink}",
+                app_settings,
+                current_logger=logger_to_use,
         ):
             run_elevated_command(
                 ["rm", default_nginx_symlink],
@@ -203,7 +203,7 @@ def manage_nginx_sites(
 
 
 def test_nginx_configuration(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Tests the Nginx configuration for syntax errors."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -228,7 +228,7 @@ def test_nginx_configuration(
             app_settings,
         )
     except (
-        subprocess.CalledProcessError
+            subprocess.CalledProcessError
     ):  # check=True will raise this on failure
         # Error already logged by run_elevated_command
         # log_map_server(f"{symbols.get('error','❌')} Nginx configuration test FAILED. Output: {e.stderr or e.stdout}", "error", logger_to_use, app_settings)
@@ -236,7 +236,7 @@ def test_nginx_configuration(
 
 
 def activate_nginx_service(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reloads systemd, restarts and enables the Nginx service."""
     logger_to_use = current_logger if current_logger else module_logger

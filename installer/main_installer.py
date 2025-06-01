@@ -16,7 +16,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Import all individual step functions
 # (These are assumed to be refactored to accept (app_settings, logger))
 from actions.website_setup_actions import deploy_test_website_content
-
 # Common utilities (now refactored to accept AppSettings)
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
@@ -102,12 +101,10 @@ from installer.renderd_installer import (
 )
 from installer.ufw_installer import ensure_ufw_package_installed
 from processors.gtfs.orchestrator import process_and_setup_gtfs
-
 # Static constants and core setup utilities
 from setup import config as static_config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.config_loader import load_app_settings
-
 # New configuration system imports
 from setup.config_models import (
     ADMIN_GROUP_IP_DEFAULT,
@@ -291,7 +288,7 @@ def get_dynamic_help(base_help: str, task_tag: str) -> str:
 
 # --- Orchestrator Sequences (accept app_cfg and pass it to execute_step) ---
 def ufw_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -315,7 +312,7 @@ def ufw_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"UFW step '{desc}' failed.")
     log_map_server(
@@ -327,7 +324,7 @@ def ufw_full_setup_sequence(
 
 
 def postgres_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -375,7 +372,7 @@ def postgres_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"PostgreSQL step '{desc}' failed.")
     log_map_server(
@@ -387,7 +384,7 @@ def postgres_full_setup_sequence(
 
 
 def carto_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -441,7 +438,7 @@ def carto_full_setup_sequence(
     try:
         for tag, desc, func in steps:
             if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                    tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
             ):
                 raise RuntimeError(f"Carto step '{desc}' failed.")
     except Exception as e:
@@ -470,7 +467,7 @@ def carto_full_setup_sequence(
 
 
 def renderd_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -508,7 +505,7 @@ def renderd_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"Renderd step '{desc}' failed.")
     log_map_server(
@@ -520,7 +517,7 @@ def renderd_full_setup_sequence(
 
 
 def apache_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -563,7 +560,7 @@ def apache_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"Apache step '{desc}' failed.")
     log_map_server(
@@ -575,7 +572,7 @@ def apache_full_setup_sequence(
 
 
 def nginx_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -613,7 +610,7 @@ def nginx_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"Nginx step '{desc}' failed.")
     log_map_server(
@@ -625,7 +622,7 @@ def nginx_full_setup_sequence(
 
 
 def certbot_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -644,7 +641,7 @@ def certbot_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             log_map_server(
                 f"{app_cfg.symbols.get('warning', '!')} Certbot step '{desc}' failed/skipped.",
@@ -662,7 +659,7 @@ def certbot_full_setup_sequence(
 
 
 def pg_tileserv_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -705,7 +702,7 @@ def pg_tileserv_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"pg_tileserv step '{desc}' failed.")
     log_map_server(
@@ -717,7 +714,7 @@ def pg_tileserv_full_setup_sequence(
 
 
 def osrm_full_setup_sequence(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -760,16 +757,16 @@ def osrm_full_setup_sequence(
     ]
     for tag, desc, func in infra_steps:
         if not execute_step(
-            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"OSRM infra step '{desc}' failed.")
     if not execute_step(
-        "DATAPROC_OSMIUM_EXTRACT_REGIONS",
-        "Extract Regional PBFs",
-        _extract_regions_step,
-        app_cfg,
-        logger_to_use,
-        cli_prompt_for_rerun,
+            "DATAPROC_OSMIUM_EXTRACT_REGIONS",
+            "Extract Regional PBFs",
+            _extract_regions_step,
+            app_cfg,
+            logger_to_use,
+            cli_prompt_for_rerun,
     ):
         raise RuntimeError("Osmium regional PBF extraction failed.")
     regional_map = regional_pbf_map_holder.get("map", {})
@@ -788,12 +785,12 @@ def osrm_full_setup_sequence(
             return build_osrm_graphs_for_region(r, p, ac, cl)
 
         if not execute_step(
-            f"DATAPROC_OSRM_BUILD_GRAPH_{rn.upper()}",
-            f"Build OSRM Graphs for {rn}",
-            _build,
-            app_cfg,
-            logger_to_use,
-            cli_prompt_for_rerun,
+                f"DATAPROC_OSRM_BUILD_GRAPH_{rn.upper()}",
+                f"Build OSRM Graphs for {rn}",
+                _build,
+                app_cfg,
+                logger_to_use,
+                cli_prompt_for_rerun,
         ):
             continue
 
@@ -801,12 +798,12 @@ def osrm_full_setup_sequence(
             create_osrm_routed_service_file(r, ac, cl)
 
         if not execute_step(
-            f"SETUP_OSRM_SYSTEMD_SERVICE_{rn.upper()}",
-            f"Create OSRM Service File for {rn}",
-            _create_svc,
-            app_cfg,
-            logger_to_use,
-            cli_prompt_for_rerun,
+                f"SETUP_OSRM_SYSTEMD_SERVICE_{rn.upper()}",
+                f"Create OSRM Service File for {rn}",
+                _create_svc,
+                app_cfg,
+                logger_to_use,
+                cli_prompt_for_rerun,
         ):
             continue
 
@@ -814,12 +811,12 @@ def osrm_full_setup_sequence(
             activate_osrm_routed_service(r, ac, cl)
 
         if not execute_step(
-            f"CONFIG_OSRM_ACTIVATE_SERVICE_{rn.upper()}",
-            f"Activate OSRM Service for {rn}",
-            _activate_svc,
-            app_cfg,
-            logger_to_use,
-            cli_prompt_for_rerun,
+                f"CONFIG_OSRM_ACTIVATE_SERVICE_{rn.upper()}",
+                f"Activate OSRM Service for {rn}",
+                _activate_svc,
+                app_cfg,
+                logger_to_use,
+                cli_prompt_for_rerun,
         ):
             continue
         processed_regions_count += 1
@@ -840,8 +837,8 @@ def osrm_full_setup_sequence(
 
 
 def systemd_reload_step_group(
-    app_cfg: AppSettings,
-    current_logger_instance: Optional[logging.Logger] = None,
+        app_cfg: AppSettings,
+        current_logger_instance: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = (
         current_logger_instance if current_logger_instance else logger
@@ -857,7 +854,7 @@ def systemd_reload_step_group(
 
 
 def run_full_gtfs_module_wrapper(
-    app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
+        app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
 ):
     db_p = {
         "PGHOST": app_cfg.pg.host,
@@ -1102,9 +1099,9 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         APP_CONFIG,
     )
     if (
-        APP_CONFIG.pg.password == PGPASSWORD_DEFAULT
-        and not parsed_cli_args.view_config
-        and not APP_CONFIG.dev_override_unsafe_password
+            APP_CONFIG.pg.password == PGPASSWORD_DEFAULT
+            and not parsed_cli_args.view_config
+            and not APP_CONFIG.dev_override_unsafe_password
     ):
         log_map_server(
             f"{APP_CONFIG.symbols.get('warning', '⚠️')} WARNING: Default PostgreSQL password in use.",
@@ -1153,9 +1150,9 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         return 0
     if parsed_cli_args.clear_state:
         if cli_prompt_for_rerun(
-            f"Clear state from {static_config.STATE_FILE_PATH}?",
-            APP_CONFIG,
-            logger,
+                f"Clear state from {static_config.STATE_FILE_PATH}?",
+                APP_CONFIG,
+                logger,
         ):
             h = get_current_script_hash(
                 static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger
@@ -1223,22 +1220,22 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
 
     for arg_dest_name, was_flag_set in vars(parsed_cli_args).items():
         if (
-            was_flag_set
-            and arg_dest_name in defined_tasks_callable_map
-            and arg_dest_name in cli_flag_to_task_details
+                was_flag_set
+                and arg_dest_name in defined_tasks_callable_map
+                and arg_dest_name in cli_flag_to_task_details
         ):
             action_taken = True
             task_tag, task_desc = cli_flag_to_task_details[arg_dest_name]
             step_func = defined_tasks_callable_map[arg_dest_name]
             if not any(
-                t["tag"] == task_tag for t in tasks_to_run
+                    t["tag"] == task_tag for t in tasks_to_run
             ):  # Avoid duplicates
                 tasks_to_run.append(
                     {"tag": task_tag, "desc": task_desc, "func": step_func}
                 )
 
     if parsed_cli_args.run_all_core_prerequisites and not any(
-        t["tag"] == ALL_CORE_PREREQUISITES_GROUP_TAG for t in tasks_to_run
+            t["tag"] == ALL_CORE_PREREQUISITES_GROUP_TAG for t in tasks_to_run
     ):
         action_taken = True
         tag, desc = cli_flag_to_task_details["run_all_core_prerequisites"]
@@ -1262,12 +1259,12 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 )
                 continue
             if not execute_step(
-                task["tag"],
-                task["desc"],
-                task["func"],
-                APP_CONFIG,
-                logger,
-                cli_prompt_for_rerun,
+                    task["tag"],
+                    task["desc"],
+                    task["func"],
+                    APP_CONFIG,
+                    logger,
+                    cli_prompt_for_rerun,
             ):
                 overall_success = False
 
@@ -1363,12 +1360,12 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 APP_CONFIG,
             )
             if not execute_step(
-                tag,
-                desc,
-                phase_func,
-                APP_CONFIG,
-                logger,
-                cli_prompt_for_rerun,
+                    tag,
+                    desc,
+                    phase_func,
+                    APP_CONFIG,
+                    logger,
+                    cli_prompt_for_rerun,
             ):
                 overall_success = False
                 log_map_server(
@@ -1402,7 +1399,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             tag, desc = cli_flag_to_task_details[key]
             func = defined_tasks_callable_map[key]
             if not execute_step(
-                tag, desc, func, APP_CONFIG, logger, cli_prompt_for_rerun
+                    tag, desc, func, APP_CONFIG, logger, cli_prompt_for_rerun
             ):
                 overall_success = False
         if overall_success:
@@ -1410,12 +1407,12 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 "task_systemd_reload"
             ]  # Should map to a group reload tag
             if not execute_step(
-                tag_rl,
-                "Systemd Reload After Services",
-                systemd_reload_step_group,
-                APP_CONFIG,
-                logger,
-                cli_prompt_for_rerun,
+                    tag_rl,
+                    "Systemd Reload After Services",
+                    systemd_reload_step_group,
+                    APP_CONFIG,
+                    logger,
+                    cli_prompt_for_rerun,
             ):
                 overall_success = False
 
@@ -1437,19 +1434,19 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             "task_systemd_reload"
         ]  # Assuming task_systemd_reload points to group orchestrator
         if not execute_step(
-            tag_rl_grp,
-            desc_rl_grp,
-            systemd_reload_step_group,
-            APP_CONFIG,
-            logger,
-            cli_prompt_for_rerun,
+                tag_rl_grp,
+                desc_rl_grp,
+                systemd_reload_step_group,
+                APP_CONFIG,
+                logger,
+                cli_prompt_for_rerun,
         ):
             overall_success = False
 
     if not action_taken and not (
-        parsed_cli_args.view_config
-        or parsed_cli_args.view_state
-        or parsed_cli_args.clear_state
+            parsed_cli_args.view_config
+            or parsed_cli_args.view_state
+            or parsed_cli_args.clear_state
     ):
         log_map_server(
             f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No action specified. Displaying help.",
@@ -1470,10 +1467,10 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         return 1
 
     if (
-        action_taken
-        or parsed_cli_args.view_config
-        or parsed_cli_args.view_state
-        or parsed_cli_args.clear_state
+            action_taken
+            or parsed_cli_args.view_config
+            or parsed_cli_args.view_state
+            or parsed_cli_args.clear_state
     ):
         log_map_server(
             f"{APP_CONFIG.symbols.get('sparkles', '✨')} Operation(s) completed.",

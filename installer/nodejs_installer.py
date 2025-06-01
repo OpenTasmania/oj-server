@@ -17,7 +17,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def install_nodejs_lts(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

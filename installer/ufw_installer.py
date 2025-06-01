@@ -20,7 +20,7 @@ UFW_PACKAGE_NAME = "ufw"  # UFW package name is static
 
 
 def ensure_ufw_package_installed(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Confirms UFW package is installed.
@@ -35,9 +35,9 @@ def ensure_ufw_package_installed(
         logger_to_use,
     )
     if check_package_installed(
-        UFW_PACKAGE_NAME,
-        current_logger=logger_to_use,
-        app_settings=app_settings,
+            UFW_PACKAGE_NAME,
+            current_logger=logger_to_use,
+            app_settings=app_settings,
     ):  # Pass app_settings
         log_map_server(
             f"{symbols.get('success', '')} UFW package '{UFW_PACKAGE_NAME}' is installed.",

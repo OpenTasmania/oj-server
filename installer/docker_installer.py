@@ -23,7 +23,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def install_docker_engine(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -45,7 +45,7 @@ def install_docker_engine(
             current_logger=logger_to_use,
         )
         with tempfile.NamedTemporaryFile(
-            delete=False, prefix="dockerkey_", suffix=".asc"
+                delete=False, prefix="dockerkey_", suffix=".asc"
         ) as temp_f:
             key_dest_tmp = temp_f.name
         run_command(

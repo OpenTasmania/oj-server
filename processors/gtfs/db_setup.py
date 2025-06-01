@@ -107,9 +107,9 @@ def create_tables_from_schema(conn: PgConnection) -> None:
 
             pk_column_names = details.get("pk_cols")
             if (
-                pk_column_names
-                and isinstance(pk_column_names, list)
-                and len(pk_column_names) > 0
+                    pk_column_names
+                    and isinstance(pk_column_names, list)
+                    and len(pk_column_names) > 0
             ):
                 sanitized_pk_cols = [
                     sql.Identifier(col) for col in pk_column_names
@@ -145,19 +145,19 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             cursor.execute(
                 sql.SQL(
                     """
-                        CREATE TABLE IF NOT EXISTS gtfs_shapes_lines
-                        (
-                            shape_id
-                            TEXT
-                            PRIMARY
-                            KEY,
-                            geom
-                            GEOMETRY
-                        (
-                            LineString,
-                            4326
-                        ));
-                        """
+                    CREATE TABLE IF NOT EXISTS gtfs_shapes_lines
+                    (
+                        shape_id
+                        TEXT
+                        PRIMARY
+                        KEY,
+                        geom
+                        GEOMETRY
+                    (
+                        LineString,
+                        4326
+                    ));
+                    """
                 )
             )
             module_logger.info("Table 'gtfs_shapes_lines' ensured.")
@@ -171,29 +171,29 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             cursor.execute(
                 sql.SQL(
                     """
-                                   CREATE TABLE IF NOT EXISTS gtfs_dlq
-                                   (
-                                       id
-                                       SERIAL
-                                       PRIMARY
-                                       KEY,
-                                       gtfs_filename
-                                       TEXT,
-                                       original_row_data
-                                       TEXT,
-                                       error_timestamp
-                                       TIMESTAMP
-                                       WITH
-                                       TIME
-                                       ZONE
-                                       DEFAULT
-                                       CURRENT_TIMESTAMP,
-                                       error_reason
-                                       TEXT,
-                                       notes
-                                       TEXT
-                                   );
-                                   """
+                    CREATE TABLE IF NOT EXISTS gtfs_dlq
+                    (
+                        id
+                        SERIAL
+                        PRIMARY
+                        KEY,
+                        gtfs_filename
+                        TEXT,
+                        original_row_data
+                        TEXT,
+                        error_timestamp
+                        TIMESTAMP
+                        WITH
+                        TIME
+                        ZONE
+                        DEFAULT
+                        CURRENT_TIMESTAMP,
+                        error_reason
+                        TEXT,
+                        notes
+                        TEXT
+                    );
+                    """
                 )
             )
             module_logger.info("Generic DLQ table 'gtfs_dlq' ensured.")
@@ -207,7 +207,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
 
 
 def add_foreign_keys_from_schema(
-    conn: PgConnection,
+        conn: PgConnection,
 ) -> None:  # pragma: no cover
     """
     Add foreign keys based on GTFS_FOREIGN_KEYS definitions.
@@ -216,11 +216,11 @@ def add_foreign_keys_from_schema(
     module_logger.info("Attempting to add foreign keys post-data load...")
     with conn.cursor() as cursor:
         for (
-            from_table,
-            from_cols_list,
-            to_table,
-            to_cols_list,
-            fk_name,
+                from_table,
+                from_cols_list,
+                to_table,
+                to_cols_list,
+                fk_name,
         ) in GTFS_FOREIGN_KEYS:
             try:
                 cursor.execute(
@@ -283,7 +283,7 @@ def add_foreign_keys_from_schema(
 
 
 def drop_all_gtfs_foreign_keys(
-    conn: PgConnection,
+        conn: PgConnection,
 ) -> None:  # pragma: no cover
     """Drop all defined GTFS foreign keys using Psycopg 3."""
     module_logger.info("Dropping existing GTFS foreign keys...")

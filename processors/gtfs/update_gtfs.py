@@ -15,7 +15,6 @@ from typing import Dict, Optional
 
 # common.core_utils will be imported for the new logging setup
 from common.core_utils import setup_logging as common_setup_logging
-
 # Relative import for the main pipeline function
 from . import main_pipeline as core_gtfs_pipeline
 
@@ -43,7 +42,7 @@ DEFAULT_GTFS_URL = os.environ.get("GTFS_FEED_URL", DEFAULT_GTFS_URL_CONFIG)
 
 
 def run_gtfs_etl_via_core_pipeline(
-    feed_url_override: Optional[str] = None,
+        feed_url_override: Optional[str] = None,
 ) -> bool:
     """
     Sets GTFS_FEED_URL and DB environment variables then runs the main ETL pipeline.
@@ -68,7 +67,7 @@ def run_gtfs_etl_via_core_pipeline(
     os.environ["PG_PORT"] = DB_PARAMS["port"]
 
     if hasattr(
-        core_gtfs_pipeline, "GTFS_FEED_URL_MODULE_LEVEL_VAR"
+            core_gtfs_pipeline, "GTFS_FEED_URL_MODULE_LEVEL_VAR"
     ):  # pragma: no cover
         core_gtfs_pipeline.GTFS_FEED_URL_MODULE_LEVEL_VAR = effective_feed_url
 
@@ -76,11 +75,11 @@ def run_gtfs_etl_via_core_pipeline(
 
 
 def setup_update_gtfs_logging(
-    log_level_str: str = "INFO",
-    log_file_path: Optional[
-        str
-    ] = LOG_FILE,  # Use the module's LOG_FILE constant
-    log_to_console: bool = True,
+        log_level_str: str = "INFO",
+        log_file_path: Optional[
+            str
+        ] = LOG_FILE,  # Use the module's LOG_FILE constant
+        log_to_console: bool = True,
 ) -> None:
     """Set up logging configuration for the update_gtfs CLI script."""
     log_level_val = getattr(logging, log_level_str.upper(), logging.INFO)

@@ -15,7 +15,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def raster_tile_prerender(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -54,7 +54,7 @@ def raster_tile_prerender(
             app_settings,
         )
     except (
-        Exception
+            Exception
     ) as e:  # Includes CalledProcessError from run_elevated_command if check=True was used
         log_map_server(
             f"{symbols.get('error', '❌')} Error checking renderd status: {e}",

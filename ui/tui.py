@@ -81,7 +81,7 @@ class LogDisplay(urwid.WidgetWrap):
         self.log_lines.append(styled_text_widget)
 
         if (
-            self.log_lines
+                self.log_lines
         ):  # Ensure there are lines before trying to set focus
             self.list_box.set_focus(len(self.log_lines) - 1)
 
@@ -94,7 +94,7 @@ class TuiLogHandler(logging.Handler):
     """A logging handler that directs messages to the Urwid LogDisplay."""
 
     def __init__(
-        self, log_display_widget: LogDisplay, main_loop: urwid.MainLoop
+            self, log_display_widget: LogDisplay, main_loop: urwid.MainLoop
     ):
         super().__init__()
         self.log_display_widget = log_display_widget
@@ -133,9 +133,9 @@ class YesNoDialog(urwid.WidgetWrap):
     signals = ["close_yes", "close_no"]  # Emitted with self as argument
 
     def __init__(
-        self,
-        title_text: str,
-        message_text: str,
+            self,
+            title_text: str,
+            message_text: str,
     ) -> None:
         """
         Initialize the Yes/No dialog.
@@ -208,8 +208,8 @@ class InstallerTUI:
     """Main class for the Installer Text User Interface."""
 
     def __init__(
-        self,
-        defined_tasks: List[Tuple[str, str, Callable]],
+            self,
+            defined_tasks: List[Tuple[str, str, Callable]],
     ) -> None:
         """Initialize the TUI components and main loop."""
         self.defined_tasks = defined_tasks
@@ -288,9 +288,9 @@ class InstallerTUI:
                 self.interactive_pane_placeholder.original_widget
             )
             is_main_menu_linebox = (
-                isinstance(current_interactive_widget, urwid.LineBox)
-                and current_interactive_widget.original_widget
-                is self.main_menu_listbox
+                    isinstance(current_interactive_widget, urwid.LineBox)
+                    and current_interactive_widget.original_widget
+                    is self.main_menu_listbox
             )
             if not is_main_menu_linebox and not self.is_task_running:
                 self.show_main_menu()
@@ -301,7 +301,7 @@ class InstallerTUI:
                 )
 
     def _update_interactive_pane(
-        self, widget: urwid.Widget, title: str = "Controls"
+            self, widget: urwid.Widget, title: str = "Controls"
     ) -> None:
         self.interactive_pane_placeholder.original_widget = urwid.LineBox(
             widget, title=title
@@ -322,7 +322,7 @@ class InstallerTUI:
         )
 
     def show_view_configuration(
-        self, button: Optional[urwid.Button] = None
+            self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
@@ -355,7 +355,7 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def show_manage_state(
-        self, button: Optional[urwid.Button] = None
+            self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
@@ -383,10 +383,10 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def _task_runner(
-        self,
-        tag: str,
-        desc: str,
-        func: Callable[[Optional[logging.Logger]], None],
+            self,
+            tag: str,
+            desc: str,
+            func: Callable[[Optional[logging.Logger]], None],
     ) -> None:  # pragma: no cover
         success = False
         try:
@@ -412,7 +412,7 @@ class InstallerTUI:
             )
 
     def _handle_task_completion(
-        self, tag: str, desc: str, success: bool
+            self, tag: str, desc: str, success: bool
     ) -> None:  # pragma: no cover
         self.is_task_running = False
         self._active_worker_thread = None
@@ -461,7 +461,7 @@ class InstallerTUI:
         self.execute_installer_step(tag, desc, func)
 
     def run_full_installation(
-        self, button: Optional[urwid.Button] = None
+            self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
@@ -485,7 +485,7 @@ class InstallerTUI:
         self._process_next_task_in_queue()
 
     def show_step_selection(
-        self, button: Optional[urwid.Button] = None
+            self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
@@ -495,9 +495,9 @@ class InstallerTUI:
         items_to_run_for_queue: List[Tuple[str, str, Callable]] = []
 
         def on_checklist_change(
-            checkbox: urwid.CheckBox,
-            new_state: bool,
-            step_data: Tuple[str, str, Callable],
+                checkbox: urwid.CheckBox,
+                new_state: bool,
+                step_data: Tuple[str, str, Callable],
         ) -> None:
             if new_state:
                 if step_data not in items_to_run_for_queue:
@@ -577,7 +577,7 @@ class InstallerTUI:
         )
 
     def _show_rerun_dialog_from_worker(
-        self, _loop=None, _data=None
+            self, _loop=None, _data=None
     ) -> None:  # pragma: no cover
         if not self._dialog_prompt_message:
             module_logger.error(
@@ -616,7 +616,7 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def _threaded_prompt_for_rerun(
-        self, prompt_message: str
+            self, prompt_message: str
     ) -> bool:  # pragma: no cover
         if threading.current_thread() is threading.main_thread():
             module_logger.warning(
@@ -635,7 +635,7 @@ class InstallerTUI:
         )
 
     def tui_prompt_for_rerun(
-        self, prompt_message: str
+            self, prompt_message: str
     ) -> bool:  # pragma: no cover
         if threading.current_thread() is not threading.main_thread():
             module_logger.error(
@@ -647,7 +647,7 @@ class InstallerTUI:
         dialog_result_holder: Dict[str, Optional[bool]] = {"result": None}
 
         def handle_dialog_close(
-            is_yes: bool, temp_loop_ref: urwid.MainLoop
+                is_yes: bool, temp_loop_ref: urwid.MainLoop
         ) -> None:
             dialog_result_holder["result"] = is_yes
             if temp_loop_ref.is_running():
@@ -685,10 +685,10 @@ class InstallerTUI:
         )
 
     def execute_installer_step(
-        self,
-        tag: str,
-        desc: str,
-        func: Callable[[Optional[logging.Logger]], None],
+            self,
+            tag: str,
+            desc: str,
+            func: Callable[[Optional[logging.Logger]], None],
     ) -> None:  # pragma: no cover
         self._active_worker_thread = threading.Thread(
             target=self._task_runner, args=(tag, desc, func), daemon=True
@@ -696,7 +696,7 @@ class InstallerTUI:
         self._active_worker_thread.start()
 
     def confirm_exit_dialog(
-        self, button: Optional[urwid.Button] = None
+            self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
         message = "Are you sure you want to quit the installer?"
         if self.is_task_running:
@@ -705,7 +705,7 @@ class InstallerTUI:
         original_top_widget = self.main_loop.widget
 
         def close_dialog_and_exit(
-            _dialog_widget: YesNoDialog, confirmed_exit: bool
+                _dialog_widget: YesNoDialog, confirmed_exit: bool
         ) -> None:
             self.main_loop.widget = original_top_widget
             if confirmed_exit:
@@ -743,7 +743,7 @@ class InstallerTUI:
 
         # Ensure root logger's level is DEBUG for TuiLogHandler if not already lower
         if (
-            root_logger.level == 0 or root_logger.level > logging.DEBUG
+                root_logger.level == 0 or root_logger.level > logging.DEBUG
         ):  # NOTSET or higher than DEBUG
             root_logger.setLevel(logging.DEBUG)
             self._root_logger_level_modified_by_tui = True
@@ -755,10 +755,10 @@ class InstallerTUI:
         # Temporarily remove other console StreamHandlers
         for handler in list(root_logger.handlers):  # Iterate over a copy
             if isinstance(
-                handler, logging.StreamHandler
+                    handler, logging.StreamHandler
             ) and handler.stream in (
-                sys.stdout,
-                sys.stderr,
+                    sys.stdout,
+                    sys.stderr,
             ):  # Check stream, not type of TuiLogHandler
                 module_logger.debug(
                     f"TUI temporarily removing console handler: {handler}"
@@ -792,15 +792,15 @@ class InstallerTUI:
                 )
             for handler_to_restore in self._removed_handlers_by_tui:
                 if (
-                    handler_to_restore not in root_logger.handlers
+                        handler_to_restore not in root_logger.handlers
                 ):  # Avoid re-adding if somehow still there
                     root_logger.addHandler(handler_to_restore)
                     module_logger.debug(
                         f"TUI restored console handler: {handler_to_restore}"
                     )
             if (
-                self._root_logger_level_modified_by_tui
-                and self._original_root_logger_level is not None
+                    self._root_logger_level_modified_by_tui
+                    and self._original_root_logger_level is not None
             ):
                 root_logger.setLevel(self._original_root_logger_level)
                 module_logger.debug(
@@ -810,7 +810,7 @@ class InstallerTUI:
 
 
 def run_tui_installer(
-    defined_tasks: List[Tuple[str, str, Callable]]
+        defined_tasks: List[Tuple[str, str, Callable]]
 ) -> None:  # pragma: no cover
     """Initialize and run the Urwid TUI for the installer."""
     # Logging should be set up by the main entry point (e.g., main_installer.py)
@@ -832,18 +832,21 @@ if __name__ == "__main__":  # pragma: no cover
             "TUI __main__: BasicConfig logging configured for standalone test."
         )
 
+
     class DummyConfig:
         SYMBOLS = {"info": "ℹ>", "step": "->", "success": "✓ ", "error": "✗ "}
         ADMIN_GROUP_IP = "192.168.1.100/24 (dummy)"
         GTFS_FEED_URL = "http://example.com/dummy_gtfs.zip"
         # PBF_PLANET_URL = "http://example.com/dummy_planet.pbf" # Example if needed
 
+
     app_config = (
         DummyConfig()
     )  # Make app_config available for TUI's use if it imports it directly.
 
+
     def _dummy_log(
-        msg: str, lvl: str, logger_instance: Optional[logging.Logger]
+            msg: str, lvl: str, logger_instance: Optional[logging.Logger]
     ):
         actual_logger = logger_instance or module_logger
         if lvl == "info":
@@ -853,6 +856,7 @@ if __name__ == "__main__":  # pragma: no cover
         else:
             actual_logger.debug(msg)
 
+
     def example_step_alpha(cl: Optional[logging.Logger]):
         _dummy_log("Executing Example Step Alpha...", "info", cl)
         import time
@@ -860,6 +864,7 @@ if __name__ == "__main__":  # pragma: no cover
         time.sleep(2)
         _dummy_log("Example Step Alpha finished.", "info", cl)
         _dummy_log("This is a debug message from Alpha.", "debug", cl)
+
 
     def example_step_beta_fails_and_reruns(cl: Optional[logging.Logger]):
         _dummy_log(
@@ -872,7 +877,7 @@ if __name__ == "__main__":  # pragma: no cover
 
         time.sleep(1)
         if not getattr(
-            example_step_beta_fails_and_reruns, "has_failed_once", False
+                example_step_beta_fails_and_reruns, "has_failed_once", False
         ):
             example_step_beta_fails_and_reruns.has_failed_once = True
             _dummy_log("Something went wrong in Beta!", "error", cl)
@@ -880,6 +885,7 @@ if __name__ == "__main__":  # pragma: no cover
         _dummy_log(
             "Example Step Beta (rerun) finished successfully.", "info", cl
         )
+
 
     DUMMY_TASKS_FOR_STANDALONE: List[Tuple[str, str, Callable]] = [
         ("ALPHA_STEP", "Run Example Step Alpha (OK, 2s)", example_step_alpha),
@@ -892,12 +898,13 @@ if __name__ == "__main__":  # pragma: no cover
     ]
     _original_execute_step = execute_step
 
+
     def dummy_execute_step_tui_threaded(
-        tag: str,
-        desc: str,
-        func: Callable,
-        current_logger_instance: logging.Logger,
-        prompt_user_for_rerun: Callable[[str], bool],
+            tag: str,
+            desc: str,
+            func: Callable,
+            current_logger_instance: logging.Logger,
+            prompt_user_for_rerun: Callable[[str], bool],
     ) -> bool:
         current_logger_instance.info(f"[DummyTh Exec] Attempting: {desc}")
         current_logger_instance.debug(
@@ -932,20 +939,23 @@ if __name__ == "__main__":  # pragma: no cover
                 )
                 return False
 
+
     execute_step = (
         dummy_execute_step_tui_threaded  # Monkey patch for standalone test
     )
 
     _original_view_completed = view_completed_steps
 
+
     def dummy_view_completed_steps_tui(
-        current_logger_instance,
+            current_logger_instance,
     ) -> List[str]:  # Renamed param for clarity
         current_logger_instance.info("[Dummy State] Viewing completed steps.")
         current_logger_instance.debug(
             "[Dummy State DEBUG] No actual state file read."
         )
         return ["PREVIOUS_DUMMY_STEP_1", "PREVIOUS_DUMMY_STEP_2"]
+
 
     view_completed_steps = dummy_view_completed_steps_tui  # Monkey patch
 

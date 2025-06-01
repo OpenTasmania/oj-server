@@ -16,7 +16,6 @@ from typing import List, Optional
 # Import static_config for OSM_PROJECT_ROOT, as it's a fixed project path
 # Import AppSettings for type hinting
 from setup.config_models import AppSettings
-
 # Import command utilities that now also expect app_settings
 from .command_utils import log_map_server, run_command, run_elevated_command
 
@@ -28,9 +27,9 @@ CACHED_SCRIPT_HASH: Optional[str] = None
 
 
 def calculate_project_hash(
-    project_root_dir: Path,
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None,
+        project_root_dir: Path,
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """
     Calculate a SHA256 hash of all .py files within the project directory.
@@ -94,7 +93,7 @@ def calculate_project_hash(
                 file_content = file_path.read_bytes()
                 hasher.update(file_content)
             except (
-                Exception
+                    Exception
             ) as e_file:  # Handle errors reading individual files
                 log_map_server(
                     f"{symbols.get('error', '❌')} Error reading file {file_path} for hashing: {e_file}",
@@ -113,7 +112,7 @@ def calculate_project_hash(
         )
         return final_hash
     except (
-        Exception
+            Exception
     ) as e_hash:  # Catch-all for other errors during hashing process
         log_map_server(
             f"{symbols.get('error', '❌')} Critical error during project hashing: {e_hash}",
@@ -126,9 +125,9 @@ def calculate_project_hash(
 
 
 def get_current_script_hash(
-    project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
-    app_settings: AppSettings,
-    logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
+        project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
+        app_settings: AppSettings,
+        logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
 ) -> Optional[str]:
     """
     Get the current script hash, calculating it if not already cached.
@@ -146,7 +145,7 @@ def get_current_script_hash(
 
 
 def systemd_reload(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Reload the systemd daemon.
@@ -184,7 +183,7 @@ def systemd_reload(
 
 
 def get_debian_codename(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> Optional[str]:
     """
     Get the Debian codename (e.g., 'bookworm', 'bullseye').

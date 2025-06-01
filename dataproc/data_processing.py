@@ -31,7 +31,7 @@ RASTER_PREP_TAG = (
 
 
 def data_prep_group(
-    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:
     """
     Run all data preparation steps as a group.
@@ -49,7 +49,7 @@ def data_prep_group(
 
     # Wrapper for GTFS processing to match execute_step signature (AppSettings, Logger)
     def _run_gtfs_processing_step(
-        ac: AppSettings, cl: Optional[logging.Logger]
+            ac: AppSettings, cl: Optional[logging.Logger]
     ):
         db_params_dict: Dict[str, str] = {
             "PGHOST": ac.pg.host,
@@ -87,16 +87,16 @@ def data_prep_group(
     for tag, desc, func_ref in step_definitions:
         # Ensure cli_prompt_for_rerun is passed correctly
         if not execute_step(
-            tag,
-            desc,
-            func_ref,
-            app_cfg,
-            logger_to_use,
-            lambda prompt, ac_prompt, cl_prompt: cli_prompt_for_rerun(
-                prompt,
-                app_settings=ac_prompt,
-                current_logger_instance=cl_prompt,
-            ),
+                tag,
+                desc,
+                func_ref,
+                app_cfg,
+                logger_to_use,
+                lambda prompt, ac_prompt, cl_prompt: cli_prompt_for_rerun(
+                    prompt,
+                    app_settings=ac_prompt,
+                    current_logger_instance=cl_prompt,
+                ),
         ):
             overall_success = False
             log_map_server(

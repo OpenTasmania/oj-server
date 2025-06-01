@@ -22,20 +22,20 @@ module_logger = logging.getLogger(__name__)
 
 
 def create_osrm_routed_service_file(
-    region_name_key: str,  # Unique key for the region, e.g., "Australia_Tasmania_Hobart"
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None,
+        region_name_key: str,  # Unique key for the region, e.g., "Australia_Tasmania_Hobart"
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """Creates a systemd service file for osrm-routed for a specific region using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            app_settings=app_settings,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
+            get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                app_settings=app_settings,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH"
     )
 
     osrm_data_cfg = app_settings.osrm_data
@@ -46,7 +46,7 @@ def create_osrm_routed_service_file(
 
     # Path to the directory on host containing this region's .osrm files (e.g., /opt/osrm_processed_data/Australia_Tasmania_Hobart/)
     host_osrm_data_dir_for_this_region = (
-        Path(osrm_data_cfg.processed_dir) / region_name_key
+            Path(osrm_data_cfg.processed_dir) / region_name_key
     )
     # The OSRM filename inside the container (relative to its /data_processing mount)
     # OSRM tools use region_name_key as the base, e.g., Australia_Tasmania_Hobart.osrm
@@ -63,8 +63,8 @@ def create_osrm_routed_service_file(
     # The actual file might be region_name_key.osrm, region_name_key.hsgr etc.
     # Checking for the base .osrm file is a good indicator.
     expected_osrm_file_on_host = (
-        host_osrm_data_dir_for_this_region
-        / f"{osrm_filename_stem_in_container}.osrm"
+            host_osrm_data_dir_for_this_region
+            / f"{osrm_filename_stem_in_container}.osrm"
     )
     if not expected_osrm_file_on_host.exists():
         log_map_server(
@@ -138,9 +138,9 @@ def create_osrm_routed_service_file(
 
 
 def activate_osrm_routed_service(
-    region_name_key: str,  # Unique key for the region
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None,
+        region_name_key: str,  # Unique key for the region
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """Reloads systemd, enables and restarts the osrm-routed service for a region."""
     logger_to_use = current_logger if current_logger else module_logger

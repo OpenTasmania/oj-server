@@ -17,10 +17,10 @@ module_logger = logging.getLogger(__name__)
 
 
 def log_map_server(
-    message: str,
-    level: str = "info",
-    current_logger: Optional[logging.Logger] = None,
-    app_settings: Optional[AppSettings] = None,
+        message: str,
+        level: str = "info",
+        current_logger: Optional[logging.Logger] = None,
+        app_settings: Optional[AppSettings] = None,
 ) -> None:
     """
     Log a message using the provided logger or a default module logger.
@@ -30,9 +30,9 @@ def log_map_server(
 
     symbols_to_use = SYMBOLS_DEFAULT
     if (
-        app_settings
-        and hasattr(app_settings, "symbols")
-        and app_settings.symbols
+            app_settings
+            and hasattr(app_settings, "symbols")
+            and app_settings.symbols
     ):
         symbols_to_use = app_settings.symbols
 
@@ -58,15 +58,15 @@ def _get_elevated_command_prefix() -> List[str]:
 
 
 def run_command(
-    command: Union[List[str], str],
-    app_settings: Optional[AppSettings],
-    check: bool = True,
-    shell: bool = False,
-    capture_output: bool = False,
-    text: bool = True,
-    cmd_input: Optional[str] = None,
-    current_logger: Optional[logging.Logger] = None,
-    cwd: Optional[str] = None,
+        command: Union[List[str], str],
+        app_settings: Optional[AppSettings],
+        check: bool = True,
+        shell: bool = False,
+        capture_output: bool = False,
+        text: bool = True,
+        cmd_input: Optional[str] = None,
+        current_logger: Optional[logging.Logger] = None,
+        cwd: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     effective_logger = current_logger if current_logger else module_logger
     symbols = (
@@ -120,7 +120,7 @@ def run_command(
             cwd=cwd,
         )
         if (
-            capture_output
+                capture_output
         ):  # Log captured output only at debug level for brevity
             if result.stdout and result.stdout.strip():
                 log_map_server(
@@ -130,9 +130,9 @@ def run_command(
                     app_settings,
                 )
             if (
-                result.stderr
-                and result.stderr.strip()
-                and (not check or result.returncode == 0)
+                    result.stderr
+                    and result.stderr.strip()
+                    and (not check or result.returncode == 0)
             ):  # Non-error stderr
                 log_map_server(
                     f"   stderr: {result.stderr.strip()}",
@@ -199,13 +199,13 @@ def run_command(
 
 
 def run_elevated_command(
-    command: List[str],
-    app_settings: Optional[AppSettings],
-    check: bool = True,
-    capture_output: bool = False,
-    cmd_input: Optional[str] = None,
-    current_logger: Optional[logging.Logger] = None,
-    cwd: Optional[str] = None,
+        command: List[str],
+        app_settings: Optional[AppSettings],
+        check: bool = True,
+        capture_output: bool = False,
+        cmd_input: Optional[str] = None,
+        current_logger: Optional[logging.Logger] = None,
+        cwd: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     prefix = _get_elevated_command_prefix()
     elevated_command_list = prefix + list(command)
@@ -228,9 +228,9 @@ def command_exists(command_name: str) -> bool:
 
 
 def elevated_command_exists(
-    command_name: str,
-    app_settings: Optional[AppSettings],
-    current_logger: Optional[logging.Logger] = None,
+        command_name: str,
+        app_settings: Optional[AppSettings],
+        current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     """Checks if a command exists when searched with elevated privileges."""
     try:
@@ -273,9 +273,9 @@ def elevated_command_exists(
 
 
 def check_package_installed(
-    package_name: str,
-    app_settings: Optional[AppSettings],
-    current_logger: Optional[logging.Logger] = None,
+        package_name: str,
+        app_settings: Optional[AppSettings],
+        current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     """Checks if an apt package is installed using dpkg-query."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -294,7 +294,7 @@ def check_package_installed(
             current_logger=logger_to_use,
         )
         return (
-            result.returncode == 0 and "install ok installed" in result.stdout
+                result.returncode == 0 and "install ok installed" in result.stdout
         )
     except FileNotFoundError:  # If dpkg-query itself is not found
         log_map_server(

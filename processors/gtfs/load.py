@@ -25,9 +25,9 @@ module_logger = logging.getLogger(__name__)
 
 
 def get_table_columns(
-    cursor: PgCursor,
-    table_name: str,
-    schema: str = "public",
+        cursor: PgCursor,
+        table_name: str,
+        schema: str = "public",
 ) -> Optional[List[str]]:
     """
     Fetch column names for a given table from the information_schema.
@@ -69,11 +69,11 @@ def get_table_columns(
 
 
 def load_dataframe_to_db(
-    conn: PgConnection,
-    df: pd.DataFrame,
-    table_name: str,
-    schema_definition: Dict[str, Any],
-    dlq_table_name: Optional[str] = None,
+        conn: PgConnection,
+        df: pd.DataFrame,
+        table_name: str,
+        schema_definition: Dict[str, Any],
+        dlq_table_name: Optional[str] = None,
 ) -> Tuple[int, int]:
     """
     Load a Pandas DataFrame into a specified PostgreSQL table using Psycopg 3.
@@ -229,11 +229,11 @@ def load_dataframe_to_db(
 
 
 def log_to_dlq(
-    conn: PgConnection,
-    dlq_table_name: str,
-    failed_record_data: Dict,
-    error_reason: str,
-    source_info: str,  # Renamed from 'notes' to be more descriptive of its use
+        conn: PgConnection,
+        dlq_table_name: str,
+        failed_record_data: Dict,
+        error_reason: str,
+        source_info: str,  # Renamed from 'notes' to be more descriptive of its use
 ) -> None:
     """
     Log a failed record or batch failure information to a Dead-Letter Queue (DLQ) table.
@@ -273,15 +273,15 @@ def log_to_dlq(
 
         # To ensure DLQ write happens even if main transaction failed:
         is_main_transaction_active = (
-            conn.info.transaction_status
-            == psycopg.pq.TransactionStatus.INTRANS
+                conn.info.transaction_status
+                == psycopg.pq.TransactionStatus.INTRANS
         )
 
         with conn.cursor() as cursor:
             if (
-                not is_main_transaction_active
-                and conn.info.transaction_status
-                != psycopg.pq.TransactionStatus.IDLE
+                    not is_main_transaction_active
+                    and conn.info.transaction_status
+                    != psycopg.pq.TransactionStatus.IDLE
             ):
                 try:
                     conn.rollback()  # Attempt to clear failed transaction state if any

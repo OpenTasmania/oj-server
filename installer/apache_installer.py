@@ -8,7 +8,6 @@ import logging
 from typing import Optional
 
 from common.command_utils import check_package_installed, log_map_server
-
 # Import static_config for package lists (MAPPING_PACKAGES contains apache2, libapache2-mod-tile)
 # Import AppSettings for type hinting
 from setup.config_models import AppSettings
@@ -17,7 +16,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def ensure_apache_packages_installed(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Confirms that Apache and libapache2-mod-tile packages are present.
@@ -49,7 +48,7 @@ def ensure_apache_packages_installed(
     for pkg in apache_packages_to_check:
         # check_package_installed now takes app_settings
         if check_package_installed(
-            pkg, app_settings=app_settings, current_logger=logger_to_use
+                pkg, app_settings=app_settings, current_logger=logger_to_use
         ):
             log_map_server(
                 f"{symbols.get('success', '✅')} Package '{pkg}' is installed.",

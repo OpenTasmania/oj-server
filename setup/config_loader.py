@@ -25,7 +25,7 @@ from .config_models import AppSettings
 
 
 def _deep_update(
-    source: Dict[str, Any], overrides: Dict[str, Any]
+        source: Dict[str, Any], overrides: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Deeply updates a dictionary with values from another dictionary.
@@ -34,25 +34,25 @@ def _deep_update(
     """
     for key, value in overrides.items():
         if (
-            isinstance(value, dict)
-            and key in source
-            and isinstance(source[key], dict)
+                isinstance(value, dict)
+                and key in source
+                and isinstance(source[key], dict)
         ):
             source[key] = _deep_update(source[key], value)
         elif (
-            value is not None
+                value is not None
         ):  # Only update if the override value is not None
             source[key] = value
         elif (
-            key not in source and value is None
+                key not in source and value is None
         ):  # If key is new and value is None, add it
             source[key] = value
     return source
 
 
 def load_app_settings(
-    cli_args: Optional[argparse.Namespace] = None,
-    config_file_path: str = "config.yaml",
+        cli_args: Optional[argparse.Namespace] = None,
+        config_file_path: str = "config.yaml",
 ) -> AppSettings:
     """
     Loads application settings with the following precedence:
@@ -164,7 +164,7 @@ def load_app_settings(
 
         if pg_cli_values:
             if "pg" not in current_values_dict or not isinstance(
-                current_values_dict["pg"], dict
+                    current_values_dict["pg"], dict
             ):
                 current_values_dict["pg"] = {}  # Initialize if not present
             current_values_dict["pg"] = _deep_update(

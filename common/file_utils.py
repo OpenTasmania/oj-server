@@ -12,16 +12,15 @@ from pathlib import Path
 from typing import Optional
 
 from setup.config_models import AppSettings  # For type hinting
-
 from .command_utils import log_map_server, run_elevated_command
 
 module_logger = logging.getLogger(__name__)
 
 
 def backup_file(
-    file_path: str,
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None,
+        file_path: str,
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -36,7 +35,7 @@ def backup_file(
             current_logger=logger_to_use,
         )
     except (
-        subprocess.CalledProcessError
+            subprocess.CalledProcessError
     ):  # test -f returns 1 if file does not exist
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} File {file_path} does not exist or is not a regular file. No backup needed.",
@@ -80,10 +79,10 @@ def backup_file(
 
 
 def cleanup_directory(
-    directory_path: Path,
-    app_settings: AppSettings,
-    ensure_dir_exists_after: bool = False,
-    current_logger: Optional[logging.Logger] = None,
+        directory_path: Path,
+        app_settings: AppSettings,
+        ensure_dir_exists_after: bool = False,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

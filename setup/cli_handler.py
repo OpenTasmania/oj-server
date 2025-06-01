@@ -9,7 +9,6 @@ import logging
 from typing import Optional
 
 from common.command_utils import log_map_server
-
 # get_current_script_hash is now in common.system_utils, state_manager imports it
 # Import static_config for OSM_PROJECT_ROOT, STATE_FILE_PATH, SCRIPT_VERSION
 from setup import config as static_config
@@ -22,9 +21,9 @@ module_logger = logging.getLogger(__name__)
 
 
 def cli_prompt_for_rerun(
-    prompt_message: str,
-    app_settings: AppSettings,
-    current_logger_instance: Optional[logging.Logger] = None,
+        prompt_message: str,
+        app_settings: AppSettings,
+        current_logger_instance: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = (
         current_logger_instance if current_logger_instance else module_logger
@@ -48,7 +47,7 @@ def cli_prompt_for_rerun(
 
 
 def view_configuration(
-    app_config: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_config: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_config.symbols
@@ -82,13 +81,13 @@ def view_configuration(
 
     pg_password_display = "[FROM CONFIGURATION (ENV/YAML/CLI)]"
     if (
-        app_config.pg.password == PGPASSWORD_DEFAULT
-        and not app_config.dev_override_unsafe_password
+            app_config.pg.password == PGPASSWORD_DEFAULT
+            and not app_config.dev_override_unsafe_password
     ):  # PGPASSWORD_DEFAULT from config_models
         pg_password_display = "[DEFAULT - Potentially Insecure! Override via ENV, YAML, or CLI -W]"
     elif (
-        app_config.pg.password == PGPASSWORD_DEFAULT
-        and app_config.dev_override_unsafe_password
+            app_config.pg.password == PGPASSWORD_DEFAULT
+            and app_config.dev_override_unsafe_password
     ):
         pg_password_display = "[DEFAULT - Dev override active]"
     elif not app_config.pg.password:  # Should be rare with Pydantic defaults
@@ -104,12 +103,12 @@ def view_configuration(
     )
     # common_get_current_script_hash needs app_settings for its internal logging too
     current_hash = (
-        common_get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            app_settings=app_config,
-            current_logger=logger_to_use,
-        )
-        or "N/A"
+            common_get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                app_settings=app_config,
+                current_logger=logger_to_use,
+            )
+            or "N/A"
     )
     config_text += f"  Script Hash:                   {current_hash}\n"
     config_text += (
@@ -122,7 +121,6 @@ def view_configuration(
         "Displaying current configuration:", "info", logger_to_use, app_config
     )
     print(f"\n{config_text}\n")
-
 
 # manage_state_interactive and show_menu would also need app_settings
 # if they use log_map_server or call functions that do.

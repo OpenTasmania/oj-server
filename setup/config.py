@@ -25,11 +25,9 @@ SCRIPT_VERSION: str = (
 # This assumes config.py is in setup/
 OSM_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-
 # --- State File Configuration (Static Paths) ---
 STATE_FILE_DIR: str = "/var/lib/map-server-setup-script"
 STATE_FILE_PATH: Path = Path(STATE_FILE_DIR) / "progress_state.txt"
-
 
 # --- Symbols for Logging (Static) ---
 SYMBOLS: dict[str, str] = {
@@ -45,7 +43,6 @@ SYMBOLS: dict[str, str] = {
     "critical": "🔥",
     "debug": "🐛",
 }
-
 
 # --- Package Lists (Static - for apt installation by core_prerequisites.py) ---
 CORE_PREREQ_PACKAGES: list[str] = [

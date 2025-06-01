@@ -17,7 +17,6 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-
 # Import AppSettings for type hinting
 from setup.config_models import (  # For PGPASSWORD_DEFAULT comparison
     PGPASSWORD_DEFAULT,
@@ -38,7 +37,7 @@ PRIMARY_DATASOURCE_ANCHOR_LINE_START_CONFIG = "osm2pgsql: &osm2pgsql"
 
 
 def compile_osm_carto_stylesheet(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> str:
     """
     Compiles the CartoCSS stylesheet `project.mml`, updates its database connection parameters
@@ -57,7 +56,7 @@ def compile_osm_carto_stylesheet(
     project_mml_path = Path(OSM_CARTO_BASE_DIR_CONFIG) / "project.mml"
     compiled_mapnik_xml_path = Path(OSM_CARTO_BASE_DIR_CONFIG) / "mapnik.xml"
     compile_log_filename = (
-        Path(OSM_CARTO_BASE_DIR_CONFIG) / "carto_compile_log.txt"
+            Path(OSM_CARTO_BASE_DIR_CONFIG) / "carto_compile_log.txt"
     )
     mml_content_updated_for_log = ""  # For debugging output on failure
 
@@ -73,21 +72,21 @@ def compile_osm_carto_stylesheet(
 
         # Check if using default password without override
         db_params_are_all_default_check = (
-            db_params_from_config["host"]
-            == app_settings.pg.model_fields["host"].default
-            and db_params_from_config["port"]
-            == str(app_settings.pg.model_fields["port"].default)
-            and db_params_from_config["dbname"]
-            == app_settings.pg.model_fields["database"].default
-            and db_params_from_config["user"]
-            == app_settings.pg.model_fields["user"].default
-            and db_params_from_config["password"]
-            == PGPASSWORD_DEFAULT  # Compare against imported constant
+                db_params_from_config["host"]
+                == app_settings.pg.model_fields["host"].default
+                and db_params_from_config["port"]
+                == str(app_settings.pg.model_fields["port"].default)
+                and db_params_from_config["dbname"]
+                == app_settings.pg.model_fields["database"].default
+                and db_params_from_config["user"]
+                == app_settings.pg.model_fields["user"].default
+                and db_params_from_config["password"]
+                == PGPASSWORD_DEFAULT  # Compare against imported constant
         )
 
         if (
-            db_params_are_all_default_check
-            and not app_settings.dev_override_unsafe_password
+                db_params_are_all_default_check
+                and not app_settings.dev_override_unsafe_password
         ):
             error_message = (
                 "Critical: PostgreSQL connection parameters in project.mml appear to be all defaults, "
@@ -147,9 +146,9 @@ def compile_osm_carto_stylesheet(
         )
 
         if (
-            db_params_from_config["password"] == PGPASSWORD_DEFAULT
-            and not app_settings.dev_override_unsafe_password
-            and not db_params_are_all_default_check
+                db_params_from_config["password"] == PGPASSWORD_DEFAULT
+                and not app_settings.dev_override_unsafe_password
+                and not db_params_are_all_default_check
         ):
             log_map_server(
                 f"{symbols.get('warning', '!')} Using default DB password in project.mml. Set a unique password.",
@@ -158,8 +157,8 @@ def compile_osm_carto_stylesheet(
                 app_settings,
             )
         elif (
-            db_params_from_config["password"] == PGPASSWORD_DEFAULT
-            and app_settings.dev_override_unsafe_password
+                db_params_from_config["password"] == PGPASSWORD_DEFAULT
+                and app_settings.dev_override_unsafe_password
         ):
             log_map_server(
                 f"{symbols.get('info', 'ℹ️')} Using default DB password in project.mml due to developer override.",
@@ -211,7 +210,7 @@ def compile_osm_carto_stylesheet(
                         )
 
                         if current_block_line_content.strip() and len(
-                            current_line_actual_indent
+                                current_line_actual_indent
                         ) <= len(block_initial_indent):
                             break  # End of current datasource block
 
@@ -228,21 +227,21 @@ def compile_osm_carto_stylesheet(
                                 else unquoted_val
                             )
                             remainder = current_block_line_content[
-                                kv_match_obj.end() :
-                            ].strip()
+                                        kv_match_obj.end():
+                                        ].strip()
                             is_complex = (
-                                remainder and not remainder.startswith("#")
+                                    remainder and not remainder.startswith("#")
                             )
 
                             if (
-                                key in db_params_from_config
+                                    key in db_params_from_config
                             ):  # DB param to be replaced
                                 if is_complex:
                                     logger_to_use.warning(
                                         f"MML line for DB param '{key}' ('{current_block_line_content}') has trailing data. Will be replaced cleanly."
                                     )
                             elif (
-                                not is_complex
+                                    not is_complex
                             ):  # Non-DB param, simple key-value
                                 current_block_original_params[key] = (
                                     val if val is not None else ""
@@ -252,8 +251,8 @@ def compile_osm_carto_stylesheet(
                                     current_block_line_content
                                 )
                         elif (
-                            current_block_line_content.strip().startswith("#")
-                            or not current_block_line_content.strip()
+                                current_block_line_content.strip().startswith("#")
+                                or not current_block_line_content.strip()
                         ):
                             other_structural_lines_in_block.append(
                                 current_block_line_content
@@ -288,7 +287,7 @@ def compile_osm_carto_stylesheet(
                         )  # Remove if it was there
 
                     for other_k, other_v in sorted(
-                        current_block_original_params.items()
+                            current_block_original_params.items()
                     ):
                         params_to_write.append((other_k, other_v))
 
@@ -301,7 +300,7 @@ def compile_osm_carto_stylesheet(
                         other_structural_lines_in_block
                     )
                     line_idx = (
-                        block_line_idx_iter - 1
+                            block_line_idx_iter - 1
                     )  # Adjust main loop index
                 else:  # Not start of datasource block
                     output_lines_collector.append(line_content)
@@ -322,9 +321,9 @@ def compile_osm_carto_stylesheet(
         mml_content_updated_for_log = "\n".join(output_lines_collector)
         # Ensure trailing newline if original had one
         if (
-            mml_content_original_text.endswith("\n")
-            and not mml_content_updated_for_log.endswith("\n")
-            and mml_content_updated_for_log
+                mml_content_original_text.endswith("\n")
+                and not mml_content_updated_for_log.endswith("\n")
+                and mml_content_updated_for_log
         ):
             mml_content_updated_for_log += "\n"
 
@@ -365,10 +364,10 @@ def compile_osm_carto_stylesheet(
             log_f.write(f"Return code: {carto_result.returncode}\n")
 
         if (
-            carto_result.returncode == 0 and carto_result.stdout
+                carto_result.returncode == 0 and carto_result.stdout
         ):  # Successful compilation
             with open(
-                compiled_mapnik_xml_path, "w", encoding="utf-8"
+                    compiled_mapnik_xml_path, "w", encoding="utf-8"
             ) as mapnik_f:
                 mapnik_f.write(carto_result.stdout)
             log_map_server(
@@ -407,8 +406,8 @@ def compile_osm_carto_stylesheet(
                 f"MML content (updated) at time of error:\n{mml_content_updated_for_log}"
             )
         elif (
-            "mml_content_original_text" in locals()
-            and mml_content_original_text
+                "mml_content_original_text" in locals()
+                and mml_content_original_text
         ):
             logger_to_use.debug(
                 f"MML content (original) at time of error:\n{mml_content_original_text}"
@@ -419,9 +418,9 @@ def compile_osm_carto_stylesheet(
 
 
 def deploy_mapnik_stylesheet(
-    compiled_xml_path_str: str,
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None,
+        compiled_xml_path_str: str,
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """Deploys the compiled Mapnik XML stylesheet."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -444,8 +443,8 @@ def deploy_mapnik_stylesheet(
 
     source_mapnik_xml = Path(compiled_xml_path_str)
     if (
-        not source_mapnik_xml.is_file()
-        or source_mapnik_xml.stat().st_size == 0
+            not source_mapnik_xml.is_file()
+            or source_mapnik_xml.stat().st_size == 0
     ):
         log_map_server(
             f"{symbols.get('error', '❌')} Compiled mapnik.xml at {source_mapnik_xml} is missing or empty. Cannot deploy.",
@@ -484,7 +483,7 @@ def deploy_mapnik_stylesheet(
 
 
 def finalize_carto_directory_processing(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reverts ownership of the Carto directory to root:root."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -509,7 +508,7 @@ def finalize_carto_directory_processing(
 
 
 def update_font_cache(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Updates the system font cache using fc-cache."""
     logger_to_use = current_logger if current_logger else module_logger

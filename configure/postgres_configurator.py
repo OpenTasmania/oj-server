@@ -29,7 +29,7 @@ PG_HBA_FILE_TEMPLATE = os.path.join(PG_CONF_DIR_TEMPLATE, "pg_hba.conf")
 
 
 def _get_pg_config_path_params(
-    app_settings: AppSettings,
+        app_settings: AppSettings,
 ) -> tuple[str, str, str, str]:
     pg_version = getattr(app_settings.pg, "version", PG_VERSION_DEFAULT)
     pg_conf_dir = PG_CONF_DIR_TEMPLATE.format(version=pg_version)
@@ -39,7 +39,7 @@ def _get_pg_config_path_params(
 
 
 def _check_pg_config_dir_exists(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     pg_version, pg_conf_dir, _, _ = _get_pg_config_path_params(app_settings)
@@ -69,7 +69,7 @@ def _check_pg_config_dir_exists(
 
 
 def create_postgres_user_and_db(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the PostgreSQL user and database if they don't exist."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -187,7 +187,7 @@ def create_postgres_user_and_db(
 
 
 def enable_postgres_extensions(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Ensures necessary PostgreSQL extensions (PostGIS, Hstore) are enabled."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -237,7 +237,7 @@ def enable_postgres_extensions(
 
 
 def set_postgres_permissions(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Sets database permissions for the application user."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -294,7 +294,7 @@ def set_postgres_permissions(
 
 
 def customize_postgresql_conf(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     _check_pg_config_dir_exists(app_settings, logger_to_use)
@@ -302,11 +302,11 @@ def customize_postgresql_conf(
     _, _, pg_conf_file, _ = _get_pg_config_path_params(app_settings)
     symbols = app_settings.symbols
     script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
+            get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH"
     )
 
     # Get the postgresql.conf additions template from AppSettings
@@ -328,7 +328,7 @@ def customize_postgresql_conf(
         )
 
         if (
-            grep_result.returncode != 0
+                grep_result.returncode != 0
         ):  # Marker not found, append the settings
             try:
                 # Format the template with current script_hash
@@ -370,7 +370,7 @@ def customize_postgresql_conf(
 
 
 def customize_pg_hba_conf(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     _check_pg_config_dir_exists(app_settings, logger_to_use)
@@ -378,11 +378,11 @@ def customize_pg_hba_conf(
     _, _, _, pg_hba_file = _get_pg_config_path_params(app_settings)
     symbols = app_settings.symbols
     script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
+            get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH"
     )
 
     hba_template = app_settings.pg.hba_template
@@ -394,7 +394,7 @@ def customize_pg_hba_conf(
     }
 
     if not validate_cidr(
-        app_settings.admin_group_ip, current_logger=logger_to_use
+            app_settings.admin_group_ip, current_logger=logger_to_use
     ):
         log_map_server(
             f"{symbols.get('error', '')} Invalid ADMIN_GROUP_IP '{app_settings.admin_group_ip}' for pg_hba.conf. Skipping HBA update.",
@@ -435,7 +435,7 @@ def customize_pg_hba_conf(
 
 
 def restart_and_enable_postgres_service(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

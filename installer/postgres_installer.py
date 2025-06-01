@@ -16,7 +16,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def ensure_postgres_packages_are_installed(
-    current_logger: Optional[logging.Logger] = None,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Confirms that PostgreSQL packages (expected to be installed by a core
@@ -67,7 +67,6 @@ def ensure_postgres_packages_are_installed(
             "success",
             logger_to_use,
         )
-
 
 # If there were other setup-specific actions before configuration, they'd go here.
 # For PostgreSQL, most actions are configuration after the package install.

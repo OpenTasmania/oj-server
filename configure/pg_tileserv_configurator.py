@@ -24,18 +24,18 @@ module_logger = logging.getLogger(__name__)
 
 
 def create_pg_tileserv_config_file(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the pg_tileserv config.toml file using template from app_settings and sets its permissions."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            app_settings=app_settings,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
+            get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                app_settings=app_settings,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH"
     )
 
     pgts_settings = app_settings.pg_tileserv
@@ -62,8 +62,8 @@ def create_pg_tileserv_config_file(
     )
     # Check for default password usage
     if (
-        app_settings.pg.password == PGPASSWORD_DEFAULT
-        and not app_settings.dev_override_unsafe_password
+            app_settings.pg.password == PGPASSWORD_DEFAULT
+            and not app_settings.dev_override_unsafe_password
     ):
         log_map_server(
             f"{symbols.get('warning', '!')} Default PGPASSWORD used in pg_tileserv config.toml. "
@@ -152,7 +152,7 @@ def create_pg_tileserv_config_file(
 
 
 def activate_pg_tileserv_service(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reloads systemd, enables and restarts the pg_tileserv service."""
     logger_to_use = current_logger if current_logger else module_logger

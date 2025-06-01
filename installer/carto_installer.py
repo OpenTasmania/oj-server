@@ -18,10 +18,8 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-
 # Import static_config for OSM_PROJECT_ROOT and other true constants
 from setup import config as static_config
-
 # Import AppSettings for type hinting
 from setup.config_models import AppSettings
 
@@ -32,7 +30,7 @@ OSM_CARTO_BASE_DIR = "/opt/openstreetmap-carto"
 
 
 def install_carto_cli(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Installs the CartoCSS compiler (carto) globally via npm."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -70,7 +68,7 @@ def install_carto_cli(
         carto_version = (
             carto_version_result.stdout.strip()
             if carto_version_result.returncode == 0
-            and carto_version_result.stdout
+               and carto_version_result.stdout
             else "Not found or error determining version"
         )
         log_map_server(
@@ -90,7 +88,7 @@ def install_carto_cli(
 
 
 def setup_osm_carto_repository(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Clones or confirms existence of the OpenStreetMap-Carto git repository."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -144,7 +142,7 @@ def setup_osm_carto_repository(
 
 
 def prepare_carto_directory_for_processing(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Temporarily changes ownership of the Carto directory to the current user for script execution."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -176,7 +174,7 @@ def prepare_carto_directory_for_processing(
 
 
 def fetch_carto_external_data(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Fetches external data (shapefiles, etc.) for the OpenStreetMap-Carto style."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -193,8 +191,8 @@ def fetch_carto_external_data(
 
     # OSM_PROJECT_ROOT comes from static_config
     custom_script_path = (
-        static_config.OSM_PROJECT_ROOT
-        / "external/openstreetmap-carto/scripts/get-external-data.py"
+            static_config.OSM_PROJECT_ROOT
+            / "external/openstreetmap-carto/scripts/get-external-data.py"
     )
     script_to_run_cmd: List[str] = []
 
@@ -214,7 +212,7 @@ def fetch_carto_external_data(
             app_settings,
         )
         default_script_path = (
-            Path(OSM_CARTO_BASE_DIR) / "scripts/get-external-data.py"
+                Path(OSM_CARTO_BASE_DIR) / "scripts/get-external-data.py"
         )
         if default_script_path.is_file():
             log_map_server(

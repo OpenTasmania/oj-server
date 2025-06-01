@@ -15,8 +15,8 @@ module_logger = logging.getLogger(__name__)
 
 
 def install_certbot_packages(
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None,  # Added Optional
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,  # Added Optional
 ) -> None:  # Added type hint for return
     """Installs Certbot and its Nginx plugin via apt. Uses app_settings for symbols."""
     logger_to_use = current_logger if current_logger else module_logger

@@ -7,7 +7,7 @@ from common.core_utils import DEFAULT_DB_PARAMS, module_logger
 
 
 def get_db_connection(
-    db_params: Optional[Dict[str, str]] = None,
+        db_params: Optional[Dict[str, str]] = None,
 ) -> Optional[psycopg.Connection]:
     """
     Establish and return a PostgreSQL database connection using Psycopg 3.
@@ -27,10 +27,10 @@ def get_db_connection(
         params_to_use.update(db_params)
 
     if (
-        params_to_use.get("password") == "yourStrongPasswordHere"
-        and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
-        and os.environ.get("PGPASSWORD")
-        == "yourStrongPasswordHere"  # Check PGPASSWORD too
+            params_to_use.get("password") == "yourStrongPasswordHere"
+            and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
+            and os.environ.get("PGPASSWORD")
+            == "yourStrongPasswordHere"  # Check PGPASSWORD too
     ):
         module_logger.critical(
             "CRITICAL: Default placeholder password is being used for database "
