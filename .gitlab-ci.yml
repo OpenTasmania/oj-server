@@ -78,6 +78,7 @@ Type checking:
 Testing:
   rules:
     - when: manual
+    - if: $CI_COMMIT_TAG
   extends: .uv_setup
   stage: test
   script:
@@ -95,6 +96,9 @@ Testing:
 generate_documentation:
   stage: docs
   image: debian:bookworm # Stays on debian:bookworm
+  rules:
+    - when: manual
+    - if: "$CI_COMMIT_TAG"
   before_script:
     - echo "Starting documentation generation for tag $CI_COMMIT_TAG"
     - apt-get update -y
@@ -150,12 +154,12 @@ generate_documentation:
       - CHANGELOG.md
       - TODO.md
     expire_in: 1 day
-  rules:
-    - if: "$CI_COMMIT_TAG"
-    - when: manual
 
 commit_documentation:
   stage: commit_docs
+  rules:
+    - when: manual
+    - if: "$CI_COMMIT_TAG"
   image: debian:bookworm
   needs:
     - job: generate_documentation
@@ -178,5 +182,3 @@ commit_documentation:
         git push origin $CI_DEFAULT_BRANCH
         echo "Documentation updates pushed to $CI_DEFAULT_BRANCH."
       fi
-  rules:
-    - if: "$CI_COMMIT_TAG"
