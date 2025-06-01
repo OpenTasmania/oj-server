@@ -13,7 +13,7 @@ from common.system_utils import get_current_script_hash
 from setup import (
     config as static_config,  # For SCRIPT_VERSION if used in {script_version_short}
 )
-from setup.config_models import AppSettings  # For type hinting
+from setup.config_models import VM_IP_OR_DOMAIN_DEFAULT, AppSettings
 
 
 module_logger = logging.getLogger(__name__)
