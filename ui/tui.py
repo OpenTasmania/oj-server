@@ -8,16 +8,16 @@ viewing configuration, managing state, and selecting steps to run.
 """
 
 import logging
-import sys  # For StreamHandler check and stderr output
-import threading  # For handling long-running tasks
+import sys # For StreamHandler check and stderr output
+import threading # For handling long-running tasks
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import urwid
+import urwid # Ensure urwid is imported
 
 # Assuming these are correctly imported relative to the TUI's execution context
 # when integrated into the main application.
 from setup import (
-    config as app_config,  # Renamed to avoid conflict if testing standalone
+    config as app_config, # Renamed to avoid conflict if testing standalone
 )
 from setup.state_manager import view_completed_steps
 from setup.step_executor import execute_step
@@ -43,7 +43,7 @@ palette = [
     ("log_critical", "white", "dark red", "standout"),
     ("checklist_focus", "black", "dark cyan", "standout"),
     ("edit_focus", "black", "dark cyan", "standout"),
-    ("pane_border", "black", "light gray"),  # For column divider
+    ("pane_border", "black", "light gray"), # For column divider
 ]
 
 
@@ -70,10 +70,10 @@ class LogDisplay(urwid.WidgetWrap):
         """
         attr_map_key = f"log_{level.lower()}"
         # Ensure the palette entry exists, otherwise default to 'body'
-        if any((p[0] == attr_map_key for p in palette)):  # pragma: no branch
+        if any((p[0] == attr_map_key for p in palette)): # pragma: no branch
             attr = attr_map_key
-        else:  # pragma: no cover
-            attr = "body"  # Fallback style
+        else: # pragma: no cover
+            attr = "body" # Fallback style
 
         # Create a Text widget for the message and wrap it with AttrMap
         text_widget = urwid.Text(message)
@@ -82,7 +82,7 @@ class LogDisplay(urwid.WidgetWrap):
 
         if (
                 self.log_lines
-        ):  # Ensure there are lines before trying to set focus
+        ): # Ensure there are lines before trying to set focus
             self.list_box.set_focus(len(self.log_lines) - 1)
 
     def clear_logs(self) -> None:
@@ -98,9 +98,9 @@ class TuiLogHandler(logging.Handler):
     ):
         super().__init__()
         self.log_display_widget = log_display_widget
-        self.main_loop = main_loop
+        self.main_loop: urwid.MainLoop = main_loop # Added type hint
         self.formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",  # TUI specific format
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s", # TUI specific format
             datefmt="%H:%M:%S",
         )
 
@@ -111,26 +111,26 @@ class TuiLogHandler(logging.Handler):
 
             if threading.current_thread() is threading.main_thread():
                 self.log_display_widget.add_message(msg, level=level_name)
-            else:  # pragma: no cover
+            else: # pragma: no cover
                 # If in a worker thread, schedule UI update in the main loop
                 def _update_log_display_from_thread():
                     self.log_display_widget.add_message(msg, level=level_name)
 
-                self.main_loop.alarm(
+                self.main_loop.alarm( # type: ignore[attr-defined]
                     0,
                     lambda _loop, _user_data: _update_log_display_from_thread(),
                 )
 
-        except RecursionError:  # pragma: no cover
+        except RecursionError: # pragma: no cover
             raise
-        except Exception:  # pragma: no cover
+        except Exception: # pragma: no cover
             self.handleError(record)
 
 
 class YesNoDialog(urwid.WidgetWrap):
     """A modal dialog widget for Yes/No questions."""
 
-    signals = ["close_yes", "close_no"]  # Emitted with self as argument
+    signals = ["close_yes", "close_no"] # Emitted with self as argument
 
     def __init__(
             self,
@@ -198,7 +198,7 @@ class YesNoDialog(urwid.WidgetWrap):
 
     def keypress(self, size: Tuple[int, int], key: str) -> Optional[str]:
         """Handle key presses for the dialog. Escape key is treated as "No"."""
-        if key == "esc":  # pragma: no cover
+        if key == "esc": # pragma: no cover
             self._on_no(None)
             return None
         return super().keypress(size, key)
@@ -255,7 +255,7 @@ class InstallerTUI:
             header=self.header,
             footer=self.footer,
         )
-        self.main_loop = urwid.MainLoop(
+        self.main_loop: urwid.MainLoop = urwid.MainLoop( # Explicit type hint
             self.frame,
             palette=palette,
             unhandled_input=self._handle_global_keys,
@@ -280,7 +280,7 @@ class InstallerTUI:
             buttons.append(button)
         return buttons
 
-    def _handle_global_keys(self, key: str) -> None:  # pragma: no cover
+    def _handle_global_keys(self, key: str) -> None: # pragma: no cover
         if key == "ctrl c":
             self.confirm_exit_dialog()
         elif key == "q":
@@ -309,7 +309,7 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def show_main_menu(self, button: Optional[urwid.Button] = None) -> None:
-        if self.is_task_running:  # pragma: no cover
+        if self.is_task_running: # pragma: no cover
             self.log_display.add_message(
                 "Task in progress. Cannot show main menu now.", "warning"
             )
@@ -323,7 +323,7 @@ class InstallerTUI:
 
     def show_view_configuration(
             self, button: Optional[urwid.Button] = None
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
                 "Task in progress. Cannot view configuration now.", "warning"
@@ -356,7 +356,7 @@ class InstallerTUI:
 
     def show_manage_state(
             self, button: Optional[urwid.Button] = None
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
                 "Task in progress. Cannot manage state now.", "warning"
@@ -387,14 +387,14 @@ class InstallerTUI:
             tag: str,
             desc: str,
             func: Callable[[Optional[logging.Logger]], None],
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         success = False
         try:
             success = execute_step(
                 tag,
                 desc,
                 func,
-                current_logger_instance=module_logger,  # Use TUI's module_logger for step execution logs
+                current_logger_instance=module_logger, # Use TUI's module_logger for step execution logs
                 prompt_user_for_rerun=self._threaded_prompt_for_rerun,
             )
         except Exception as e:
@@ -404,7 +404,7 @@ class InstallerTUI:
             )
             success = False
         finally:
-            self.main_loop.alarm(
+            self.main_loop.alarm( # type: ignore[attr-defined]
                 0,
                 lambda _loop, _data: self._handle_task_completion(
                     tag, desc, success
@@ -413,7 +413,7 @@ class InstallerTUI:
 
     def _handle_task_completion(
             self, tag: str, desc: str, success: bool
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         self.is_task_running = False
         self._active_worker_thread = None
         if success:
@@ -426,7 +426,7 @@ class InstallerTUI:
             )
         self._process_next_task_in_queue()
 
-    def _process_next_task_in_queue(self) -> None:  # pragma: no cover
+    def _process_next_task_in_queue(self) -> None: # pragma: no cover
         if self.is_task_running:
             return
         if not self.task_queue:
@@ -462,7 +462,7 @@ class InstallerTUI:
 
     def run_full_installation(
             self, button: Optional[urwid.Button] = None
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
                 "A task or sequence is already in progress.", "warning"
@@ -486,7 +486,7 @@ class InstallerTUI:
 
     def show_step_selection(
             self, button: Optional[urwid.Button] = None
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         if self.is_task_running:
             self.log_display.add_message(
                 "Task in progress. Cannot select new steps now.", "warning"
@@ -578,7 +578,7 @@ class InstallerTUI:
 
     def _show_rerun_dialog_from_worker(
             self, _loop=None, _data=None
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         if not self._dialog_prompt_message:
             module_logger.error(
                 "No prompt message for rerun dialog from worker."
@@ -617,7 +617,7 @@ class InstallerTUI:
 
     def _threaded_prompt_for_rerun(
             self, prompt_message: str
-    ) -> bool:  # pragma: no cover
+    ) -> bool: # pragma: no cover
         if threading.current_thread() is threading.main_thread():
             module_logger.warning(
                 "_threaded_prompt_for_rerun called from main thread, using original."
@@ -626,7 +626,7 @@ class InstallerTUI:
         self._dialog_event = threading.Event()
         self._dialog_prompt_message = prompt_message
         self._dialog_result = None
-        self.main_loop.alarm(0, self._show_rerun_dialog_from_worker)
+        self.main_loop.alarm(0, self._show_rerun_dialog_from_worker) # type: ignore[attr-defined]
         self._dialog_event.wait()
         self._dialog_event = None
         self._dialog_prompt_message = ""
@@ -636,7 +636,7 @@ class InstallerTUI:
 
     def tui_prompt_for_rerun(
             self, prompt_message: str
-    ) -> bool:  # pragma: no cover
+    ) -> bool: # pragma: no cover
         if threading.current_thread() is not threading.main_thread():
             module_logger.error(
                 "FATAL: tui_prompt_for_rerun (original) called from non-main thread!"
@@ -647,13 +647,13 @@ class InstallerTUI:
         dialog_result_holder: Dict[str, Optional[bool]] = {"result": None}
 
         def handle_dialog_close(
-                is_yes: bool, temp_loop_ref: urwid.MainLoop
+                is_yes: bool, current_temp_loop_ref: urwid.MainLoop # Added type hint
         ) -> None:
             dialog_result_holder["result"] = is_yes
-            if temp_loop_ref.is_running():
-                temp_loop_ref.stop()
+            if current_temp_loop_ref.is_running(): # type: ignore[attr-defined]
+                current_temp_loop_ref.stop()
 
-        temp_loop = urwid.MainLoop(
+        temp_loop: urwid.MainLoop = urwid.MainLoop( # Added type hint
             widget=urwid.Overlay(
                 dialog,
                 original_main_loop_widget,
@@ -689,7 +689,7 @@ class InstallerTUI:
             tag: str,
             desc: str,
             func: Callable[[Optional[logging.Logger]], None],
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         self._active_worker_thread = threading.Thread(
             target=self._task_runner, args=(tag, desc, func), daemon=True
         )
@@ -697,7 +697,7 @@ class InstallerTUI:
 
     def confirm_exit_dialog(
             self, button: Optional[urwid.Button] = None
-    ) -> None:  # pragma: no cover
+    ) -> None: # pragma: no cover
         message = "Are you sure you want to quit the installer?"
         if self.is_task_running:
             message = "A task is currently running. Are you sure you want to quit?\nThe task may not complete cleanly."
@@ -744,7 +744,7 @@ class InstallerTUI:
         # Ensure root logger's level is DEBUG for TuiLogHandler if not already lower
         if (
                 root_logger.level == 0 or root_logger.level > logging.DEBUG
-        ):  # NOTSET or higher than DEBUG
+        ): # NOTSET or higher than DEBUG
             root_logger.setLevel(logging.DEBUG)
             self._root_logger_level_modified_by_tui = True
             # Log this change using the TUI's module_logger, which should now be configured by an entry point
@@ -753,13 +753,13 @@ class InstallerTUI:
             )
 
         # Temporarily remove other console StreamHandlers
-        for handler in list(root_logger.handlers):  # Iterate over a copy
+        for handler in list(root_logger.handlers): # Iterate over a copy
             if isinstance(
                     handler, logging.StreamHandler
             ) and handler.stream in (
                     sys.stdout,
                     sys.stderr,
-            ):  # Check stream, not type of TuiLogHandler
+            ): # Check stream, not type of TuiLogHandler
                 module_logger.debug(
                     f"TUI temporarily removing console handler: {handler}"
                 )
@@ -777,15 +777,15 @@ class InstallerTUI:
         )
         try:
             self.main_loop.run()
-        except urwid.ExitMainLoop:  # pragma: no cover
+        except urwid.ExitMainLoop: # pragma: no cover
             module_logger.info("Exiting TUI normally.")
-        except Exception:  # pragma: no cover
+        except Exception: # pragma: no cover
             module_logger.exception("Unhandled exception in TUI main loop")
         finally:
             module_logger.debug(
                 "TUI shutting down. Restoring original logging setup..."
             )
-            if self.tui_log_handler in root_logger.handlers:
+            if self.tui_log_handler and self.tui_log_handler in root_logger.handlers: # Added check for self.tui_log_handler
                 root_logger.removeHandler(self.tui_log_handler)
                 module_logger.debug(
                     f"TUI removed TuiLogHandler: {self.tui_log_handler}"
@@ -793,7 +793,7 @@ class InstallerTUI:
             for handler_to_restore in self._removed_handlers_by_tui:
                 if (
                         handler_to_restore not in root_logger.handlers
-                ):  # Avoid re-adding if somehow still there
+                ): # Avoid re-adding if somehow still there
                     root_logger.addHandler(handler_to_restore)
                     module_logger.debug(
                         f"TUI restored console handler: {handler_to_restore}"
@@ -811,7 +811,7 @@ class InstallerTUI:
 
 def run_tui_installer(
         defined_tasks: List[Tuple[str, str, Callable]]
-) -> None:  # pragma: no cover
+) -> None: # pragma: no cover
     """Initialize and run the Urwid TUI for the installer."""
     # Logging should be set up by the main entry point (e.g., main_installer.py)
     # *before* this function is called.
@@ -820,7 +820,7 @@ def run_tui_installer(
     app.run()
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__": # pragma: no cover
     print("Running TUI in standalone test mode...", file=sys.stderr)
     if not logging.getLogger().handlers:
         logging.basicConfig(
@@ -842,7 +842,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     app_config = (
         DummyConfig()
-    )  # Make app_config available for TUI's use if it imports it directly.
+    ) # Make app_config available for TUI's use if it imports it directly.
 
 
     def _dummy_log(
@@ -941,15 +941,15 @@ if __name__ == "__main__":  # pragma: no cover
 
 
     execute_step = (
-        dummy_execute_step_tui_threaded  # Monkey patch for standalone test
+        dummy_execute_step_tui_threaded # Monkey patch for standalone test
     )
 
     _original_view_completed = view_completed_steps
 
 
     def dummy_view_completed_steps_tui(
-            current_logger_instance,
-    ) -> List[str]:  # Renamed param for clarity
+            current_logger_instance, # type: ignore
+    ) -> List[str]: # Renamed param for clarity
         current_logger_instance.info("[Dummy State] Viewing completed steps.")
         current_logger_instance.debug(
             "[Dummy State DEBUG] No actual state file read."
@@ -957,13 +957,13 @@ if __name__ == "__main__":  # pragma: no cover
         return ["PREVIOUS_DUMMY_STEP_1", "PREVIOUS_DUMMY_STEP_2"]
 
 
-    view_completed_steps = dummy_view_completed_steps_tui  # Monkey patch
+    view_completed_steps = dummy_view_completed_steps_tui # Monkey patch
 
     try:
         run_tui_installer(defined_tasks=DUMMY_TASKS_FOR_STANDALONE)
     finally:
-        execute_step = _original_execute_step  # Restore
-        view_completed_steps = _original_view_completed  # Restore
+        execute_step = _original_execute_step # Restore
+        view_completed_steps = _original_view_completed # Restore
         if hasattr(example_step_beta_fails_and_reruns, "has_failed_once"):
             delattr(example_step_beta_fails_and_reruns, "has_failed_once")
         print("Standalone TUI test finished.", file=sys.stderr)
