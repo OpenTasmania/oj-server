@@ -6,129 +6,84 @@ File system utility functions, such as backing up files and cleaning directories
 
 import datetime
 import logging
-import shutil  # For shutil.rmtree
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
 
-# Assuming config.py is accessible from the project root or PYTHONPATH is set up
-# If config.py moves to root, this would be: from config import SYMBOLS
-from setup import config
-# Assuming command_utils is now in the common package
-from .command_utils import log_map_server, run_elevated_command
+from setup.config_models import AppSettings # For type hinting
+# from setup import config as static_config # Keep for SYMBOLS if not from app_settings
+from .command_utils import log_map_server, run_elevated_command # log_map_server now takes app_settings
 
 module_logger = logging.getLogger(__name__)
 
 
 def backup_file(
-    file_path: str, current_logger: Optional[logging.Logger] = None
+    file_path: str,
+    app_settings: AppSettings, # Added app_settings
+    current_logger: Optional[logging.Logger] = None,
 ) -> bool:
-    """
-    Create a timestamped backup of a file using elevated privileges.
-
-    Args:
-        file_path: The absolute path to the file to back up.
-        current_logger: Optional logger instance to use.
-
-    Returns:
-        True if the backup was successful or if the file does not exist
-        (nothing to backup), False if a critical error occurs during backup.
-    """
     logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
 
     try:
-        # Check file existence with elevated privileges first.
-        # run_elevated_command will raise CalledProcessError if 'test -f' fails
-        # which means file doesn't exist or isn't a regular file.
         run_elevated_command(
-            ["test", "-f", file_path],
-            check=True, # Raise error if file doesn't exist or isn't regular file
-            capture_output=True,
-            current_logger=logger_to_use,
+            ["test", "-f", file_path], app_settings, # Pass app_settings
+            check=True, capture_output=True, current_logger=logger_to_use,
         )
     except subprocess.CalledProcessError:
-        # test -f returns 1 if file does not exist or is not a regular file.
         log_map_server(
-            f"{config.SYMBOLS['info']} File {file_path} does not exist or "
-            "is not a regular file. No backup needed.", # Changed from warning to info
-            "info",
-            logger_to_use,
-        )
-        return True # Indicate success as there's nothing to backup or it's not a file we manage this way
+            f"{symbols.get('info','')} File {file_path} does not exist or is not a regular file. No backup needed.",
+            "info", logger_to_use, app_settings)
+        return True
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Error pre-checking file existence "
-            f"for backup of {file_path}: {e}",
-            "error",
-            logger_to_use,
-        )
-        return False # Indicate failure in pre-check
+            f"{symbols.get('error','')} Error pre-checking file existence for backup of {file_path}: {e}",
+            "error", logger_to_use, app_settings)
+        return False
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     backup_path = f"{file_path}.bak.{timestamp}"
     try:
-        run_elevated_command(
-            ["cp", "-a", file_path, backup_path], current_logger=logger_to_use
-        )
+        run_elevated_command(["cp", "-a", file_path, backup_path], app_settings, current_logger=logger_to_use) # Pass app_settings
         log_map_server(
-            f"{config.SYMBOLS['success']} Backed up {file_path} to "
-            f"{backup_path}",
-            "success",
-            logger_to_use,
-        )
+            f"{symbols.get('success','')} Backed up {file_path} to {backup_path}",
+            "success", logger_to_use, app_settings)
         return True
     except Exception as e:
         log_map_server(
-            f"{config.SYMBOLS['error']} Failed to backup {file_path} to "
-            f"{backup_path}: {e}",
-            "error",
-            logger_to_use,
-        )
+            f"{symbols.get('error','')} Failed to backup {file_path} to {backup_path}: {e}",
+            "error", logger_to_use, app_settings)
         return False
 
 
 def cleanup_directory(
-        directory_path: Path, ensure_dir_exists_after: bool = False,
-        current_logger: Optional[logging.Logger] = None
+        directory_path: Path,
+        app_settings: AppSettings, # Added app_settings
+        ensure_dir_exists_after: bool = False,
+        current_logger: Optional[logging.Logger] = None,
 ) -> None:
-    """
-    Remove all files and subdirectories within a given directory.
-    Optionally recreates the directory after cleaning.
-
-    Args:
-        directory_path: Path object representing the directory to clean up.
-        ensure_dir_exists_after: If True, creates the directory if it doesn't
-                                 exist after cleaning attempts.
-        current_logger: Optional logger instance.
-    """
     logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
     dir_to_clean = Path(directory_path)
-    logger_to_use.debug(f"Attempting to clean directory: {dir_to_clean}")
+    # Use log_map_server for consistency if symbols are desired here
+    log_map_server(f"Attempting to clean directory: {dir_to_clean}", "debug", logger_to_use, app_settings)
 
     if dir_to_clean.exists():
         if dir_to_clean.is_dir():
             try:
-                # shutil.rmtree does not require elevated privileges if the current user
-                # has permissions to delete the directory and its contents.
-                # If it might contain files owned by root, this could fail.
-                # For consistency with other operations that might create root-owned files
-                # in temp dirs, using an elevated remove might be safer in some contexts,
-                # but generally, user-initiated cleanup should work with standard perms
-                # if the user owns the directory.
-                # For now, using shutil.rmtree directly. If issues arise, consider
-                # an elevated 'rm -rf'.
                 shutil.rmtree(dir_to_clean)
-                logger_to_use.info(f"Successfully removed directory and its contents: {dir_to_clean}")
+                log_map_server(f"{symbols.get('success','')} Successfully removed directory and its contents: {dir_to_clean}", "info", logger_to_use, app_settings)
             except Exception as e:
-                logger_to_use.error(f"Error removing directory {dir_to_clean} using shutil.rmtree: {e}", exc_info=True)
+                log_map_server(f"{symbols.get('error','')} Error removing directory {dir_to_clean} using shutil.rmtree: {e}", "error", logger_to_use, app_settings, exc_info=True)
         else:
-            logger_to_use.warning(f"Path {dir_to_clean} exists but is not a directory. Cannot clean as a directory.")
+            log_map_server(f"{symbols.get('warning','')} Path {dir_to_clean} exists but is not a directory.", "warning", logger_to_use, app_settings)
     else:
-        logger_to_use.info(f"Directory {dir_to_clean} does not exist. No cleanup needed there.")
+        log_map_server(f"{symbols.get('info','')} Directory {dir_to_clean} does not exist. No cleanup needed.", "info", logger_to_use, app_settings)
 
     if ensure_dir_exists_after:
         try:
             dir_to_clean.mkdir(parents=True, exist_ok=True)
-            logger_to_use.debug(f"Ensured directory exists: {dir_to_clean}")
+            log_map_server(f"Ensured directory exists: {dir_to_clean}", "debug", logger_to_use, app_settings)
         except Exception as e:
-            logger_to_use.error(f"Error creating directory {dir_to_clean} after cleanup: {e}", exc_info=True)
+            log_map_server(f"{symbols.get('error','')} Error creating directory {dir_to_clean} after cleanup: {e}", "error", logger_to_use, app_settings, exc_info=True)

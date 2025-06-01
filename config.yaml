@@ -1,0 +1,62 @@
+# config.yaml
+# Default configuration settings for the OpenStreetMap Server Setup.
+# Users can override these settings by editing this file.
+# Environment variables and CLI arguments can also override these settings.
+
+# General Application Settings
+admin_group_ip: "192.168.128.0/22"
+gtfs_feed_url: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
+vm_ip_or_domain: "example.com" # IMPORTANT: Change this to your server's actual FQDN or IP
+pg_tileserv_binary_location: "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
+log_prefix: "[MAP-SETUP]" # Log prefix for the main installer script
+
+# Developer Flags
+dev_override_unsafe_password: false # Set to true only for development if using default DB password
+
+# Containerization Settings
+container_runtime_command: "docker" # e.g., "docker" or "podman"
+osrm_image_tag: "osrm/osrm-backend:latest" # OSRM Docker image to use
+
+# PostgreSQL Connection Settings
+pg:
+  host: "127.0.0.1"
+  port: 5432
+  database: "gis"
+  user: "osmuser"
+  # password: "yourStrongPasswordHere" # IMPORTANT: It's highly recommended to set the PG_PASSWORD
+                                    # environment variable instead of hardcoding the password here.
+                                    # Pydantic will pick up PG_PASSWORD from the environment.
+
+  # Template for pg_hba.conf content.
+  # Placeholders like {pg_database}, {pg_user}, {admin_group_ip}, {script_hash}
+  # will be formatted by the setup script using other configuration values.
+  # Use YAML's literal block scalar style for multi-line strings.
+  hba_template: |
+    # pg_hba.conf configured by script V{script_hash}
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             postgres                                peer
+    local   all             all                                     peer
+    local   {pg_database}    {pg_user}                                scram-sha-256
+    host    all             all             127.0.0.1/32            scram-sha-256
+    host    {pg_database}    {pg_user}        127.0.0.1/32            scram-sha-256
+    host    {pg_database}    {pg_user}        {admin_group_ip}       scram-sha-256
+    host    all             all             ::1/128                 scram-sha-256
+    host    {pg_database}    {pg_user}        ::1/128                 scram-sha-256
+    # Template for additions to postgresql.conf.
+    # Supports placeholder {script_hash}.
+    postgresql_conf_additions_template: |
+      # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash} ---
+      listen_addresses = '*'
+      shared_buffers = 2GB
+      work_mem = 256MB
+      maintenance_work_mem = 2GB
+      checkpoint_timeout = 15min
+      max_wal_size = 4GB
+      min_wal_size = 2GB
+      checkpoint_completion_target = 0.9
+      effective_cache_size = 6GB
+      logging_collector = on
+      log_directory = 'log'
+      log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+      log_min_duration_statement = 250ms
+      # --- END TRANSIT SERVER CUSTOMISATIONS ---
