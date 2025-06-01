@@ -15,8 +15,8 @@ module_logger = logging.getLogger(__name__)
 
 
 def install_certbot_packages(
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None  # Added Optional
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,  # Added Optional
 ) -> None:  # Added type hint for return
     """Installs Certbot and its Nginx plugin via apt. Uses app_settings for symbols."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -24,7 +24,10 @@ def install_certbot_packages(
 
     log_map_server(
         f"{symbols.get('package', '📦')} Installing Certbot and Nginx plugin...",
-        "info", logger_to_use, app_settings)
+        "info",
+        logger_to_use,
+        app_settings,
+    )
     try:
         # Update apt cache before installing, though core_prerequisites might have done this.
         # Consider if this update is always necessary here or should be ensured by a prior global step.
@@ -32,12 +35,21 @@ def install_certbot_packages(
 
         run_elevated_command(
             ["apt", "install", "-y", "certbot", "python3-certbot-nginx"],
-            app_settings, current_logger=logger_to_use)
+            app_settings,
+            current_logger=logger_to_use,
+        )
         log_map_server(
             f"{symbols.get('success', '✅')} Certbot packages installed.",
-            "success", logger_to_use, app_settings)
+            "success",
+            logger_to_use,
+            app_settings,
+        )
     except Exception as e:
         log_map_server(
             f"{symbols.get('error', '❌')} Failed to install Certbot packages: {e}",
-            "error", logger_to_use, app_settings, exc_info=True)
+            "error",
+            logger_to_use,
+            app_settings,
+            exc_info=True,
+        )
         raise  # Certbot packages are usually critical if SSL is intended.

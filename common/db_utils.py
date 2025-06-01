@@ -7,7 +7,7 @@ from common.core_utils import DEFAULT_DB_PARAMS, module_logger
 
 
 def get_db_connection(
-        db_params: Optional[Dict[str, str]] = None,
+    db_params: Optional[Dict[str, str]] = None,
 ) -> Optional[psycopg.Connection]:
     """
     Establish and return a PostgreSQL database connection using Psycopg 3.
@@ -27,9 +27,10 @@ def get_db_connection(
         params_to_use.update(db_params)
 
     if (
-            params_to_use.get("password") == "yourStrongPasswordHere"
-            and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
-            and os.environ.get("PGPASSWORD") == "yourStrongPasswordHere"  # Check PGPASSWORD too
+        params_to_use.get("password") == "yourStrongPasswordHere"
+        and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
+        and os.environ.get("PGPASSWORD")
+        == "yourStrongPasswordHere"  # Check PGPASSWORD too
     ):
         module_logger.critical(
             "CRITICAL: Default placeholder password is being used for database "
@@ -44,7 +45,9 @@ def get_db_connection(
         "host": params_to_use.get("host"),
         "port": params_to_use.get("port"),
     }
-    conn_kwargs_filtered = {k: v for k, v in conn_kwargs.items() if v is not None}
+    conn_kwargs_filtered = {
+        k: v for k, v in conn_kwargs.items() if v is not None
+    }
 
     try:
         module_logger.debug(
@@ -61,9 +64,14 @@ def get_db_connection(
         )
         return conn
     except psycopg.OperationalError as e:  # More specific Psycopg 3 error
-        module_logger.error(f"Psycopg 3 database connection failed (OperationalError): {e}", exc_info=True)
+        module_logger.error(
+            f"Psycopg 3 database connection failed (OperationalError): {e}",
+            exc_info=True,
+        )
     except psycopg.Error as e:  # General Psycopg 3 errors
-        module_logger.error(f"Psycopg 3 database connection failed: {e}", exc_info=True)
+        module_logger.error(
+            f"Psycopg 3 database connection failed: {e}", exc_info=True
+        )
     except Exception as e:
         module_logger.error(
             f"An unexpected error occurred while connecting to the database using Psycopg 3: {e}",

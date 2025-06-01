@@ -24,25 +24,35 @@ import yaml  # PyYAML - ensure this is in dependencies
 from .config_models import AppSettings
 
 
-def _deep_update(source: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+def _deep_update(
+    source: Dict[str, Any], overrides: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Deeply updates a dictionary with values from another dictionary.
     'overrides' take precedence. Values from `overrides` that are None are ignored,
     unless the corresponding key does not exist in `source`.
     """
     for key, value in overrides.items():
-        if isinstance(value, dict) and key in source and isinstance(source[key], dict):
+        if (
+            isinstance(value, dict)
+            and key in source
+            and isinstance(source[key], dict)
+        ):
             source[key] = _deep_update(source[key], value)
-        elif value is not None:  # Only update if the override value is not None
+        elif (
+            value is not None
+        ):  # Only update if the override value is not None
             source[key] = value
-        elif key not in source and value is None:  # If key is new and value is None, add it
+        elif (
+            key not in source and value is None
+        ):  # If key is new and value is None, add it
             source[key] = value
     return source
 
 
 def load_app_settings(
-        cli_args: Optional[argparse.Namespace] = None,
-        config_file_path: str = "config.yaml",
+    cli_args: Optional[argparse.Namespace] = None,
+    config_file_path: str = "config.yaml",
 ) -> AppSettings:
     """
     Loads application settings with the following precedence:
@@ -66,7 +76,9 @@ def load_app_settings(
     #    BaseSettings also loads from actual environment variables and .env files here.
     #    So, `settings_after_env_and_defaults` now holds: Model Defaults < .env file < Environment Variables
     settings_after_env_and_defaults = AppSettings()
-    current_values_dict = settings_after_env_and_defaults.model_dump(exclude_defaults=False)
+    current_values_dict = settings_after_env_and_defaults.model_dump(
+        exclude_defaults=False
+    )
 
     # 2. Override with values from YAML configuration file.
     #    YAML values will override anything loaded from defaults or environment variables up to this point.
@@ -76,7 +88,9 @@ def load_app_settings(
             with open(yaml_config_path, "r", encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f)
             if yaml_data and isinstance(yaml_data, dict):
-                current_values_dict = _deep_update(current_values_dict, yaml_data)
+                current_values_dict = _deep_update(
+                    current_values_dict, yaml_data
+                )
             elif yaml_data is not None:
                 print(
                     f"Warning: Config file '{yaml_config_path}' does not contain a valid YAML dictionary. Ignoring.",
@@ -95,7 +109,8 @@ def load_app_settings(
     else:
         print(
             f"Info: Configuration file '{yaml_config_path}' not found. Using defaults, environment variables, and CLI args.",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
 
     # 3. Override with Command-Line Arguments (highest precedence).
     if cli_args:
@@ -114,11 +129,15 @@ def load_app_settings(
             if cli_key == "admin_group_ip":
                 mapped_cli_values["admin_group_ip"] = cli_value
             elif cli_key == "gtfs_feed_url":
-                mapped_cli_values["gtfs_feed_url"] = str(cli_value)  # Ensure HttpUrl can parse
+                mapped_cli_values["gtfs_feed_url"] = str(
+                    cli_value
+                )  # Ensure HttpUrl can parse
             elif cli_key == "vm_ip_or_domain":
                 mapped_cli_values["vm_ip_or_domain"] = cli_value
             elif cli_key == "pg_tileserv_binary_location":
-                mapped_cli_values["pg_tileserv_binary_location"] = str(cli_value)
+                mapped_cli_values["pg_tileserv_binary_location"] = str(
+                    cli_value
+                )
             elif cli_key == "log_prefix":
                 mapped_cli_values["log_prefix"] = cli_value
             elif cli_key == "dev_override_unsafe_password":
@@ -132,7 +151,9 @@ def load_app_settings(
             elif cli_key == "pghost":
                 pg_cli_values["host"] = cli_value
             elif cli_key == "pgport":
-                pg_cli_values["port"] = int(cli_value)  # argparse might give str
+                pg_cli_values["port"] = int(
+                    cli_value
+                )  # argparse might give str
             elif cli_key == "pgdatabase":
                 pg_cli_values["database"] = cli_value
             elif cli_key == "pguser":
@@ -142,11 +163,17 @@ def load_app_settings(
             # Add other CLI args to AppSettings field mappings here if necessary
 
         if pg_cli_values:
-            if "pg" not in current_values_dict or not isinstance(current_values_dict["pg"], dict):
+            if "pg" not in current_values_dict or not isinstance(
+                current_values_dict["pg"], dict
+            ):
                 current_values_dict["pg"] = {}  # Initialize if not present
-            current_values_dict["pg"] = _deep_update(current_values_dict["pg"], pg_cli_values)
+            current_values_dict["pg"] = _deep_update(
+                current_values_dict["pg"], pg_cli_values
+            )
 
-        current_values_dict = _deep_update(current_values_dict, mapped_cli_values)
+        current_values_dict = _deep_update(
+            current_values_dict, mapped_cli_values
+        )
 
     # 4. Create the final AppSettings instance, which will also validate all values.
     try:

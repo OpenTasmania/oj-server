@@ -17,7 +17,9 @@ from pathlib import Path
 
 # --- Static Project Definitions ---
 # Represents the version of the setup script logic (used in comments, state file).
-SCRIPT_VERSION: str = "1.4"  # Or a new version number reflecting these changes
+SCRIPT_VERSION: str = (
+    "1.4"  # Or a new version number reflecting these changes
+)
 
 # Define the root directory of the 'osm' project.
 # This assumes config.py is in setup/
@@ -47,34 +49,88 @@ SYMBOLS: dict[str, str] = {
 
 # --- Package Lists (Static - for apt installation by core_prerequisites.py) ---
 CORE_PREREQ_PACKAGES: list[str] = [
-    "git", "unzip", "vim", "build-essential", "gir1.2-packagekitglib-1.0",
-    "gir1.2-glib-2.0", "packagekit", "python-apt-common", "dirmngr",
-    "gnupg", "apt-transport-https", "lsb-release", "ca-certificates",
-    "qemu-guest-agent", "ufw", "curl", "wget", "bash", "btop", "screen",
+    "git",
+    "unzip",
+    "vim",
+    "build-essential",
+    "gir1.2-packagekitglib-1.0",
+    "gir1.2-glib-2.0",
+    "packagekit",
+    "python-apt-common",
+    "dirmngr",
+    "gnupg",
+    "apt-transport-https",
+    "lsb-release",
+    "ca-certificates",
+    "qemu-guest-agent",
+    "ufw",
+    "curl",
+    "wget",
+    "bash",
+    "btop",
+    "screen",
 ]
 
 PYTHON_SYSTEM_PACKAGES: list[str] = [
-    "python3", "python3-pip", "python3-venv", "python3-dev",
+    "python3",
+    "python3-pip",
+    "python3-venv",
+    "python3-dev",
 ]
 
 POSTGRES_PACKAGES: list[str] = [
-    "postgresql-17", "libpq-dev", "postgresql-common", "postgis",
-    "postgresql-17-postgis-3", "postgresql-17-postgis-3-scripts",
+    "postgresql-17",
+    "libpq-dev",
+    "postgresql-common",
+    "postgis",
+    "postgresql-17-postgis-3",
+    "postgresql-17-postgis-3-scripts",
 ]
 
 FONT_PACKAGES: list[str] = [
-    "fontconfig", "fonts-noto-core", "fonts-noto-cjk", "fonts-noto-ui-core",
-    "fonts-noto-mono", "fonts-dejavu", "fonts-dejavu-core", "fonts-dejavu-extra",
-    "fonts-unifont", "fonts-hanazono", "fonts-sil-gentium-basic", "fonts-firacode",
-    "fonts-crosextra-carlito", "fonts-takao-gothic", "fonts-takao-mincho", "fonts-takao",
+    "fontconfig",
+    "fonts-noto-core",
+    "fonts-noto-cjk",
+    "fonts-noto-ui-core",
+    "fonts-noto-mono",
+    "fonts-dejavu",
+    "fonts-dejavu-core",
+    "fonts-dejavu-extra",
+    "fonts-unifont",
+    "fonts-hanazono",
+    "fonts-sil-gentium-basic",
+    "fonts-firacode",
+    "fonts-crosextra-carlito",
+    "fonts-takao-gothic",
+    "fonts-takao-mincho",
+    "fonts-takao",
 ]
 
 MAPPING_PACKAGES: list[str] = [
-    "cmake", "libbz2-dev", "libstxxl-dev", "libstxxl1v5", "libxml2-dev",
-    "libzip-dev", "libboost-all-dev", "lua5.4", "liblua5.4-dev", "libtbb-dev",
-    "libluabind-dev", "pkg-config", "apache2", "libapache2-mod-tile", "renderd",
-    "mapnik-utils", "python3-mapnik", "libmapnik-dev", "xmlstarlet", "nginx",
-    "osm2pgsql", "gdal-bin", "osmium-tool", "osmcoastline",
+    "cmake",
+    "libbz2-dev",
+    "libstxxl-dev",
+    "libstxxl1v5",
+    "libxml2-dev",
+    "libzip-dev",
+    "libboost-all-dev",
+    "lua5.4",
+    "liblua5.4-dev",
+    "libtbb-dev",
+    "libluabind-dev",
+    "pkg-config",
+    "apache2",
+    "libapache2-mod-tile",
+    "renderd",
+    "mapnik-utils",
+    "python3-mapnik",
+    "libmapnik-dev",
+    "xmlstarlet",
+    "nginx",
+    "osm2pgsql",
+    "gdal-bin",
+    "osmium-tool",
+    "osmcoastline",
 ]
 
 # --- REMOVED Mutable Configuration Variables and their _DEFAULT counterparts ---

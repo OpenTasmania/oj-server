@@ -28,9 +28,9 @@ CACHED_SCRIPT_HASH: Optional[str] = None
 
 
 def calculate_project_hash(
-        project_root_dir: Path,
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None
+    project_root_dir: Path,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """
     Calculate a SHA256 hash of all .py files within the project directory.
@@ -57,7 +57,10 @@ def calculate_project_hash(
         if not project_root.is_dir():
             log_map_server(
                 f"{symbols.get('error', '❌')} Project root directory '{project_root}' not found for hashing.",
-                "error", logger_to_use, app_settings)
+                "error",
+                logger_to_use,
+                app_settings,
+            )
             return None
 
         # Iterate over .py files for hashing
@@ -68,42 +71,64 @@ def calculate_project_hash(
         if not py_files_found:  # Handle case with no Python files
             log_map_server(
                 f"{symbols.get('warning', '!')} No .py files found under '{project_root}' for hashing. Hash will be of an empty set.",
-                "warning", logger_to_use, app_settings)
+                "warning",
+                logger_to_use,
+                app_settings,
+            )
             return hasher.hexdigest()  # Returns hash of empty string
 
         # Sort files by relative path for consistent hashing
-        sorted_files = sorted(py_files_found, key=lambda p: p.relative_to(project_root).as_posix())
+        sorted_files = sorted(
+            py_files_found,
+            key=lambda p: p.relative_to(project_root).as_posix(),
+        )
 
         for file_path in sorted_files:
             try:
                 # Include relative path in hash to account for file moves/renames
-                relative_path_str = file_path.relative_to(project_root).as_posix()
+                relative_path_str = file_path.relative_to(
+                    project_root
+                ).as_posix()
                 hasher.update(relative_path_str.encode("utf-8"))
                 # Include file content in hash
                 file_content = file_path.read_bytes()
                 hasher.update(file_content)
-            except Exception as e_file:  # Handle errors reading individual files
+            except (
+                Exception
+            ) as e_file:  # Handle errors reading individual files
                 log_map_server(
                     f"{symbols.get('error', '❌')} Error reading file {file_path} for hashing: {e_file}",
-                    "error", logger_to_use, app_settings)
+                    "error",
+                    logger_to_use,
+                    app_settings,
+                )
                 return None  # Invalidate hash on any file read error
 
         final_hash = hasher.hexdigest()
         log_map_server(
             f"{symbols.get('debug', '🐛')} Calculated SCRIPT_HASH: {final_hash} from {len(sorted_files)} .py files in {project_root}.",
-            "debug", logger_to_use, app_settings)
+            "debug",
+            logger_to_use,
+            app_settings,
+        )
         return final_hash
-    except Exception as e_hash:  # Catch-all for other errors during hashing process
+    except (
+        Exception
+    ) as e_hash:  # Catch-all for other errors during hashing process
         log_map_server(
             f"{symbols.get('error', '❌')} Critical error during project hashing: {e_hash}",
-            "error", logger_to_use, app_settings, exc_info=True)
+            "error",
+            logger_to_use,
+            app_settings,
+            exc_info=True,
+        )
         return None
 
 
 def get_current_script_hash(
-        project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
-        app_settings: AppSettings,
-        logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
+    project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
+    app_settings: AppSettings,
+    logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
 ) -> Optional[str]:
     """
     Get the current script hash, calculating it if not already cached.
@@ -119,26 +144,48 @@ def get_current_script_hash(
 
 # --- Other System Utilities ---
 
-def systemd_reload(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+
+def systemd_reload(
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> None:
     """
     Reload the systemd daemon.
     Uses app_settings for logging symbols.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
-    log_map_server(f"{symbols.get('gear', '⚙️')} Reloading systemd daemon...", "info", logger_to_use, app_settings)
+    log_map_server(
+        f"{symbols.get('gear', '⚙️')} Reloading systemd daemon...",
+        "info",
+        logger_to_use,
+        app_settings,
+    )
     try:
         # run_elevated_command now takes app_settings
-        run_elevated_command(["systemctl", "daemon-reload"], app_settings, current_logger=logger_to_use)
-        log_map_server(f"{symbols.get('success', '✅')} Systemd daemon reloaded.", "success", logger_to_use,
-                       app_settings)
+        run_elevated_command(
+            ["systemctl", "daemon-reload"],
+            app_settings,
+            current_logger=logger_to_use,
+        )
+        log_map_server(
+            f"{symbols.get('success', '✅')} Systemd daemon reloaded.",
+            "success",
+            logger_to_use,
+            app_settings,
+        )
     except Exception as e:
-        log_map_server(f"{symbols.get('error', '❌')} Failed to reload systemd: {e}", "error", logger_to_use,
-                       app_settings)
+        log_map_server(
+            f"{symbols.get('error', '❌')} Failed to reload systemd: {e}",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
         # Consider if this should raise an error or just log, depending on criticality of systemd reload
 
 
-def get_debian_codename(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> Optional[str]:
+def get_debian_codename(
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> Optional[str]:
     """
     Get the Debian codename (e.g., 'bookworm', 'bullseye').
     Uses app_settings for logging symbols.
@@ -152,13 +199,16 @@ def get_debian_codename(app_settings: AppSettings, current_logger: Optional[logg
             app_settings,
             capture_output=True,
             check=True,
-            current_logger=logger_to_use
+            current_logger=logger_to_use,
         )
         return result.stdout.strip()
     except FileNotFoundError:  # lsb_release not found
         log_map_server(
             f"{symbols.get('warning', '!')} lsb_release command not found. Cannot determine Debian codename.",
-            "warning", logger_to_use, app_settings)
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
         return None
     except subprocess.CalledProcessError:  # Command failed
         # Error is already logged by run_command if check=True
@@ -166,5 +216,8 @@ def get_debian_codename(app_settings: AppSettings, current_logger: Optional[logg
     except Exception as e:  # Other errors
         log_map_server(
             f"{symbols.get('warning', '!')} Unexpected error getting Debian codename: {e}",
-            "warning", logger_to_use, app_settings)
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
         return None

@@ -22,8 +22,7 @@ NGINX_PACKAGE_NAME = "nginx"  # Nginx package name is static
 
 
 def ensure_nginx_package_installed(
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Confirms that the Nginx package is present.
@@ -34,19 +33,33 @@ def ensure_nginx_package_installed(
 
     log_map_server(
         f"{symbols.get('info', 'ℹ️')} Checking Nginx package ('{NGINX_PACKAGE_NAME}') installation status...",
-        "info", logger_to_use, app_settings)
+        "info",
+        logger_to_use,
+        app_settings,
+    )
 
     # elevated_command_exists and check_package_installed now take app_settings
-    if elevated_command_exists("nginx", app_settings, current_logger=logger_to_use) and \
-       check_package_installed(NGINX_PACKAGE_NAME, app_settings=app_settings, current_logger=logger_to_use):
+    if elevated_command_exists(
+        "nginx", app_settings, current_logger=logger_to_use
+    ) and check_package_installed(
+        NGINX_PACKAGE_NAME,
+        app_settings=app_settings,
+        current_logger=logger_to_use,
+    ):
         log_map_server(
             f"{symbols.get('success', '✅')} Nginx package '{NGINX_PACKAGE_NAME}' is installed and command exists.",
-            "success", logger_to_use, app_settings)
+            "success",
+            logger_to_use,
+            app_settings,
+        )
     else:
         log_map_server(
             f"{symbols.get('error', '❌')} Nginx package '{NGINX_PACKAGE_NAME}' or command is NOT found/installed. "
             "This should have been handled by a core prerequisite installation step.",
-            "error", logger_to_use, app_settings)
+            "error",
+            logger_to_use,
+            app_settings,
+        )
         raise EnvironmentError(
             f"Nginx package '{NGINX_PACKAGE_NAME}' or command not found. "
             "Please ensure core prerequisites (which installs from static_config.MAPPING_PACKAGES) ran successfully."

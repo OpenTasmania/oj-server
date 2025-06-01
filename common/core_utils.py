@@ -26,16 +26,20 @@ DEFAULT_DB_PARAMS: Dict[str, str] = {
 }
 
 DETAILED_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(module)s.%(funcName)s:%(lineno)d - %(message)s"
-SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER = "{log_prefix}%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-SIMPLE_LOG_FORMAT_NO_PREFIX = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER = (
+    "{log_prefix}%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+SIMPLE_LOG_FORMAT_NO_PREFIX = (
+    "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
 
 
 def setup_logging(
-        log_level: int = logging.INFO,
-        log_file: Optional[str] = None,
-        log_to_console: bool = True,
-        log_format_str: Optional[str] = None,
-        log_prefix: Optional[str] = None
+    log_level: int = logging.INFO,
+    log_file: Optional[str] = None,
+    log_to_console: bool = True,
+    log_format_str: Optional[str] = None,
+    log_prefix: Optional[str] = None,
 ) -> None:
     """
     Set up basic logging configuration for the application.
@@ -49,7 +53,10 @@ def setup_logging(
             file_handler = logging.FileHandler(log_file_path, mode="a")
             handlers.append(file_handler)
         except Exception as e:
-            print(f"Warning: Could not create file handler for log file {log_file}: {e}", file=sys.stderr)
+            print(
+                f"Warning: Could not create file handler for log file {log_file}: {e}",
+                file=sys.stderr,
+            )
 
     if log_to_console:
         console_handler = logging.StreamHandler(sys.stdout)
@@ -61,7 +68,11 @@ def setup_logging(
             log_level = logging.INFO
 
     final_format_str: str
-    actual_prefix = (log_prefix.strip() + " ") if log_prefix and log_prefix.strip() else ""
+    actual_prefix = (
+        (log_prefix.strip() + " ")
+        if log_prefix and log_prefix.strip()
+        else ""
+    )
 
     if log_format_str:
         if "{log_prefix}" in log_format_str:
@@ -70,7 +81,11 @@ def setup_logging(
             final_format_str = actual_prefix + log_format_str
     else:
         if actual_prefix:
-            final_format_str = SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER.format(log_prefix=actual_prefix)
+            final_format_str = (
+                SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER.format(
+                    log_prefix=actual_prefix
+                )
+            )
         else:
             final_format_str = SIMPLE_LOG_FORMAT_NO_PREFIX
 
@@ -79,16 +94,19 @@ def setup_logging(
         format=final_format_str,
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=handlers,
-        force=True
+        force=True,
     )
     logging.getLogger().setLevel(log_level)
 
     logger_for_this_message = logging.getLogger(__name__)
-    if not logger_for_this_message.isEnabledFor(logging.INFO):  # pragma: no cover
+    if not logger_for_this_message.isEnabledFor(
+        logging.INFO
+    ):  # pragma: no cover
         logger_for_this_message.setLevel(logging.INFO)
 
     logger_for_this_message.info(
         f"Logging configured. Level: {logging.getLevelName(log_level)}. Format: '{final_format_str}'"
     )
+
 
 # REMOVE cleanup_directory function from here.

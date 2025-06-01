@@ -17,8 +17,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def ensure_apache_packages_installed(
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Confirms that Apache and libapache2-mod-tile packages are present.
@@ -31,7 +30,7 @@ def ensure_apache_packages_installed(
         f"{symbols.get('info', 'ℹ️')} Checking Apache package installation status...",
         "info",
         logger_to_use,
-        app_settings  # Pass app_settings to log_map_server
+        app_settings,  # Pass app_settings to log_map_server
     )
 
     # Packages expected to be in static_config.MAPPING_PACKAGES
@@ -49,12 +48,14 @@ def ensure_apache_packages_installed(
 
     for pkg in apache_packages_to_check:
         # check_package_installed now takes app_settings
-        if check_package_installed(pkg, app_settings=app_settings, current_logger=logger_to_use):
+        if check_package_installed(
+            pkg, app_settings=app_settings, current_logger=logger_to_use
+        ):
             log_map_server(
                 f"{symbols.get('success', '✅')} Package '{pkg}' is installed.",
                 "debug",  # Changed from success for individual packages to debug
                 logger_to_use,
-                app_settings
+                app_settings,
             )
         else:
             log_map_server(
@@ -62,7 +63,7 @@ def ensure_apache_packages_installed(
                 "This should have been handled by a core prerequisite installation step.",
                 "error",
                 logger_to_use,
-                app_settings
+                app_settings,
             )
             all_found = False
 
@@ -76,5 +77,5 @@ def ensure_apache_packages_installed(
             f"{symbols.get('success', '✅')} All required Apache/mod_tile packages confirmed as installed.",
             "success",  # Overall success for this check step
             logger_to_use,
-            app_settings
+            app_settings,
         )

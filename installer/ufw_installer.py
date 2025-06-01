@@ -20,8 +20,7 @@ UFW_PACKAGE_NAME = "ufw"  # UFW package name is static
 
 
 def ensure_ufw_package_installed(
-    app_settings: AppSettings,
-    current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Confirms UFW package is installed.
@@ -33,13 +32,17 @@ def ensure_ufw_package_installed(
     log_map_server(
         f"{symbols.get('info', '')} Checking UFW package ('{UFW_PACKAGE_NAME}') installation status...",
         "info",
-        logger_to_use
+        logger_to_use,
     )
-    if check_package_installed(UFW_PACKAGE_NAME, current_logger=logger_to_use, app_settings=app_settings):  # Pass app_settings
+    if check_package_installed(
+        UFW_PACKAGE_NAME,
+        current_logger=logger_to_use,
+        app_settings=app_settings,
+    ):  # Pass app_settings
         log_map_server(
             f"{symbols.get('success', '')} UFW package '{UFW_PACKAGE_NAME}' is installed.",
             "success",  # Changed from 'debug' for clarity on successful check
-            logger_to_use
+            logger_to_use,
         )
     else:
         # This should ideally not happen if core_prerequisites ran successfully,
@@ -48,7 +51,7 @@ def ensure_ufw_package_installed(
             f"{symbols.get('error', '')} UFW package '{UFW_PACKAGE_NAME}' is NOT installed. "
             "This should have been handled by a core prerequisite installation step.",
             "error",
-            logger_to_use
+            logger_to_use,
         )
         raise EnvironmentError(
             f"UFW package '{UFW_PACKAGE_NAME}' not found, but is a core prerequisite."

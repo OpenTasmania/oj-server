@@ -93,7 +93,9 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
             "arrival_time": {"type": "TEXT"},
             "departure_time": {"type": "TEXT"},
             "stop_id": {"type": "TEXT"},  # Part of composite PK
-            "stop_sequence": {"type": "INTEGER"},  # Part of composite PK, pk handling for composite is different
+            "stop_sequence": {
+                "type": "INTEGER"
+            },  # Part of composite PK, pk handling for composite is different
             "stop_headsign": {"type": "TEXT"},
             "pickup_type": {"type": "INTEGER"},
             "drop_off_type": {"type": "INTEGER"},
@@ -156,11 +158,14 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "gtfs_shapes_lines.txt": {  # This is a conceptual name for the table holding LineString geometries
         "db_table_name": "gtfs_shapes_lines",  # This table is created with an EXPLICIT PK in update_gtfs.py
         "columns": {
-            "shape_id": {"type": "TEXT", "pk": True},  # "pk": True added for consistency, though creation is separate
+            "shape_id": {
+                "type": "TEXT",
+                "pk": True,
+            },  # "pk": True added for consistency, though creation is separate
             "geom": {"type": "GEOMETRY(LineString, 4326)"},
         },
         "pk_cols": ["shape_id"],
-         "geom_config": {
+        "geom_config": {
             "geom_col": "geom",
             "srid": 4326,
         },
@@ -184,12 +189,18 @@ GTFS_FILE_SCHEMAS: Dict[str, Dict[str, Any]] = {
             "transfer_type": {"type": "INTEGER"},  # Part of composite PK
             "min_transfer_time": {"type": "INTEGER"},
         },
-        "pk_cols": ["from_stop_id", "to_stop_id", "transfer_type"],  # Composite PK
+        "pk_cols": [
+            "from_stop_id",
+            "to_stop_id",
+            "transfer_type",
+        ],  # Composite PK
     },
     "feed_info.txt": {
         "db_table_name": "gtfs_feed_info",
         "columns": {  # feed_info often doesn't have a single PK, sometimes composite, sometimes none if only one row
-            "feed_publisher_name": {"type": "TEXT"},  # Part of composite PK (as defined in pk_cols)
+            "feed_publisher_name": {
+                "type": "TEXT"
+            },  # Part of composite PK (as defined in pk_cols)
             "feed_publisher_url": {"type": "TEXT"},
             "feed_lang": {"type": "TEXT"},
             "default_lang": {"type": "TEXT"},

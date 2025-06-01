@@ -21,16 +21,22 @@ DEFAULT_GTFS_PROCESSOR_LOG_FILE = "/var/log/gtfs_processor_app.log"
 
 
 def setup_gtfs_environment(
-        app_settings: AppSettings,  # Changed to accept AppSettings
-        # Parameters like feed_url, db_params, log_file_path, log_level, log_prefix
-        # will now be sourced from app_settings.
-        current_logger_for_setup: Optional[logging.Logger] = None  # Logger for this setup function's messages
+    app_settings: AppSettings,  # Changed to accept AppSettings
+    # Parameters like feed_url, db_params, log_file_path, log_level, log_prefix
+    # will now be sourced from app_settings.
+    current_logger_for_setup: Optional[
+        logging.Logger
+    ] = None,  # Logger for this setup function's messages
 ) -> None:
     """
     Sets up logging for GTFS processing and exports necessary OS environment
     variables for the GTFS pipeline based on app_settings.
     """
-    logger_to_use = current_logger_for_setup if current_logger_for_setup else module_logger
+    logger_to_use = (
+        current_logger_for_setup
+        if current_logger_for_setup
+        else module_logger
+    )
     symbols = app_settings.symbols
 
     # Extract necessary values from app_settings
@@ -50,13 +56,15 @@ def setup_gtfs_environment(
     # These parameters will be added to the process_and_setup_gtfs and passed here.
     # We'll use placeholder names that the orchestrator will populate from app_settings.
 
-    gtfs_feed_url = str(app_settings.gtfs_feed_url)  # From top-level AppSettings
+    gtfs_feed_url = str(
+        app_settings.gtfs_feed_url
+    )  # From top-level AppSettings
     db_params = {  # From app_settings.pg
         "PGHOST": app_settings.pg.host,
         "PGPORT": str(app_settings.pg.port),
         "PGDATABASE": app_settings.pg.database,
         "PGUSER": app_settings.pg.user,
-        "PGPASSWORD": app_settings.pg.password
+        "PGPASSWORD": app_settings.pg.password,
     }
     # Log file settings for the GTFS application itself (not this setup function's logger)
     # These could be specific fields in AppSettings, e.g., app_settings.gtfs_app_log_file
@@ -71,50 +79,85 @@ def setup_gtfs_environment(
         log_level=effective_gtfs_app_log_level,
         log_file=effective_gtfs_app_log_file,
         log_to_console=True,  # GTFS pipeline might also log to console
-        log_prefix=effective_gtfs_app_log_prefix
+        log_prefix=effective_gtfs_app_log_prefix,
     )
     log_map_server(
         f"{symbols.get('info', 'ℹ️')} GTFS Application logging configured by environment setup. Log file: {effective_gtfs_app_log_file}, Level: {logging.getLevelName(effective_gtfs_app_log_level)}",
-        "info", logger_to_use, app_settings)
+        "info",
+        logger_to_use,
+        app_settings,
+    )
 
     # Ensure log file exists and has appropriate permissions (using current user of *this* script)
     try:
-        run_elevated_command(["touch", effective_gtfs_app_log_file], app_settings, current_logger=logger_to_use)
+        run_elevated_command(
+            ["touch", effective_gtfs_app_log_file],
+            app_settings,
+            current_logger=logger_to_use,
+        )
         current_user_name = getuser()
         try:
             current_group_info = getgrgid(os.getgid())
             current_group_name = current_group_info.gr_name
         except KeyError:
-            current_group_name = str(os.getgid())  # Fallback to GID if name not found
+            current_group_name = str(
+                os.getgid()
+            )  # Fallback to GID if name not found
 
         run_elevated_command(
-            ["chown", f"{current_user_name}:{current_group_name}", effective_gtfs_app_log_file],
-            app_settings, current_logger=logger_to_use,
+            [
+                "chown",
+                f"{current_user_name}:{current_group_name}",
+                effective_gtfs_app_log_file,
+            ],
+            app_settings,
+            current_logger=logger_to_use,
         )
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} Ensured GTFS app log file '{effective_gtfs_app_log_file}' exists and is writable by '{current_user_name}'.",
-            "info", logger_to_use, app_settings)
+            "info",
+            logger_to_use,
+            app_settings,
+        )
     except Exception as e:
         log_map_server(
             f"{symbols.get('warning', '!')} Could not create/chown GTFS app log file {effective_gtfs_app_log_file}: {e}. Logging might fail or go to stdout/stderr.",
-            "warning", logger_to_use, app_settings)
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
 
     # 2. Set OS Environment Variables for the GTFS pipeline execution context
-    log_map_server(f"{symbols.get('gear', '⚙️')} Setting OS environment variables for GTFS processing context...",
-                   "info", logger_to_use, app_settings)
+    log_map_server(
+        f"{symbols.get('gear', '⚙️')} Setting OS environment variables for GTFS processing context...",
+        "info",
+        logger_to_use,
+        app_settings,
+    )
     os.environ["GTFS_FEED_URL"] = gtfs_feed_url
     os.environ["PG_OSM_PASSWORD"] = db_params.get("PGPASSWORD", "")
     os.environ["PG_OSM_USER"] = db_params.get("PGUSER", "")
     # PG_GIS_DB is used by main_pipeline.py's DB_PARAMS, so map PGDATABASE to it.
-    os.environ["PG_GIS_DB"] = db_params.get("PGDATABASE", "")  # main_pipeline uses PG_GIS_DB
-    os.environ["PG_HOST"] = db_params.get("PGHOST", "")  # main_pipeline uses PG_HOST
-    os.environ["PG_PORT"] = db_params.get("PGPORT", "")  # main_pipeline uses PG_PORT
+    os.environ["PG_GIS_DB"] = db_params.get(
+        "PGDATABASE", ""
+    )  # main_pipeline uses PG_GIS_DB
+    os.environ["PG_HOST"] = db_params.get(
+        "PGHOST", ""
+    )  # main_pipeline uses PG_HOST
+    os.environ["PG_PORT"] = db_params.get(
+        "PGPORT", ""
+    )  # main_pipeline uses PG_PORT
 
     # Export the log file path for any sub-processes or GTFS modules that might need it directly
-    os.environ["GTFS_PROCESSOR_LOG_FILE"] = effective_gtfs_app_log_file  # For GTFS sub-modules if they look for it
+    os.environ["GTFS_PROCESSOR_LOG_FILE"] = (
+        effective_gtfs_app_log_file  # For GTFS sub-modules if they look for it
+    )
 
     log_map_server(
         f"{symbols.get('info', 'ℹ️')} GTFS OS environment variables set. "
         f"GTFS_FEED_URL (for pipeline): {os.environ.get('GTFS_FEED_URL')}, "
         f"GTFS_PROCESSOR_LOG_FILE (for pipeline): {os.environ.get('GTFS_PROCESSOR_LOG_FILE')}",
-        "info", logger_to_use, app_settings)
+        "info",
+        logger_to_use,
+        app_settings,
+    )

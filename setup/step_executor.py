@@ -25,14 +25,16 @@ module_logger = logging.getLogger(__name__)
 
 
 def execute_step(
-        step_tag: str,
-        step_description: str,
-        # The step_function now expects AppSettings as its first argument
-        step_function: Callable[[AppSettings, Optional[logging.Logger]], None],
-        app_settings: AppSettings,  # Added app_settings parameter
-        current_logger_instance: Optional[logging.Logger],
-        # prompt_user_for_rerun also now takes app_settings
-        prompt_user_for_rerun: Callable[[str, AppSettings, Optional[logging.Logger]], bool],
+    step_tag: str,
+    step_description: str,
+    # The step_function now expects AppSettings as its first argument
+    step_function: Callable[[AppSettings, Optional[logging.Logger]], None],
+    app_settings: AppSettings,  # Added app_settings parameter
+    current_logger_instance: Optional[logging.Logger],
+    # prompt_user_for_rerun also now takes app_settings
+    prompt_user_for_rerun: Callable[
+        [str, AppSettings, Optional[logging.Logger]], bool
+    ],
 ) -> bool:
     """
     Execute a single setup step.
@@ -56,49 +58,78 @@ def execute_step(
         True if the step was successfully executed or if it was skipped.
         False if the step execution failed.
     """
-    logger_to_use = current_logger_instance if current_logger_instance else module_logger
+    logger_to_use = (
+        current_logger_instance if current_logger_instance else module_logger
+    )
     symbols = app_settings.symbols  # Use symbols from app_settings
     run_this_step = True
 
     # Pass app_settings to state_manager functions
-    if is_step_completed(step_tag, app_settings=app_settings, current_logger=logger_to_use):
+    if is_step_completed(
+        step_tag, app_settings=app_settings, current_logger=logger_to_use
+    ):
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} Step '{step_description}' ({step_tag}) is already marked as completed.",
-            "info", logger_to_use, app_settings)
+            "info",
+            logger_to_use,
+            app_settings,
+        )
 
         prompt = f"Step '{step_description}' ({step_tag}) is completed. Re-run anyway?"
         # Pass app_settings to prompt_user_for_rerun
         if prompt_user_for_rerun(prompt, app_settings, logger_to_use):
             log_map_server(
                 f"{symbols.get('info', 'ℹ️')} User chose to re-run step: {step_tag}",
-                "info", logger_to_use, app_settings)
+                "info",
+                logger_to_use,
+                app_settings,
+            )
             # run_this_step remains True
         else:
             log_map_server(
                 f"{symbols.get('info', 'ℹ️')} Skipping re-run of step: {step_tag}",
-                "info", logger_to_use, app_settings)
+                "info",
+                logger_to_use,
+                app_settings,
+            )
             run_this_step = False
 
     if run_this_step:
         log_map_server(
             f"--- {symbols.get('step', '➡️')} Executing: {step_description} ({step_tag}) ---",
-            "info", logger_to_use, app_settings)
+            "info",
+            logger_to_use,
+            app_settings,
+        )
         try:
             # Pass app_settings and the logger to the actual step function
             step_function(app_settings, logger_to_use)
 
             # Pass app_settings to mark_step_completed
-            mark_step_completed(step_tag, app_settings=app_settings, current_logger=logger_to_use)
+            mark_step_completed(
+                step_tag,
+                app_settings=app_settings,
+                current_logger=logger_to_use,
+            )
             log_map_server(
                 f"--- {symbols.get('success', '✅')} Successfully completed: {step_description} ({step_tag}) ---",
-                "success", logger_to_use, app_settings)
+                "success",
+                logger_to_use,
+                app_settings,
+            )
             return True
         except Exception as e:
             log_map_server(
                 f"{symbols.get('error', '❌')} FAILED: {step_description} ({step_tag})",
-                "error", logger_to_use, app_settings)
+                "error",
+                logger_to_use,
+                app_settings,
+            )
             log_map_server(
-                f"   Error details: {str(e)}", "error", logger_to_use, app_settings,
+                f"   Error details: {str(e)}",
+                "error",
+                logger_to_use,
+                app_settings,
             )
             # For more detailed debugging, you might log the full exception info:
             # logger_to_use.exception(f"Detailed error information for step {step_tag}:")

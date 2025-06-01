@@ -21,9 +21,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --- Default Static Values ---
 ADMIN_GROUP_IP_DEFAULT: str = "192.168.128.0/22"
-GTFS_FEED_URL_DEFAULT: str = "https://www.transport.act.gov.au/googletransit/google_transit.zip"
+GTFS_FEED_URL_DEFAULT: str = (
+    "https://www.transport.act.gov.au/googletransit/google_transit.zip"
+)
 VM_IP_OR_DOMAIN_DEFAULT: str = "example.com"
-PG_TILESERV_BINARY_LOCATION_DEFAULT: str = "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
+PG_TILESERV_BINARY_LOCATION_DEFAULT: str = (
+    "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
+)
 LOG_PREFIX_DEFAULT: str = "[MAP-SETUP]"
 
 PGHOST_DEFAULT: str = "127.0.0.1"
@@ -37,11 +41,15 @@ OSRM_IMAGE_TAG_DEFAULT: str = "osrm/osrm-backend:latest"
 # OSRM Specific Defaults
 OSRM_DATA_BASE_DIR_DEFAULT: str = "/opt/osm_data"
 OSRM_PROCESSED_DIR_DEFAULT: str = "/opt/osrm_processed_data"
-OSRM_BASE_PBF_URL_DEFAULT: str = "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
+OSRM_BASE_PBF_URL_DEFAULT: str = (
+    "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
+)
 OSRM_BASE_PBF_FILENAME_DEFAULT: str = "australia-latest.osm.pbf"
 OSRM_CAR_PROFILE_PORT_DEFAULT: int = 5000
 OSRM_MAX_TABLE_SIZE_ROUTED_DEFAULT: int = 8000
-OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT: str = "/opt/car.lua"  # Default car profile in OSRM container
+OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT: str = (
+    "/opt/car.lua"  # Default car profile in OSRM container
+)
 APACHE_LISTEN_PORT_DEFAULT: int = 8080
 POSTGRES_VERSION_DEFAULT: str = "17"
 
@@ -184,7 +192,9 @@ RENDERD_TILE_CACHE_DIR_DEFAULT = "/var/lib/mod_tile"
 RENDERD_RUN_DIR_DEFAULT = "/var/run/renderd"  # For socket and stats
 RENDERD_SOCKET_PATH_DEFAULT = "/var/run/renderd/renderd.sock"
 MAPNIK_XML_STYLESHEET_PATH_DEFAULT = "/usr/local/share/maps/style/openstreetmap-carto/mapnik.xml"  # Standard deployment path for our style
-RENDERD_URI_PATH_SEGMENT_DEFAULT = "hot"  # Matches Apache AddTileConfig and Nginx location /raster/hot/
+RENDERD_URI_PATH_SEGMENT_DEFAULT = (
+    "hot"  # Matches Apache AddTileConfig and Nginx location /raster/hot/
+)
 
 
 PG_TILESERV_CONFIG_TEMPLATE_DEFAULT: str = """\
@@ -355,184 +365,335 @@ WEBAPP_ROOT_DIR_DEFAULT = "/var/www/html/map_test_page"
 WEBAPP_INDEX_FILENAME_DEFAULT = "index.html"
 
 SYMBOLS_DEFAULT: Dict[str, str] = {
-    "success": "✅", "error": "❌", "warning": "⚠️", "info": "ℹ️",
-    "step": "➡️", "gear": "⚙️", "package": "📦", "rocket": "🚀",
-    "sparkles": "✨", "critical": "🔥", "debug": "🐛",
+    "success": "✅",
+    "error": "❌",
+    "warning": "⚠️",
+    "info": "ℹ️",
+    "step": "➡️",
+    "gear": "⚙️",
+    "package": "📦",
+    "rocket": "🚀",
+    "sparkles": "✨",
+    "critical": "🔥",
+    "debug": "🐛",
 }
 
 
 class PgTileservSettings(BaseSettings):
     """pg_tileserv specific settings."""
-    model_config = SettingsConfigDict(env_prefix='PGTS_', extra='ignore')
 
-    binary_url: Union[HttpUrl, str] = Field(default=PG_TILESERV_BINARY_LOCATION_DEFAULT,
-                                            description="URL or local path for the pg_tileserv binary if not installed via apt.")  # Renamed from pg_tileserv_binary_location in AppSettings for clarity here
-    system_user: str = Field(default=PG_TILESERV_SYSTEM_USER_DEFAULT, description="System user to run pg_tileserv.")
-    binary_install_path: FilePath = Field(default=Path(PG_TILESERV_BINARY_PATH_DEFAULT),
-                                          description="Install path for pg_tileserv binary.")
-    config_dir: DirectoryPath = Field(default=Path(PG_TILESERV_CONFIG_DIR_DEFAULT),
-                                      description="Directory for pg_tileserv config file.")
-    config_filename: str = Field(default=PG_TILESERV_CONFIG_FILENAME_DEFAULT,
-                                 description="Filename for pg_tileserv config (e.g., config.toml).")
+    model_config = SettingsConfigDict(env_prefix="PGTS_", extra="ignore")
 
-    http_host: str = Field(default="0.0.0.0", description="Host pg_tileserv binds to.")
-    http_port: int = Field(default=7800, description="Port pg_tileserv listens on.")
-    default_max_features: int = Field(default=10000, description="DefaultMaxFeatures for pg_tileserv.")
-    publish_schemas: str = Field(default="public,gtfs",
-                                 description="Comma-separated list of schemas for pg_tileserv to publish.")
-    uri_prefix: str = Field(default="/vector",
-                            description="Base URI prefix for tile requests (used in Nginx proxy and pg_tileserv).")
-    development_mode: bool = Field(default=False, description="Enable DevelopmentMode in pg_tileserv.")
-    allow_function_sources: bool = Field(default=True, description="Enable AllowFunctionSources in pg_tileserv.")
+    binary_url: Union[HttpUrl, str] = Field(
+        default=PG_TILESERV_BINARY_LOCATION_DEFAULT,
+        description="URL or local path for the pg_tileserv binary if not installed via apt.",
+    )  # Renamed from pg_tileserv_binary_location in AppSettings for clarity here
+    system_user: str = Field(
+        default=PG_TILESERV_SYSTEM_USER_DEFAULT,
+        description="System user to run pg_tileserv.",
+    )
+    binary_install_path: FilePath = Field(
+        default=Path(PG_TILESERV_BINARY_PATH_DEFAULT),
+        description="Install path for pg_tileserv binary.",
+    )
+    config_dir: DirectoryPath = Field(
+        default=Path(PG_TILESERV_CONFIG_DIR_DEFAULT),
+        description="Directory for pg_tileserv config file.",
+    )
+    config_filename: str = Field(
+        default=PG_TILESERV_CONFIG_FILENAME_DEFAULT,
+        description="Filename for pg_tileserv config (e.g., config.toml).",
+    )
 
-    config_template: str = Field(default=PG_TILESERV_CONFIG_TEMPLATE_DEFAULT,
-                                 description="Template for the pg_tileserv config.toml file.")
-    systemd_template: str = Field(default=PG_TILESERV_SYSTEMD_TEMPLATE_DEFAULT,
-                                  description="Template for the pg_tileserv systemd service file.")
+    http_host: str = Field(
+        default="0.0.0.0", description="Host pg_tileserv binds to."
+    )
+    http_port: int = Field(
+        default=7800, description="Port pg_tileserv listens on."
+    )
+    default_max_features: int = Field(
+        default=10000, description="DefaultMaxFeatures for pg_tileserv."
+    )
+    publish_schemas: str = Field(
+        default="public,gtfs",
+        description="Comma-separated list of schemas for pg_tileserv to publish.",
+    )
+    uri_prefix: str = Field(
+        default="/vector",
+        description="Base URI prefix for tile requests (used in Nginx proxy and pg_tileserv).",
+    )
+    development_mode: bool = Field(
+        default=False, description="Enable DevelopmentMode in pg_tileserv."
+    )
+    allow_function_sources: bool = Field(
+        default=True,
+        description="Enable AllowFunctionSources in pg_tileserv.",
+    )
+
+    config_template: str = Field(
+        default=PG_TILESERV_CONFIG_TEMPLATE_DEFAULT,
+        description="Template for the pg_tileserv config.toml file.",
+    )
+    systemd_template: str = Field(
+        default=PG_TILESERV_SYSTEMD_TEMPLATE_DEFAULT,
+        description="Template for the pg_tileserv systemd service file.",
+    )
 
 
 class PostgresSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='PG_', extra='ignore')
+    model_config = SettingsConfigDict(env_prefix="PG_", extra="ignore")
     host: str = Field(default=PGHOST_DEFAULT)
     port: int = Field(default=PGPORT_DEFAULT)
     database: str = Field(default=PGDATABASE_DEFAULT)
     user: str = Field(default=PGUSER_DEFAULT)
     password: str = Field(default=PGPASSWORD_DEFAULT, exclude=True)
-    version: str = Field(default=POSTGRES_VERSION_DEFAULT,
-                         description="Major PostgreSQL version for path construction.")
+    version: str = Field(
+        default=POSTGRES_VERSION_DEFAULT,
+        description="Major PostgreSQL version for path construction.",
+    )
     hba_template: str = Field(default=PG_HBA_TEMPLATE_DEFAULT)
-    postgresql_conf_additions_template: str = Field(default=POSTGRESQL_CONF_ADDITIONS_TEMPLATE_DEFAULT)
+    postgresql_conf_additions_template: str = Field(
+        default=POSTGRESQL_CONF_ADDITIONS_TEMPLATE_DEFAULT
+    )
 
 
 class ApacheSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='APACHE_', extra='ignore')
+    model_config = SettingsConfigDict(env_prefix="APACHE_", extra="ignore")
     listen_port: int = Field(default=APACHE_LISTEN_PORT_DEFAULT)
     mod_tile_request_timeout: int = Field(default=5)
     mod_tile_missing_request_timeout: int = Field(default=30)
     mod_tile_max_load_old: int = Field(default=2)
     mod_tile_max_load_missing: int = Field(default=5)
-    mod_tile_conf_template: str = Field(default=APACHE_MOD_TILE_CONF_TEMPLATE_DEFAULT)
+    mod_tile_conf_template: str = Field(
+        default=APACHE_MOD_TILE_CONF_TEMPLATE_DEFAULT
+    )
     tile_site_template: str = Field(default=APACHE_TILE_SITE_TEMPLATE_DEFAULT)
 
 
 class NginxSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='NGINX_', extra='ignore')
-    proxy_site_template: str = Field(default=NGINX_PROXY_SITE_TEMPLATE_DEFAULT)
-    proxy_conf_name_base: str = Field(default="transit_proxy",
-                                      description="Base name for Nginx proxy conf file (without .conf).")
+    model_config = SettingsConfigDict(env_prefix="NGINX_", extra="ignore")
+    proxy_site_template: str = Field(
+        default=NGINX_PROXY_SITE_TEMPLATE_DEFAULT
+    )
+    proxy_conf_name_base: str = Field(
+        default="transit_proxy",
+        description="Base name for Nginx proxy conf file (without .conf).",
+    )
 
 
 class PgTileservSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix='PGTS_', extra='ignore')
-    http_host: str = Field(default="0.0.0.0", description="Host pg_tileserv binds to.")
-    http_port: int = Field(default=7800, description="Port pg_tileserv listens on.")
+    model_config = SettingsConfigDict(env_prefix="PGTS_", extra="ignore")
+    http_host: str = Field(
+        default="0.0.0.0", description="Host pg_tileserv binds to."
+    )
+    http_port: int = Field(
+        default=7800, description="Port pg_tileserv listens on."
+    )
     default_max_features: int = Field(default=10000)
-    publish_schemas: str = Field(default="public,gtfs", description="Comma-separated list of schemas to publish.")
-    uri_prefix: str = Field(default="/vector", description="Base URI prefix for tile requests (used in Nginx proxy).")
+    publish_schemas: str = Field(
+        default="public,gtfs",
+        description="Comma-separated list of schemas to publish.",
+    )
+    uri_prefix: str = Field(
+        default="/vector",
+        description="Base URI prefix for tile requests (used in Nginx proxy).",
+    )
     development_mode: bool = Field(default=False)
     allow_function_sources: bool = Field(default=True)
     # config_template: Optional[str] = Field(default=None, description="Full template for pg_tileserv config.toml. If None, one is generated.")
 
 
-class OsrmServiceSettings(BaseSettings):  # Renamed from OsrmSettings to avoid conflict
+class OsrmServiceSettings(
+    BaseSettings
+):  # Renamed from OsrmSettings to avoid conflict
     """OSRM runtime service specific settings (ports, image for running service)."""
-    model_config = SettingsConfigDict(env_prefix='OSRM_SERVICE_', extra='ignore')
+
+    model_config = SettingsConfigDict(
+        env_prefix="OSRM_SERVICE_", extra="ignore"
+    )
     # Defines a base port for OSRM services. If multiple regions/profiles are run,
     # they will need distinct host ports. This might be incremented per region, or
     # a dictionary mapping region_name to port could be used if known in advance.
     # For now, one default port for the primary 'car' profile.
-    car_profile_default_host_port: int = Field(default=OSRM_CAR_PROFILE_PORT_DEFAULT, description="Default host port for OSRM car profile if not specified per region.")
-    container_osrm_port: int = Field(default=5000, description="Internal port OSRM listens on inside the container.")
-    image_tag: str = Field(default=OSRM_IMAGE_TAG_DEFAULT, description="Docker image for OSRM backend (e.g., osrm/osrm-backend:latest).")
-    extra_routed_args: str = Field(default="", description="Extra arguments for osrm-routed command, e.g. '--max-matching-size 1000'.")
-    systemd_template: str = Field(default=OSRM_SYSTEMD_TEMPLATE_DEFAULT, description="Template for OSRM systemd service files.")
+    car_profile_default_host_port: int = Field(
+        default=OSRM_CAR_PROFILE_PORT_DEFAULT,
+        description="Default host port for OSRM car profile if not specified per region.",
+    )
+    container_osrm_port: int = Field(
+        default=5000,
+        description="Internal port OSRM listens on inside the container.",
+    )
+    image_tag: str = Field(
+        default=OSRM_IMAGE_TAG_DEFAULT,
+        description="Docker image for OSRM backend (e.g., osrm/osrm-backend:latest).",
+    )
+    extra_routed_args: str = Field(
+        default="",
+        description="Extra arguments for osrm-routed command, e.g. '--max-matching-size 1000'.",
+    )
+    systemd_template: str = Field(
+        default=OSRM_SYSTEMD_TEMPLATE_DEFAULT,
+        description="Template for OSRM systemd service files.",
+    )
 
 
 class OsrmDataSettings(BaseSettings):
     """OSRM data processing paths, URLs, and parameters."""
-    model_config = SettingsConfigDict(env_prefix='OSRM_DATA_', extra='ignore')
-    base_dir: DirectoryPath = Field(default=Path(OSRM_DATA_BASE_DIR_DEFAULT), description="Base directory for OSM PBFs and region boundaries.")
-    processed_dir: DirectoryPath = Field(default=Path(OSRM_PROCESSED_DIR_DEFAULT), description="Base directory for OSRM processed graph files.")
-    base_pbf_url: HttpUrl = Field(default=HttpUrl(OSRM_BASE_PBF_URL_DEFAULT), description="URL for the base OSM PBF file.")
-    base_pbf_filename: str = Field(default=OSRM_BASE_PBF_FILENAME_DEFAULT, description="Filename for the downloaded base PBF.")
-    profile_script_in_container: FilePath = Field(default=Path(OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT), description="Path to LUA profile script inside OSRM container (e.g. /opt/car.lua).")
-    max_table_size_routed: int = Field(default=OSRM_MAX_TABLE_SIZE_ROUTED_DEFAULT, description="--max-table-size parameter for osrm-routed instances (used in systemd template).")
+
+    model_config = SettingsConfigDict(env_prefix="OSRM_DATA_", extra="ignore")
+    base_dir: DirectoryPath = Field(
+        default=Path(OSRM_DATA_BASE_DIR_DEFAULT),
+        description="Base directory for OSM PBFs and region boundaries.",
+    )
+    processed_dir: DirectoryPath = Field(
+        default=Path(OSRM_PROCESSED_DIR_DEFAULT),
+        description="Base directory for OSRM processed graph files.",
+    )
+    base_pbf_url: HttpUrl = Field(
+        default=HttpUrl(OSRM_BASE_PBF_URL_DEFAULT),
+        description="URL for the base OSM PBF file.",
+    )
+    base_pbf_filename: str = Field(
+        default=OSRM_BASE_PBF_FILENAME_DEFAULT,
+        description="Filename for the downloaded base PBF.",
+    )
+    profile_script_in_container: FilePath = Field(
+        default=Path(OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT),
+        description="Path to LUA profile script inside OSRM container (e.g. /opt/car.lua).",
+    )
+    max_table_size_routed: int = Field(
+        default=OSRM_MAX_TABLE_SIZE_ROUTED_DEFAULT,
+        description="--max-table-size parameter for osrm-routed instances (used in systemd template).",
+    )
 
 
 class RenderdSettings(BaseSettings):
     """Renderd service settings."""
-    model_config = SettingsConfigDict(env_prefix='RENDERD_', extra='ignore')
 
-    num_threads_multiplier: float = Field(default=2.0,
-                                          description="Multiplier for CPU cores for renderd threads (0 means auto). If set to 0, num_threads_renderd will be calculated as (cpu_count * 2) or (1*2) if cpu_count is None.")
-    tile_cache_dir: DirectoryPath = Field(default=Path(RENDERD_TILE_CACHE_DIR_DEFAULT))
+    model_config = SettingsConfigDict(env_prefix="RENDERD_", extra="ignore")
+
+    num_threads_multiplier: float = Field(
+        default=2.0,
+        description="Multiplier for CPU cores for renderd threads (0 means auto). If set to 0, num_threads_renderd will be calculated as (cpu_count * 2) or (1*2) if cpu_count is None.",
+    )
+    tile_cache_dir: DirectoryPath = Field(
+        default=Path(RENDERD_TILE_CACHE_DIR_DEFAULT)
+    )
     run_dir: DirectoryPath = Field(default=Path(RENDERD_RUN_DIR_DEFAULT))
-    socket_path: str = Field(default=RENDERD_SOCKET_PATH_DEFAULT,
-                             description="Path for renderd UNIX socket.")  # Also used in Apache mod_tile
+    socket_path: str = Field(
+        default=RENDERD_SOCKET_PATH_DEFAULT,
+        description="Path for renderd UNIX socket.",
+    )  # Also used in Apache mod_tile
 
-    mapnik_xml_stylesheet_path: FilePath = Field(default=Path(MAPNIK_XML_STYLESHEET_PATH_DEFAULT),
-                                                 description="Absolute path to the Mapnik XML stylesheet.")
+    mapnik_xml_stylesheet_path: FilePath = Field(
+        default=Path(MAPNIK_XML_STYLESHEET_PATH_DEFAULT),
+        description="Absolute path to the Mapnik XML stylesheet.",
+    )
     # mapnik_plugins_dir is usually system-detected by get_mapnik_plugin_dir,
     # but an override can be provided here.
-    mapnik_plugins_dir_override: Optional[DirectoryPath] = Field(default=None,
-                                                                 description="Override for Mapnik plugins directory. If None, auto-detected.")
+    mapnik_plugins_dir_override: Optional[DirectoryPath] = Field(
+        default=None,
+        description="Override for Mapnik plugins directory. If None, auto-detected.",
+    )
 
-    uri_path_segment: str = Field(default=RENDERD_URI_PATH_SEGMENT_DEFAULT,
-                                  description="URI path segment for renderd tiles (e.g., 'hot' for /hot/).")
+    uri_path_segment: str = Field(
+        default=RENDERD_URI_PATH_SEGMENT_DEFAULT,
+        description="URI path segment for renderd tiles (e.g., 'hot' for /hot/).",
+    )
     renderd_conf_template: str = Field(default=RENDERD_CONF_TEMPLATE_DEFAULT)
     # renderd_host will be derived from app_settings.vm_ip_or_domain
 
 
 class CertbotSettings(BaseSettings):
     """Certbot specific settings for SSL/TLS certificate management."""
-    model_config = SettingsConfigDict(env_prefix='CERTBOT_', extra='ignore')
+
+    model_config = SettingsConfigDict(env_prefix="CERTBOT_", extra="ignore")
 
     # admin_email: Optional[EmailStr] = Field(default=None, description="Email for Certbot registration and renewal notices. If None, it's derived from vm_ip_or_domain.")
-    use_hsts: bool = Field(default=False, description="Enable HTTP Strict Transport Security (HSTS) via Certbot.")
-    use_staple_ocsp: bool = Field(default=False,
-                                  description="Enable OCSP Stapling via Certbot for the Nginx configuration.")
-    use_uir: bool = Field(default=False,
-                          description="Advise Certbot to include the --uir flag for insecure redirects (less common).")
+    use_hsts: bool = Field(
+        default=False,
+        description="Enable HTTP Strict Transport Security (HSTS) via Certbot.",
+    )
+    use_staple_ocsp: bool = Field(
+        default=False,
+        description="Enable OCSP Stapling via Certbot for the Nginx configuration.",
+    )
+    use_uir: bool = Field(
+        default=False,
+        description="Advise Certbot to include the --uir flag for insecure redirects (less common).",
+    )
     # Add other certbot flags as needed, e.g., preferred_challenges, key_size
 
 
 class WebAppSettings(BaseSettings):
     """Settings for the static web application content."""
-    model_config = SettingsConfigDict(env_prefix='WEBAPP_', extra='ignore')
-    root_dir: DirectoryPath = Field(default=Path(WEBAPP_ROOT_DIR_DEFAULT), description="Root directory for static website content served by Nginx.")
-    index_filename: str = Field(default=WEBAPP_INDEX_FILENAME_DEFAULT, description="Filename for the main HTML page.")
-    index_html_template: str = Field(default=WEBAPP_INDEX_HTML_TEMPLATE_DEFAULT, description="HTML template for the test/index page.")
+
+    model_config = SettingsConfigDict(env_prefix="WEBAPP_", extra="ignore")
+    root_dir: DirectoryPath = Field(
+        default=Path(WEBAPP_ROOT_DIR_DEFAULT),
+        description="Root directory for static website content served by Nginx.",
+    )
+    index_filename: str = Field(
+        default=WEBAPP_INDEX_FILENAME_DEFAULT,
+        description="Filename for the main HTML page.",
+    )
+    index_html_template: str = Field(
+        default=WEBAPP_INDEX_HTML_TEMPLATE_DEFAULT,
+        description="HTML template for the test/index page.",
+    )
     # This field will determine if Nginx listens on HTTP or HTTPS for constructing URLs in the HTML.
     # It's not an Nginx setting itself, but an application setting used for templating.
     # Certbot step will modify Nginx for HTTPS. This is for URL generation in the HTML.
-    default_scheme: str = Field(default="http", description="Default scheme (http or https) to use for constructing URLs in the test page. Certbot run may make https the norm.")
+    default_scheme: str = Field(
+        default="http",
+        description="Default scheme (http or https) to use for constructing URLs in the test page. Certbot run may make https the norm.",
+    )
     # Port Nginx is listening on for external access (usually 80 for http, 443 for https)
-    nginx_external_port: int = Field(default=80, description="External port Nginx is expected to listen on (for URL construction in HTML).")
+    nginx_external_port: int = Field(
+        default=80,
+        description="External port Nginx is expected to listen on (for URL construction in HTML).",
+    )
 
 
 class AppSettings(BaseSettings):
     """Main application settings."""
-    model_config = SettingsConfigDict(extra='ignore', case_sensitive=False)  # case_sensitive=False for ENV vars
+
+    model_config = SettingsConfigDict(
+        extra="ignore", case_sensitive=False
+    )  # case_sensitive=False for ENV vars
 
     admin_group_ip: str = Field(default=ADMIN_GROUP_IP_DEFAULT)
-    gtfs_feed_url: Union[HttpUrl, str] = Field(default=GTFS_FEED_URL_DEFAULT)  # Allow file://
+    gtfs_feed_url: Union[HttpUrl, str] = Field(
+        default=GTFS_FEED_URL_DEFAULT
+    )  # Allow file://
     vm_ip_or_domain: str = Field(default=VM_IP_OR_DOMAIN_DEFAULT)
     pg_tileserv_binary_location: Union[HttpUrl, str] = Field(
-        default=PG_TILESERV_BINARY_LOCATION_DEFAULT)  # Allow file://
+        default=PG_TILESERV_BINARY_LOCATION_DEFAULT
+    )  # Allow file://
     log_prefix: str = Field(default=LOG_PREFIX_DEFAULT)
     dev_override_unsafe_password: bool = Field(default=False)
 
-    container_runtime_command: str = Field(default=CONTAINER_RUNTIME_COMMAND_DEFAULT)
+    container_runtime_command: str = Field(
+        default=CONTAINER_RUNTIME_COMMAND_DEFAULT
+    )
     osrm_image_tag: str = Field(default=OSRM_IMAGE_TAG_DEFAULT)
 
     pg: PostgresSettings = Field(default_factory=PostgresSettings)
     apache: ApacheSettings = Field(default_factory=ApacheSettings)
     nginx: NginxSettings = Field(default_factory=NginxSettings)
-    pg_tileserv: PgTileservSettings = Field(default_factory=PgTileservSettings)
-    osrm_service: OsrmServiceSettings = Field(default_factory=OsrmServiceSettings)  # Runtime OSRM service settings
-    osrm_data: OsrmDataSettings = Field(default_factory=OsrmDataSettings)  # OSRM data prep settings
+    pg_tileserv: PgTileservSettings = Field(
+        default_factory=PgTileservSettings
+    )
+    osrm_service: OsrmServiceSettings = Field(
+        default_factory=OsrmServiceSettings
+    )  # Runtime OSRM service settings
+    osrm_data: OsrmDataSettings = Field(
+        default_factory=OsrmDataSettings
+    )  # OSRM data prep settings
     renderd: RenderdSettings = Field(default_factory=RenderdSettings)
     certbot: CertbotSettings = Field(default_factory=CertbotSettings)
     webapp: WebAppSettings = Field(default_factory=WebAppSettings)
 
-    symbols: Dict[str, str] = Field(default_factory=lambda: SYMBOLS_DEFAULT.copy())
+    symbols: Dict[str, str] = Field(
+        default_factory=lambda: SYMBOLS_DEFAULT.copy()
+    )

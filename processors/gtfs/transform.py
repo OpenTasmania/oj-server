@@ -77,7 +77,7 @@ def create_point_wkt(lon: Any, lat: Any, srid: int = 4326) -> Optional[str]:
 
 
 def transform_dataframe(
-        df: pd.DataFrame, file_schema_info: Dict[str, Any]
+    df: pd.DataFrame, file_schema_info: Dict[str, Any]
 ) -> pd.DataFrame:
     """
     Transform a DataFrame to align with a database schema definition.
@@ -97,12 +97,21 @@ def transform_dataframe(
     Returns:
         A Pandas DataFrame transformed and aligned for database loading.
     """
-    table_name_for_log = file_schema_info.get("db_table_name", "unknown table")
+    table_name_for_log = file_schema_info.get(
+        "db_table_name", "unknown table"
+    )
     if df.empty:
-        module_logger.info(f"DataFrame for {table_name_for_log} is empty. No transformation.")
+        module_logger.info(
+            f"DataFrame for {table_name_for_log} is empty. No transformation."
+        )
         expected_cols = list(file_schema_info.get("columns", {}).keys())
-        geom_col_name_from_config = file_schema_info.get("geom_config", {}).get("geom_col")
-        if geom_col_name_from_config and geom_col_name_from_config not in expected_cols:
+        geom_col_name_from_config = file_schema_info.get(
+            "geom_config", {}
+        ).get("geom_col")
+        if (
+            geom_col_name_from_config
+            and geom_col_name_from_config not in expected_cols
+        ):
             expected_cols.append(geom_col_name_from_config)
         return pd.DataFrame(columns=expected_cols)
 
@@ -111,9 +120,13 @@ def transform_dataframe(
     )
     transformed_df = df.copy()
 
-    expected_db_columns_ordered = list(file_schema_info.get("columns", {}).keys())
+    expected_db_columns_ordered = list(
+        file_schema_info.get("columns", {}).keys()
+    )
     if not expected_db_columns_ordered:
-        module_logger.warning(f"No columns defined in schema for {table_name_for_log}. Returning as is.")
+        module_logger.warning(
+            f"No columns defined in schema for {table_name_for_log}. Returning as is."
+        )
         return transformed_df
 
     geom_config = file_schema_info.get("geom_config")
@@ -127,35 +140,62 @@ def transform_dataframe(
 
             srid = geom_config.get("srid", 4326)
 
-            if 'geometry' in transformed_df.columns:  # Source column from gtfs-kit often named 'geometry'
+            if (
+                "geometry" in transformed_df.columns
+            ):  # Source column from gtfs-kit often named 'geometry'
                 module_logger.debug(
-                    f"Converting 'geometry' (Shapely objects) to WKT for target column '{db_geom_col_name}' in {table_name_for_log}")
-                transformed_df[db_geom_col_name] = transformed_df['geometry'].apply(
-                    lambda geom_obj: f"SRID={srid};{geom_obj.wkt}" if geom_obj and not pd.isna(geom_obj) else None
+                    f"Converting 'geometry' (Shapely objects) to WKT for target column '{db_geom_col_name}' in {table_name_for_log}"
                 )
-            elif db_geom_col_name in transformed_df.columns and transformed_df[db_geom_col_name].dtype == 'object':
+                transformed_df[db_geom_col_name] = transformed_df[
+                    "geometry"
+                ].apply(
+                    lambda geom_obj: (
+                        f"SRID={srid};{geom_obj.wkt}"
+                        if geom_obj and not pd.isna(geom_obj)
+                        else None
+                    )
+                )
+            elif (
+                db_geom_col_name in transformed_df.columns
+                and transformed_df[db_geom_col_name].dtype == "object"
+            ):
                 module_logger.debug(
-                    f"Target geometry column '{db_geom_col_name}' already exists in DataFrame for {table_name_for_log}, assuming it's WKT.")
-            elif geom_config.get("lat_col") and geom_config.get("lon_col"):  # Fallback if no pre-computed geometry
+                    f"Target geometry column '{db_geom_col_name}' already exists in DataFrame for {table_name_for_log}, assuming it's WKT."
+                )
+            elif geom_config.get("lat_col") and geom_config.get(
+                "lon_col"
+            ):  # Fallback if no pre-computed geometry
                 lat_col = geom_config["lat_col"]
                 lon_col = geom_config["lon_col"]
-                if lat_col in transformed_df.columns and lon_col in transformed_df.columns:
+                if (
+                    lat_col in transformed_df.columns
+                    and lon_col in transformed_df.columns
+                ):
                     module_logger.info(
-                        f"Creating WKT for '{db_geom_col_name}' from source columns '{lat_col}' and '{lon_col}' in {table_name_for_log}.")
+                        f"Creating WKT for '{db_geom_col_name}' from source columns '{lat_col}' and '{lon_col}' in {table_name_for_log}."
+                    )
                     transformed_df[db_geom_col_name] = transformed_df.apply(
-                        lambda row: create_point_wkt(row.get(lon_col), row.get(lat_col), srid), axis=1
+                        lambda row: create_point_wkt(
+                            row.get(lon_col), row.get(lat_col), srid
+                        ),
+                        axis=1,
                     )
                 else:
                     module_logger.warning(
-                        f"Source lat/lon columns ('{lat_col}', '{lon_col}') for geometry missing in {table_name_for_log}. Target column '{db_geom_col_name}' will be None.")
+                        f"Source lat/lon columns ('{lat_col}', '{lon_col}') for geometry missing in {table_name_for_log}. Target column '{db_geom_col_name}' will be None."
+                    )
                     transformed_df[db_geom_col_name] = None
-            elif db_geom_col_name not in transformed_df.columns:  # If no geometry source, ensure column exists
+            elif (
+                db_geom_col_name not in transformed_df.columns
+            ):  # If no geometry source, ensure column exists
                 module_logger.debug(
-                    f"No source identified for geometry column '{db_geom_col_name}' in {table_name_for_log}. Column will be added with None values.")
+                    f"No source identified for geometry column '{db_geom_col_name}' in {table_name_for_log}. Column will be added with None values."
+                )
                 transformed_df[db_geom_col_name] = None
         else:
             module_logger.warning(
-                f"geom_config was provided for {table_name_for_log} but it is missing the 'geom_col' key to specify target DB geometry column name.")
+                f"geom_config was provided for {table_name_for_log} but it is missing the 'geom_col' key to specify target DB geometry column name."
+            )
 
     output_df = pd.DataFrame()
     for col_name in expected_db_columns_ordered:
@@ -163,9 +203,13 @@ def transform_dataframe(
             output_df[col_name] = transformed_df[col_name]
         else:
             module_logger.debug(
-                f"Database schema column '{col_name}' not found in transformed DataFrame for {table_name_for_log}; adding it with None values.")
-            output_df[col_name] = pd.Series([None] * len(transformed_df), dtype='object')
+                f"Database schema column '{col_name}' not found in transformed DataFrame for {table_name_for_log}; adding it with None values."
+            )
+            output_df[col_name] = pd.Series(
+                [None] * len(transformed_df), dtype="object"
+            )
 
     module_logger.debug(
-        f"Transformation complete for {table_name_for_log}. Final columns for DB load: {output_df.columns.tolist()}")
+        f"Transformation complete for {table_name_for_log}. Final columns for DB load: {output_df.columns.tolist()}"
+    )
     return output_df

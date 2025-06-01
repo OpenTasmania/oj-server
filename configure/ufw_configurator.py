@@ -20,7 +20,9 @@ from setup.config_models import AppSettings
 module_logger = logging.getLogger(__name__)
 
 
-def apply_ufw_rules(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+def apply_ufw_rules(
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> None:
     """
     Applies the defined UFW rules (default policies and allows).
     Uses app_settings for admin_group_ip and logging symbols.
@@ -29,47 +31,114 @@ def apply_ufw_rules(app_settings: AppSettings, current_logger: Optional[logging.
     symbols = app_settings.symbols
     admin_group_ip = app_settings.admin_group_ip
 
-    log_map_server(f"{symbols.get('step', '')} Applying UFW rules...", "info", logger_to_use)
+    log_map_server(
+        f"{symbols.get('step', '')} Applying UFW rules...",
+        "info",
+        logger_to_use,
+    )
 
-    if not validate_cidr(admin_group_ip, current_logger=logger_to_use, app_settings=app_settings):  # Pass app_settings
+    if not validate_cidr(
+        admin_group_ip,
+        current_logger=logger_to_use,
+        app_settings=app_settings,
+    ):  # Pass app_settings
         msg = (
             f"UFW rule application aborted: Invalid ADMIN_GROUP_IP CIDR format "
             f"'{admin_group_ip}'."
         )
-        log_map_server(f"{symbols.get('error', '')} {msg}", "error", logger_to_use)
+        log_map_server(
+            f"{symbols.get('error', '')} {msg}", "error", logger_to_use
+        )
         raise ValueError(msg)
 
     try:
         # Set default policies
-        run_elevated_command(["ufw", "default", "deny", "incoming"], current_logger=logger_to_use)
-        run_elevated_command(["ufw", "default", "allow", "outgoing"], current_logger=logger_to_use)
+        run_elevated_command(
+            ["ufw", "default", "deny", "incoming"],
+            current_logger=logger_to_use,
+        )
+        run_elevated_command(
+            ["ufw", "default", "allow", "outgoing"],
+            current_logger=logger_to_use,
+        )
 
         # Allow traffic on loopback interface
-        run_elevated_command(["ufw", "allow", "in", "on", "lo"], current_logger=logger_to_use)
-        run_elevated_command(["ufw", "allow", "out", "on", "lo"], current_logger=logger_to_use)
+        run_elevated_command(
+            ["ufw", "allow", "in", "on", "lo"], current_logger=logger_to_use
+        )
+        run_elevated_command(
+            ["ufw", "allow", "out", "on", "lo"], current_logger=logger_to_use
+        )
 
         # Allow SSH and PostgreSQL from admin IP
         admin_rules = [
-            (["ufw", "allow", "from", admin_group_ip, "to", "any", "port", "22", "proto", "tcp", "comment",
-              "SSH from Admin"], "SSH from Admin"),
-            (["ufw", "allow", "from", admin_group_ip, "to", "any", "port", str(app_settings.pg.port), "proto", "tcp",
-              "comment",  # Use configured PG port
-              "PostgreSQL from Admin"], f"PostgreSQL from Admin on port {app_settings.pg.port}"),
+            (
+                [
+                    "ufw",
+                    "allow",
+                    "from",
+                    admin_group_ip,
+                    "to",
+                    "any",
+                    "port",
+                    "22",
+                    "proto",
+                    "tcp",
+                    "comment",
+                    "SSH from Admin",
+                ],
+                "SSH from Admin",
+            ),
+            (
+                [
+                    "ufw",
+                    "allow",
+                    "from",
+                    admin_group_ip,
+                    "to",
+                    "any",
+                    "port",
+                    str(app_settings.pg.port),
+                    "proto",
+                    "tcp",
+                    "comment",  # Use configured PG port
+                    "PostgreSQL from Admin",
+                ],
+                f"PostgreSQL from Admin on port {app_settings.pg.port}",
+            ),
         ]
         for cmd_list, desc in admin_rules:
-            log_map_server(f"{symbols.get('info', '')} Allowing {desc} via UFW...", "info", logger_to_use)
+            log_map_server(
+                f"{symbols.get('info', '')} Allowing {desc} via UFW...",
+                "info",
+                logger_to_use,
+            )
             run_elevated_command(cmd_list, current_logger=logger_to_use)
 
         # Allow public HTTP and HTTPS
         public_rules = [
-            (["ufw", "allow", "http", "comment", "Nginx HTTP"], "HTTP (port 80)"),
-            (["ufw", "allow", "https", "comment", "Nginx HTTPS"], "HTTPS (port 443)"),
+            (
+                ["ufw", "allow", "http", "comment", "Nginx HTTP"],
+                "HTTP (port 80)",
+            ),
+            (
+                ["ufw", "allow", "https", "comment", "Nginx HTTPS"],
+                "HTTPS (port 443)",
+            ),
         ]
         for cmd_list, desc in public_rules:
-            log_map_server(f"{symbols.get('info', '')} Allowing {desc} via UFW...", "info", logger_to_use)
+            log_map_server(
+                f"{symbols.get('info', '')} Allowing {desc} via UFW...",
+                "info",
+                logger_to_use,
+            )
             run_elevated_command(cmd_list, current_logger=logger_to_use)
 
-        log_map_server(f"{symbols.get('success', '')} UFW rules applied successfully.", "success", logger_to_use)
+        log_map_server(
+            f"{symbols.get('success', '')} UFW rules applied successfully.",
+            "success",
+            logger_to_use,
+        )
 
     except subprocess.CalledProcessError as e:
         log_map_server(
@@ -87,7 +156,9 @@ def apply_ufw_rules(app_settings: AppSettings, current_logger: Optional[logging.
         raise
 
 
-def activate_ufw_service(app_settings: AppSettings, current_logger: Optional[logging.Logger] = None) -> None:
+def activate_ufw_service(
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> None:
     """
     Ensures UFW package is installed (via check) and enables the UFW service if currently inactive.
     This function replaces the old enable_ufw_service from actions/ufw_setup_actions.py.
@@ -95,7 +166,11 @@ def activate_ufw_service(app_settings: AppSettings, current_logger: Optional[log
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
-    log_map_server(f"{symbols.get('step', '')} Activating UFW service (enabling if inactive)...", "info", logger_to_use)
+    log_map_server(
+        f"{symbols.get('step', '')} Activating UFW service (enabling if inactive)...",
+        "info",
+        logger_to_use,
+    )
 
     # The package check is now expected to be a separate step in main_installer.py
     # using installer.ufw_installer.ensure_ufw_package_installed(APP_CONFIG, logger).
@@ -115,7 +190,10 @@ def activate_ufw_service(app_settings: AppSettings, current_logger: Optional[log
         )
 
         # ufw status can return non-zero if inactive, so check output primarily
-        if status_result.stdout and "inactive" in status_result.stdout.lower():
+        if (
+            status_result.stdout
+            and "inactive" in status_result.stdout.lower()
+        ):
             log_map_server(
                 f"{symbols.get('warning', '')} UFW is inactive. Enabling now. "
                 "Ensure your SSH access and other essential ports are allowed by rules.",
@@ -123,7 +201,9 @@ def activate_ufw_service(app_settings: AppSettings, current_logger: Optional[log
                 logger_to_use,
             )
             # Reload systemd just in case, though UFW doesn't always need it for simple enable
-            systemd_reload(app_settings=app_settings, current_logger=logger_to_use)  # Pass app_settings
+            systemd_reload(
+                app_settings=app_settings, current_logger=logger_to_use
+            )  # Pass app_settings
 
             run_elevated_command(
                 ["ufw", "enable"],
@@ -131,16 +211,31 @@ def activate_ufw_service(app_settings: AppSettings, current_logger: Optional[log
                 check=True,  # This should succeed if UFW is installable and rules are okay
                 current_logger=logger_to_use,
             )
-            log_map_server(f"{symbols.get('success', '')} UFW enabled.", "success", logger_to_use)
-        elif "inactive" not in status_result.stdout.lower() and status_result.returncode == 0:
+            log_map_server(
+                f"{symbols.get('success', '')} UFW enabled.",
+                "success",
+                logger_to_use,
+            )
+        elif (
+            "inactive" not in status_result.stdout.lower()
+            and status_result.returncode == 0
+        ):
             log_map_server(
                 f"{symbols.get('info', '')} UFW is already active.",
                 "info",
                 logger_to_use,
             )
         else:  # Some other status or error fetching status
-            status_output = status_result.stdout.strip() if status_result.stdout else "N/A"
-            stderr_output = status_result.stderr.strip() if status_result.stderr else "N/A"
+            status_output = (
+                status_result.stdout.strip()
+                if status_result.stdout
+                else "N/A"
+            )
+            stderr_output = (
+                status_result.stderr.strip()
+                if status_result.stderr
+                else "N/A"
+            )
             log_map_server(
                 f"{symbols.get('info', '')} UFW status not 'inactive'. Current status command output: STDOUT='{status_output}', STDERR='{stderr_output}', RC={status_result.returncode}. Assuming active or managed.",
                 "info",
@@ -148,8 +243,14 @@ def activate_ufw_service(app_settings: AppSettings, current_logger: Optional[log
             )
 
         # Log final UFW status
-        log_map_server(f"{symbols.get('info', '')} Final UFW status:", "info", logger_to_use)
-        run_elevated_command(["ufw", "status", "verbose"], current_logger=logger_to_use)
+        log_map_server(
+            f"{symbols.get('info', '')} Final UFW status:",
+            "info",
+            logger_to_use,
+        )
+        run_elevated_command(
+            ["ufw", "status", "verbose"], current_logger=logger_to_use
+        )
 
     except subprocess.CalledProcessError as e:
         log_map_server(
