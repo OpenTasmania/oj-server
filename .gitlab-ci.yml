@@ -131,7 +131,7 @@ build_docs_builder_image:
         apt-get upgrade -y
         apt-get dist-upgrade -y
         echo "Installing base dependencies..."
-        apt-get install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev
+        apt-get install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
         echo "--- Pipx version ---"
         pipx --version
         echo "--- Installing uv using pipx ---"
