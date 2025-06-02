@@ -12,7 +12,6 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Import all individual step functions
 from actions.website_setup_actions import deploy_test_website_content
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
@@ -59,9 +58,9 @@ from configure.renderd_configurator import (
     create_renderd_conf_file,
 )
 from configure.ufw_configurator import activate_ufw_service, apply_ufw_rules
-from dataproc.data_processing import data_prep_group  # Returns bool
+from dataproc.data_processing import data_prep_group
 from dataproc.osrm_data_processor import (
-    build_osrm_graphs_for_region,  # Returns bool
+    build_osrm_graphs_for_region,
     extract_regional_pbfs_with_osmium,
 )
 from dataproc.raster_processor import raster_tile_prerender
@@ -77,7 +76,7 @@ from installer.docker_installer import install_docker_engine
 from installer.nginx_installer import ensure_nginx_package_installed
 from installer.nodejs_installer import install_nodejs_lts
 from installer.osrm_installer import (
-    download_base_pbf,  # Returns str
+    download_base_pbf,
     ensure_osrm_dependencies,
     prepare_region_boundaries,
     setup_osrm_data_directories,
@@ -136,7 +135,6 @@ from setup.step_executor import execute_step
 logger = logging.getLogger(__name__)
 APP_CONFIG: Optional[AppSettings] = None
 
-# Module-level type alias for step functions passed to execute_step
 StepExecutorFunc = Callable[[AppSettings, Optional[logging.Logger]], None]
 
 # --- Task Tags ---
@@ -279,8 +277,10 @@ def get_dynamic_help(base_help: str, task_tag: str) -> str:
         return (
             f"{base_help} (Part of: '{details[0]}', Sub-step: {details[1]})"
         )
-    elif details and details[1] == 0:
-        return f"{base_help} (Orchestrates: '{details[0]}')"
+    elif (
+        details and details[1] == 0
+    ):  # Indicates it's a group orchestrator tag
+        return f"{base_help} (Orchestrates Group: '{details[0]}')"
     return f"{base_help} (Standalone or specific task)"
 
 
@@ -923,7 +923,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         add_help=False,
     )
-    # ... (argparse setup as before) ...
     parser.add_argument(
         "-h",
         "--help",
@@ -1067,6 +1066,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         ("gtfs_prep", GTFS_PROCESS_AND_SETUP_TAG, "Full GTFS Pipeline."),
         ("raster_prep", "RASTER_PREP", "Raster tile pre-rendering."),
         ("website_setup", "WEBSITE_CONTENT_DEPLOY", "Deploy test website."),
+        # Renamed dest from website-prep to website_setup to match service_orchestrator_cli_keys
         (
             "task_systemd_reload",
             "SYSTEMD_RELOAD_TASK",
@@ -1078,28 +1078,61 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         task_group.add_argument(
             f"--{dest_name.replace('_', '-')}",
             action="store_true",
-            dest=dest_name,
+            dest=dest_name,  # Ensure dest matches the key in defined_tasks_callable_map
             help=get_dynamic_help(base_desc, task_tag),
         )
+
+    # --- Enhanced Help Texts for Group Flags ---
+    prereqs_help_detail = (
+        "Run 'Comprehensive Prerequisites' group. Includes: --boot-verbosity, --core-conflicts, "
+        "--docker-install, --nodejs-install, and setup for essential utilities, Python, "
+        "PostgreSQL, mapping & font packages, and unattended upgrades."
+    )
+
+    service_orchestrator_flags = [
+        f"--{key.replace('_', '-')}"
+        for key in [
+            "ufw",
+            "postgres",
+            "pgtileserv",
+            "carto",
+            "renderd",
+            "osrm",
+            "apache",
+            "nginx",
+            "certbot",
+            "website-setup",
+        ]
+    ]
+    services_help_detail = (
+        "Run setup for ALL services. Includes: "
+        + ", ".join(service_orchestrator_flags)
+        + ", and a final systemd reload."
+    )
+
+    data_help_detail = (
+        "Run all data preparation tasks. Includes: "
+        "--gtfs-prep (Full GTFS Pipeline) and --raster-prep (Raster tile pre-rendering)."
+    )
 
     group_flags_grp = parser.add_argument_group("Group Task Flags")
     group_flags_grp.add_argument(
         "--prereqs",
         dest="run_all_core_prerequisites",
         action="store_true",
-        help="Run comprehensive prerequisites group.",
+        help=prereqs_help_detail,
     )
     group_flags_grp.add_argument(
-        "--services", action="store_true", help="Run setup for ALL services."
+        "--services", action="store_true", help=services_help_detail
     )
     group_flags_grp.add_argument(
-        "--data", action="store_true", help="Run all data preparation tasks."
+        "--data", action="store_true", help=data_help_detail
     )
     group_flags_grp.add_argument(
         "--systemd-reload",
         dest="group_systemd_reload_flag",
         action="store_true",
-        help="Run systemd reload (as a group action).",
+        help="Run systemd reload task (as a group action). Same as --task-systemd-reload.",
     )
 
     dev_grp = parser.add_argument_group("Developer Options")
@@ -1132,7 +1165,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         f"Successfully loaded and validated configuration. Log prefix: {APP_CONFIG.log_prefix}"
     )
 
-    # Corrected log_map_server call (Fix for errors at 1107 & 1108)
     log_map_server(
         message=f"{APP_CONFIG.symbols.get('sparkles', '✨')} Map Server Setup (v{static_config.SCRIPT_VERSION}) HASH:{get_current_script_hash(static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger) or 'N/A'} ...",
         level="info",
@@ -1181,7 +1213,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         )
         if completed:
             for i, s_item in enumerate(completed):
-                print(f"  {i + 1}. {s_item}")  # Keep simple print
+                print(f"  {i + 1}. {s_item}")
         else:
             log_map_server(
                 message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No steps completed.",
@@ -1199,7 +1231,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             h = get_current_script_hash(
                 static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger
             )
-            # Corrected clear_state_file call (Fix for errors at 1169)
             clear_state_file(
                 app_settings=APP_CONFIG,
                 script_hash_to_write=h,
@@ -1232,19 +1263,15 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     def _wrapped_data_prep_group(
         app_s: AppSettings, log_inst: Optional[logging.Logger]
     ) -> None:
-        if not data_prep_group(
-            app_s, log_inst
-        ):  # data_prep_group returns bool
+        if not data_prep_group(app_s, log_inst):
             raise RuntimeError("Data preparation group failed overall.")
 
-    defined_tasks_callable_map: Dict[
-        str, StepExecutorFunc
-    ] = {  # Value type is now StepExecutorFunc
+    defined_tasks_callable_map: Dict[str, StepExecutorFunc] = {
         "boot_verbosity": prereq_boot_verbosity,
         "core_conflicts": core_conflict_removal,
         "docker_install": install_docker_engine,
         "nodejs_install": install_nodejs_lts,
-        "run_all_core_prerequisites": _wrapped_core_prerequisites_group,  # Use wrapper
+        "run_all_core_prerequisites": _wrapped_core_prerequisites_group,
         "ufw_pkg_check": ensure_ufw_package_installed,
         "ufw_rules": apply_ufw_rules,
         "ufw_activate": activate_ufw_service,
@@ -1260,7 +1287,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "gtfs_prep": run_full_gtfs_module_wrapper,
         "raster_prep": raster_tile_prerender,
         "website_setup": deploy_test_website_content,
-        "task_systemd_reload": systemd_reload,  # systemd_reload itself is -> None
+        "task_systemd_reload": systemd_reload,
     }
 
     cli_flag_to_task_details: Dict[str, Tuple[str, str]] = {
@@ -1280,6 +1307,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "certbot": ("CERTBOT_FULL_SETUP", "Certbot Full Setup"),
         "pgtileserv": ("PGTILESERV_FULL_SETUP", "pg_tileserv Full Setup"),
         "osrm": ("OSRM_FULL_SETUP", "OSRM Full Setup"),
+        "website_setup": ("WEBSITE_CONTENT_DEPLOY", "Deploy test website"),
     })
 
     overall_success = True
@@ -1299,7 +1327,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 tasks_to_run.append({
                     "tag": task_tag,
                     "desc": task_desc,
-                    "func": step_func,  # This should be StepExecutorFunc
+                    "func": step_func,
                 })
 
     if parsed_cli_args.run_all_core_prerequisites and not any(
@@ -1307,13 +1335,29 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     ):
         action_taken = True
         tag, desc = cli_flag_to_task_details["run_all_core_prerequisites"]
-        # Ensure the func fetched here is the wrapped version
         func = defined_tasks_callable_map["run_all_core_prerequisites"]
         tasks_to_run.insert(0, {"tag": tag, "desc": desc, "func": func})
 
     if tasks_to_run:
+        # Sort tasks based on INSTALLATION_GROUPS_ORDER
+        def get_sort_key(task_item: Dict[str, Any]) -> Tuple[int, int]:
+            task_tag = task_item["tag"]
+            details = task_execution_details_lookup.get(task_tag)
+            if details:
+                group_name, step_index_in_group = details
+                group_main_order = group_order_lookup.get(
+                    group_name, sys.maxsize
+                )
+                return (group_main_order, step_index_in_group)
+            return (
+                sys.maxsize,
+                0,
+            )
+
+        tasks_to_run.sort(key=get_sort_key)
+
         log_map_server(
-            message=f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Specified Tasks/Groups",
+            message=f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Specified Tasks/Groups (Sorted by Execution Order)",
             level="info",
             current_logger=logger,
             app_settings=APP_CONFIG,
@@ -1327,11 +1371,10 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                     app_settings=APP_CONFIG,
                 )
                 continue
-            # task["func"] should be StepExecutorFunc
             if not execute_step(
                 task["tag"],
                 task["desc"],
-                task["func"],  # This is where the type compatibility matters
+                task["func"],
                 APP_CONFIG,
                 logger,
                 cli_prompt_for_rerun,
@@ -1346,12 +1389,11 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             current_logger=logger,
             app_settings=APP_CONFIG,
         )
-        # Ensure all functions in full_install_phases are StepExecutorFunc
         full_install_phases: List[Tuple[str, str, StepExecutorFunc]] = [
             (
                 ALL_CORE_PREREQUISITES_GROUP_TAG,
                 "Comprehensive Prerequisites",
-                _wrapped_core_prerequisites_group,  # Fix for error 1374
+                _wrapped_core_prerequisites_group,
             ),
             ("UFW_FULL_SETUP", "UFW Full Setup", ufw_full_setup_sequence),
             (
@@ -1402,17 +1444,17 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             (
                 GTFS_PROCESS_AND_SETUP_TAG,
                 "GTFS Data Pipeline",
-                run_full_gtfs_module_wrapper,  # This is (AppSettings, Logger) -> None
+                run_full_gtfs_module_wrapper,
             ),
             (
                 "RASTER_PREP",
                 "Raster Tile Pre-rendering",
-                raster_tile_prerender,  # This is (AppSettings, Logger) -> None
+                raster_tile_prerender,
             ),
             (
                 "SYSTEMD_RELOAD_GROUP",
                 "Systemd Reload After All Services",
-                _wrapped_systemd_reload_step_group,  # Use wrapper
+                _wrapped_systemd_reload_step_group,
             ),
         ]
         for tag, desc, phase_func in full_install_phases:
@@ -1433,7 +1475,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             if not execute_step(
                 tag,
                 desc,
-                phase_func,  # This should be StepExecutorFunc
+                phase_func,
                 APP_CONFIG,
                 logger,
                 cli_prompt_for_rerun,
@@ -1470,20 +1512,31 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         for key in service_orchestrator_cli_keys:
             if not overall_success:
                 break
+            if key not in cli_flag_to_task_details:
+                logger.error(
+                    f"Developer error: Key '{key}' for services group not found in cli_flag_to_task_details."
+                )
+                overall_success = False
+                break
             tag, desc = cli_flag_to_task_details[key]
-            # All sequence functions (ufw_full_setup_sequence etc.) return None
+
+            if key not in defined_tasks_callable_map:
+                logger.error(
+                    f"Developer error: Key '{key}' for services group not found in defined_tasks_callable_map."
+                )
+                overall_success = False
+                break
             func = defined_tasks_callable_map[key]
+
             if not execute_step(
                 tag, desc, func, APP_CONFIG, logger, cli_prompt_for_rerun
             ):
                 overall_success = False
         if overall_success:
-            # systemd_reload_step_group returns bool, so needs wrapper (Fix for error 1421)
             if not execute_step(
                 cli_flag_to_task_details["task_systemd_reload"][0],
-                # Using tag for task_systemd_reload which maps to direct systemd_reload
                 "Systemd Reload After Services",
-                _wrapped_systemd_reload_step_group,  # Use wrapper
+                _wrapped_systemd_reload_step_group,
                 APP_CONFIG,
                 logger,
                 cli_prompt_for_rerun,
@@ -1498,11 +1551,10 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             current_logger=logger,
             app_settings=APP_CONFIG,
         )
-        # data_prep_group returns bool, pass it to execute_step via a wrapper
         if not execute_step(
             "DATAPROC_GROUP_MAIN",
             "Data Preparation Group",
-            _wrapped_data_prep_group,  # Use wrapper
+            _wrapped_data_prep_group,
             APP_CONFIG,
             logger,
             cli_prompt_for_rerun,
@@ -1511,13 +1563,10 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
 
     elif parsed_cli_args.group_systemd_reload_flag:
         action_taken = True
-        # systemd_reload_step_group returns bool, needs wrapper (Fix for error 1448)
         if not execute_step(
-            cli_flag_to_task_details["task_systemd_reload"][
-                0
-            ],  # Using tag for task_systemd_reload
+            cli_flag_to_task_details["task_systemd_reload"][0],
             "Systemd Reload (Group CLI Flag)",
-            _wrapped_systemd_reload_step_group,  # Use wrapper
+            _wrapped_systemd_reload_step_group,
             APP_CONFIG,
             logger,
             cli_prompt_for_rerun,
