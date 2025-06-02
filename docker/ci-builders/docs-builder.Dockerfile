@@ -13,13 +13,14 @@ RUN DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y --no-install-recommends \
         curl \
         git \
+        golang \
         python3-full \
         pipx \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pipx install todocheck && \
-    pipx install git-cliff
+RUN go install github.com/preslavmihaylov/todocheck@latest && \
+    mv /root/go/bin/todocheck /usr/local/bin/
 
 # Verify installations
 RUN todocheck --version && \
