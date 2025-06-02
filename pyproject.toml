@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osm_osrm_server"
-version = "0.5.6"
+version = "0.5.7"
 description = "An Open Street Map and Open Source Routing Machine"
 readme = "README.md"
 authors = [
@@ -40,8 +40,7 @@ dependencies = [
     "pydantic-settings>=2.0.0,<3.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
     "PyYAML>=6.0.0,<7.0.0",
-    "pyutils @ git+https://gitlab.com/opentasmania/pyutils.git@5.1.1",
-    "yafc @ git+https://gitlab.com/opentasmania/yafconfigurator.git@3.0.2",
+    "yafc @ git+https://gitlab.com/opentasmania/yafconfigurator.git@3.0.4",
     "urwid>=3.0.0,<4.0.0",
 ]
 
