@@ -63,6 +63,79 @@ cache:
     - "$HOME/.local/pipx" # Caches tools installed by pipx if not using custom images
   policy: pull-push
 
+.uv_setup:
+  # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
+  # image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready
+  image: ${PYTHON_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND python-builder image is built
+  before_script:
+    - |
+      if [ "$USE_CUSTOM_CI_IMAGES" = "true" ]; then
+        echo "Using custom Python builder image. System dependencies and uv are pre-installed."
+        echo "--- uv version from image ---"
+        uv --version
+      else
+        echo "USE_CUSTOM_CI_IMAGES is false/unset. Setting up Python environment on stock debian:trixie..."
+        apt update -y
+        echo "Performing full system upgrade on stock image (this may take some time)..."
+        apt upgrade -y
+        apt dist-upgrade -y
+        echo "Installing base dependencies..."
+        DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
+        echo "--- Pipx version ---"
+        pipx --version
+        echo "--- Installing uv using pipx ---"
+        pipx install uv
+        # Ensure pipx-installed binaries are in PATH (typically $HOME/.local/bin for user, /root/.local/bin for root)
+        if ! command -v uv &> /dev/null && [ -d "$HOME/.local/bin" ]; then # Check $HOME first
+          export PATH="$HOME/.local/bin:$PATH"
+        elif ! command -v uv &> /dev/null && [ -d "/root/.local/bin" ]; then # Fallback for root if $HOME isn't /root
+           export PATH="/root/.local/bin:$PATH"
+        fi
+        echo "--- uv version ---"
+        uv --version
+      fi
+    - echo "--- Creating virtual environment with uv ---"
+    - uv venv --python $(which python3) # .venv directory will be cached by GitLab CI cache
+    - echo "--- Activating virtual environment (for context) ---"
+    - source .venv/bin/activate
+    - echo "--- Installing project dependencies with uv ---"
+    - uv pip install .[dev]
+
+
+
+Linting:
+  extends: .uv_setup
+  stage: lint
+  script:
+    - echo "Running Ruff linter (ruff check)..."
+    - uv run ruff check .
+    - echo "Checking Ruff formatting (ruff format --check)..."
+    - uv run ruff format --check .
+
+Type checking:
+  extends: .uv_setup
+  stage: type
+  script:
+    - echo "Running Mypy type checker..."
+    - uv run mypy .
+
+Testing:
+  rules:
+    - if: $CI_COMMIT_TAG
+  extends: .uv_setup
+  stage: test
+  script:
+    - echo "Running Pytest tests..."
+    - uv run pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
+  coverage: "/TOTAL.*\\s+(\\d+%)$/"
+  artifacts:
+    expire_in: 1 week
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  interruptible: true
+
 # Job to build and push the custom Python builder image
 build_python_builder_image:
   stage: build_images
@@ -118,77 +191,6 @@ build_docs_builder_image:
     - if: $USE_CUSTOM_CI_IMAGES == "true"
       when: manual
     - if: $CI_COMMIT_TAG
-
-.uv_setup:
-  # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
-  # image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready
-  image: ${PYTHON_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND python-builder image is built
-  before_script:
-    - |
-      if [ "$USE_CUSTOM_CI_IMAGES" = "true" ]; then
-        echo "Using custom Python builder image. System dependencies and uv are pre-installed."
-        echo "--- uv version from image ---"
-        uv --version
-      else
-        echo "USE_CUSTOM_CI_IMAGES is false/unset. Setting up Python environment on stock debian:trixie..."
-        apt update -y
-        echo "Performing full system upgrade on stock image (this may take some time)..."
-        apt upgrade -y
-        apt dist-upgrade -y
-        echo "Installing base dependencies..."
-        DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
-        echo "--- Pipx version ---"
-        pipx --version
-        echo "--- Installing uv using pipx ---"
-        pipx install uv
-        # Ensure pipx-installed binaries are in PATH (typically $HOME/.local/bin for user, /root/.local/bin for root)
-        if ! command -v uv &> /dev/null && [ -d "$HOME/.local/bin" ]; then # Check $HOME first
-          export PATH="$HOME/.local/bin:$PATH"
-        elif ! command -v uv &> /dev/null && [ -d "/root/.local/bin" ]; then # Fallback for root if $HOME isn't /root
-           export PATH="/root/.local/bin:$PATH"
-        fi
-        echo "--- uv version ---"
-        uv --version
-      fi
-    - echo "--- Creating virtual environment with uv ---"
-    - uv venv --python $(which python3) # .venv directory will be cached by GitLab CI cache
-    - echo "--- Activating virtual environment (for context) ---"
-    - source .venv/bin/activate
-    - echo "--- Installing project dependencies with uv ---"
-    - uv pip install .[dev]
-
-Linting:
-  extends: .uv_setup
-  stage: lint
-  script:
-    - echo "Running Ruff linter (ruff check)..."
-    - uv run ruff check .
-    - echo "Checking Ruff formatting (ruff format --check)..."
-    - uv run ruff format --check .
-
-Type checking:
-  extends: .uv_setup
-  stage: type
-  script:
-    - echo "Running Mypy type checker..."
-    - uv run mypy .
-
-Testing:
-  rules:
-    - if: $CI_COMMIT_TAG
-  extends: .uv_setup
-  stage: test
-  script:
-    - echo "Running Pytest tests..."
-    - uv run pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
-  coverage: "/TOTAL.*\\s+(\\d+%)$/"
-  artifacts:
-    expire_in: 1 week
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-  interruptible: true
 
 generate_documentation:
   stage: docs
