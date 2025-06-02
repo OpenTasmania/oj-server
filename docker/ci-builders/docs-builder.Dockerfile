@@ -23,5 +23,4 @@ RUN go install github.com/preslavmihaylov/todocheck@latest && \
     mv /root/go/bin/todocheck /usr/local/bin/
 
 # Verify installations
-RUN todocheck --version && \
-    git-cliff --version
+RUN todocheck --version
