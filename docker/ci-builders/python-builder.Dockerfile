@@ -11,7 +11,7 @@ RUN DEBIAN_FRONTEND=noninteractive && \
     apt-get upgrade -y && \
     apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
-        build-essentials \
+        build-essential \
         curl \
         git \
         python3-full \
