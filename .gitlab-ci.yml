@@ -70,7 +70,7 @@ build_python_builder_image:
     - docker:dind
   variables:
     TARGET_IMAGE: $PYTHON_BUILDER_IMAGE_BASE
-    DOCKERFILE_PATH: dockerfiles/ci-images/python-builder.Dockerfile
+    DOCKERFILE_PATH: docker/ci-builders/python-builder.Dockerfile
     IMAGE_OS_TAG: trixie
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
@@ -84,7 +84,7 @@ build_python_builder_image:
   rules:
     - if: $USE_CUSTOM_CI_IMAGES == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
       changes:
-        - dockerfiles/ci-images/python-builder.Dockerfile
+        - docker/ci-bio;ders/python-builder.Dockerfile
     - if: $USE_CUSTOM_CI_IMAGES == "true"
       when: manual
 
@@ -96,7 +96,7 @@ build_docs_builder_image:
     - docker:dind
   variables:
     TARGET_IMAGE: $DOCS_BUILDER_IMAGE_BASE
-    DOCKERFILE_PATH: dockerfiles/ci-images/docs-builder.Dockerfile
+    DOCKERFILE_PATH: docker/ci-bio;ders/docs-builder.Dockerfile
     IMAGE_OS_TAG: trixie # Standardized to trixie
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
@@ -110,7 +110,7 @@ build_docs_builder_image:
   rules:
     - if: $USE_CUSTOM_CI_IMAGES == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
       changes:
-        - dockerfiles/ci-images/docs-builder.Dockerfile
+        - docker/ci-bio;ders/docs-builder.Dockerfile
     - if: $USE_CUSTOM_CI_IMAGES == "true"
       when: manual
 
