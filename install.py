@@ -14,17 +14,73 @@ import os
 import subprocess
 import sys
 
+_install_py_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root_for_bs_import = (
+    _install_py_dir  # Assuming install.py is at project root
+)
+
+if _project_root_for_bs_import not in sys.path:
+    sys.path.insert(0, _project_root_for_bs_import)
+
+_early_bootstrap_logger_install_py = logging.getLogger(
+    "InstallPyBootstrapCall"
+)
+if not _early_bootstrap_logger_install_py.handlers:
+    _h_install_py = logging.StreamHandler(sys.stderr)
+    _h_install_py.setFormatter(
+        logging.Formatter("[INSTALL.PY-BOOTSTRAP] %(levelname)s: %(message)s")
+    )
+    _early_bootstrap_logger_install_py.addHandler(_h_install_py)
+    _early_bootstrap_logger_install_py.setLevel(logging.INFO)
+
+try:
+    from bs_installer.bs_orchestrator import (
+        ensure_all_bootstrap_prerequisites,
+    )
+except ImportError as e_bootstrap_import:
+    _early_bootstrap_logger_install_py.critical(
+        f"Could not import the bs_orchestrator module: {e_bootstrap_import}"
+    )
+    _early_bootstrap_logger_install_py.critical(
+        "Ensure 'bs_installer' directory with '__init__.py' and 'bs_orchestrator.py' exists at the project root (e.g., where install.py is) and is in Python path."
+    )
+    _early_bootstrap_logger_install_py.critical(
+        f"Current sys.path: {str(sys.path)}"
+    )
+    sys.exit(1)
+
+# TODO: At the moment, we're a monolithic install for a single host.
+#       When we next refactor for individual system installers, this will have to be readdressed.
+
+# Run the bootstrap checks. If it returns True, it means packages were installed,
+# and install.py should re-execute itself.
+if ensure_all_bootstrap_prerequisites():
+    _early_bootstrap_logger_install_py.info(
+        f"Re-executing '{os.path.basename(sys.argv[0])}' due to bootstrap system package installations..."
+    )
+    try:
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    except Exception as e_exec_main:
+        _early_bootstrap_logger_install_py.critical(
+            f"FATAL: Failed to re-execute script: {e_exec_main}. Please re-run manually."
+        )
+        sys.exit(1)
+
+_early_bootstrap_logger_install_py.info(
+    "Initial system prerequisite checks completed successfully. Proceeding with main installer script logic."
+)
+
 # Common utility imports
-from common.command_utils import (
+from common.command_utils import (  # noqa: E402
     command_exists,
     log_map_server,
     run_command,
     run_elevated_command,
 )
-from common.core_utils import (
+from common.core_utils import (  # noqa: E402
     setup_logging as common_setup_logging,
 )
-from common.system_utils import get_debian_codename
+from common.system_utils import get_debian_codename  # noqa: E402
 
 MAP_SERVER_INSTALLER_NAME = "installer.main_installer"
 VENV_DIR = ".venv"
