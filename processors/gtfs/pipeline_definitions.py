@@ -4,6 +4,7 @@
 Static definitions for the GTFS processing pipeline, including table load order
 and foreign key relationships.
 """
+
 from typing import List, Tuple
 
 GTFS_LOAD_ORDER: List[str] = [

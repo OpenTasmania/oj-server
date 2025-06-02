@@ -4,20 +4,22 @@
 Handles initial setup checks for PostgreSQL.
 Actual package installation is expected to be done by a core prerequisite step.
 """
+
 import logging
+from typing import Optional
 
 from common.command_utils import check_package_installed, log_map_server
 from setup import (
     config,  # For SYMBOLS and package list reference (config.POSTGRES_PACKAGES)
 )
 from setup.config_models import AppSettings
-from typing import Optional
+
 module_logger = logging.getLogger(__name__)
 
 
 def ensure_postgres_packages_are_installed(
-        app_settings: AppSettings, # Added app_settings parameter
-        current_logger: Optional[logging.Logger] = None,
+    app_settings: AppSettings,  # Added app_settings parameter
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Confirms that PostgreSQL packages (expected to be installed by a core
@@ -42,7 +44,9 @@ def ensure_postgres_packages_are_installed(
         return
 
     for pkg in config.POSTGRES_PACKAGES:
-        if check_package_installed(pkg, app_settings=app_settings, current_logger=logger_to_use):  # Pass app_settings
+        if check_package_installed(
+            pkg, app_settings=app_settings, current_logger=logger_to_use
+        ):  # Pass app_settings
             log_map_server(
                 f"{config.SYMBOLS['success']} Package '{pkg}' is installed.",
                 "debug",  # More verbose, success is for the overall step
@@ -68,6 +72,7 @@ def ensure_postgres_packages_are_installed(
             "success",
             logger_to_use,
         )
+
 
 # If there were other setup-specific actions before configuration, they'd go here.
 # For PostgreSQL, most actions are configuration after the package install.

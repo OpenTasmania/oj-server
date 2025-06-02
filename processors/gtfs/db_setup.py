@@ -4,6 +4,7 @@
 Handles database schema setup for GTFS processing, including table creation
 and foreign key management.
 """
+
 import logging
 from typing import List  # Added Tuple
 
@@ -107,9 +108,9 @@ def create_tables_from_schema(conn: PgConnection) -> None:
 
             pk_column_names = details.get("pk_cols")
             if (
-                    pk_column_names
-                    and isinstance(pk_column_names, list)
-                    and len(pk_column_names) > 0
+                pk_column_names
+                and isinstance(pk_column_names, list)
+                and len(pk_column_names) > 0
             ):
                 sanitized_pk_cols = [
                     sql.Identifier(col) for col in pk_column_names
@@ -207,7 +208,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
 
 
 def add_foreign_keys_from_schema(
-        conn: PgConnection,
+    conn: PgConnection,
 ) -> None:  # pragma: no cover
     """
     Add foreign keys based on GTFS_FOREIGN_KEYS definitions.
@@ -216,17 +217,21 @@ def add_foreign_keys_from_schema(
     module_logger.info("Attempting to add foreign keys post-data load...")
     with conn.cursor() as cursor:
         for (
-                from_table,
-                from_cols_list,
-                to_table,
-                to_cols_list,
-                fk_name,
+            from_table,
+            from_cols_list,
+            to_table,
+            to_cols_list,
+            fk_name,
         ) in GTFS_FOREIGN_KEYS:
             try:
                 cursor.execute(
                     "SELECT to_regclass(%s);", (f"public.{from_table}",)
                 )
-                if not cursor.fetchone()[0]:
+                source_table_exists_row = cursor.fetchone()
+                if (
+                    not source_table_exists_row
+                    or not source_table_exists_row[0]
+                ):
                     module_logger.warning(
                         f"Source Table {from_table} for FK {fk_name} does not exist. Skipping FK creation."
                     )
@@ -234,7 +239,11 @@ def add_foreign_keys_from_schema(
                 cursor.execute(
                     "SELECT to_regclass(%s);", (f"public.{to_table}",)
                 )
-                if not cursor.fetchone()[0]:
+                target_table_exists_row = cursor.fetchone()
+                if (
+                    not target_table_exists_row
+                    or not target_table_exists_row[0]
+                ):
                     module_logger.warning(
                         f"Target Table {to_table} for FK {fk_name} does not exist. Skipping FK creation."
                     )
@@ -248,7 +257,7 @@ def add_foreign_keys_from_schema(
                 )
 
                 alter_sql = sql.SQL(
-                    "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) " # type: ignore[misc] # psycoph3 linter confusion
+                    "ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) "  # type: ignore[misc] # psycoph3 linter confusion
                     "REFERENCES {} ({}) DEFERRABLE INITIALLY DEFERRED;"
                 ).format(
                     sql.Identifier(from_table),
@@ -283,7 +292,7 @@ def add_foreign_keys_from_schema(
 
 
 def drop_all_gtfs_foreign_keys(
-        conn: PgConnection,
+    conn: PgConnection,
 ) -> None:  # pragma: no cover
     """Drop all defined GTFS foreign keys using Psycopg 3."""
     module_logger.info("Dropping existing GTFS foreign keys...")
@@ -293,7 +302,8 @@ def drop_all_gtfs_foreign_keys(
                 cursor.execute(
                     "SELECT to_regclass(%s);", (f"public.{from_table}",)
                 )
-                if not cursor.fetchone()[0]:
+                table_exists_row = cursor.fetchone()
+                if not table_exists_row or not table_exists_row[0]:
                     module_logger.debug(
                         f"Table {from_table} for FK {fk_name} does not exist. Skipping FK drop."
                     )

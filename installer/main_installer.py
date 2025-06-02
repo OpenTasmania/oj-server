@@ -13,9 +13,7 @@ import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Import all individual step functions
-# (These are assumed to be refactored to accept (app_settings, logger))
 from actions.website_setup_actions import deploy_test_website_content
-# Common utilities (now refactored to accept AppSettings)
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
 from common.pgpass_utils import setup_pgpass
@@ -61,9 +59,9 @@ from configure.renderd_configurator import (
     create_renderd_conf_file,
 )
 from configure.ufw_configurator import activate_ufw_service, apply_ufw_rules
-from dataproc.data_processing import data_prep_group
+from dataproc.data_processing import data_prep_group  # Returns bool
 from dataproc.osrm_data_processor import (
-    build_osrm_graphs_for_region,
+    build_osrm_graphs_for_region,  # Returns bool
     extract_regional_pbfs_with_osmium,
 )
 from dataproc.raster_processor import raster_tile_prerender
@@ -79,7 +77,7 @@ from installer.docker_installer import install_docker_engine
 from installer.nginx_installer import ensure_nginx_package_installed
 from installer.nodejs_installer import install_nodejs_lts
 from installer.osrm_installer import (
-    download_base_pbf,
+    download_base_pbf,  # Returns str
     ensure_osrm_dependencies,
     prepare_region_boundaries,
     setup_osrm_data_directories,
@@ -100,10 +98,12 @@ from installer.renderd_installer import (
 )
 from installer.ufw_installer import ensure_ufw_package_installed
 from processors.gtfs.orchestrator import process_and_setup_gtfs
+
 # Static constants and core setup utilities
 from setup import config as static_config
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.config_loader import load_app_settings
+
 # New configuration system imports
 from setup.config_models import (
     ADMIN_GROUP_IP_DEFAULT,
@@ -122,7 +122,7 @@ from setup.config_models import (
     AppSettings,
 )
 from setup.core_prerequisites import boot_verbosity as prereq_boot_verbosity
-from setup.core_prerequisites import (
+from setup.core_prerequisites import (  # core_prerequisites_group returns bool
     core_conflict_removal,
     core_prerequisites_group,
 )
@@ -134,9 +134,10 @@ from setup.state_manager import (
 from setup.step_executor import execute_step
 
 logger = logging.getLogger(__name__)
-APP_CONFIG: Optional[AppSettings] = (
-    None  # Global APP_CONFIG, populated in main_map_server_entry
-)
+APP_CONFIG: Optional[AppSettings] = None
+
+# Module-level type alias for step functions passed to execute_step
+StepExecutorFunc = Callable[[AppSettings, Optional[logging.Logger]], None]
 
 # --- Task Tags ---
 GTFS_PROCESS_AND_SETUP_TAG = "GTFS_PROCESS_AND_SETUP"
@@ -253,20 +254,18 @@ task_execution_details_lookup: Dict[str, Tuple[str, int]] = {
     for group_info in INSTALLATION_GROUPS_ORDER
     for step_idx, step_tag in enumerate(group_info["steps"])
 }
-task_execution_details_lookup.update(
-    {
-        ALL_CORE_PREREQUISITES_GROUP_TAG: ("Comprehensive Prerequisites", 0),
-        "UFW_FULL_SETUP": ("Firewall Service (UFW)", 0),
-        "POSTGRES_FULL_SETUP": ("Database Service (PostgreSQL)", 0),
-        "CARTO_FULL_SETUP": ("Carto Service", 0),
-        "RENDERD_FULL_SETUP": ("Renderd Service", 0),
-        "NGINX_FULL_SETUP": ("Nginx Service", 0),
-        "PGTILESERV_FULL_SETUP": ("pg_tileserv Service", 0),
-        "OSRM_FULL_SETUP": ("OSRM Service & Data Processing", 0),
-        "APACHE_FULL_SETUP": ("Apache Service", 0),
-        "CERTBOT_FULL_SETUP": ("Certbot Service", 0),
-    }
-)
+task_execution_details_lookup.update({
+    ALL_CORE_PREREQUISITES_GROUP_TAG: ("Comprehensive Prerequisites", 0),
+    "UFW_FULL_SETUP": ("Firewall Service (UFW)", 0),
+    "POSTGRES_FULL_SETUP": ("Database Service (PostgreSQL)", 0),
+    "CARTO_FULL_SETUP": ("Carto Service", 0),
+    "RENDERD_FULL_SETUP": ("Renderd Service", 0),
+    "NGINX_FULL_SETUP": ("Nginx Service", 0),
+    "PGTILESERV_FULL_SETUP": ("pg_tileserv Service", 0),
+    "OSRM_FULL_SETUP": ("OSRM Service & Data Processing", 0),
+    "APACHE_FULL_SETUP": ("Apache Service", 0),
+    "CERTBOT_FULL_SETUP": ("Certbot Service", 0),
+})
 
 group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
@@ -287,16 +286,16 @@ def get_dynamic_help(base_help: str, task_tag: str) -> str:
 
 # --- Orchestrator Sequences (accept app_cfg and pass it to execute_step) ---
 def ufw_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Starting UFW Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             UFW_PACKAGE_CHECK_TAG,
             "Check UFW Package Installation",
@@ -311,28 +310,28 @@ def ufw_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"UFW step '{desc}' failed.")
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} UFW Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def postgres_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} PostgreSQL Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_POSTGRES_PKG_CHECK",
             "Check PostgreSQL Packages",
@@ -371,40 +370,46 @@ def postgres_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"PostgreSQL step '{desc}' failed.")
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} PostgreSQL Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def carto_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Carto Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    compiled_xml_path_holder = {"path": None}
+    compiled_xml_path_holder: Dict[str, Optional[str]] = {"path": None}
 
-    def _compile_step(ac, cl):
-        compiled_xml_path_holder["path"] = compile_osm_carto_stylesheet(
-            ac, cl
-        )
+    def _compile_step(ac: AppSettings, cl: Optional[logging.Logger]) -> None:
+        path_result = compile_osm_carto_stylesheet(ac, cl)
+        if not path_result:
+            raise RuntimeError(
+                "compile_osm_carto_stylesheet did not return a valid path or failed."
+            )
+        compiled_xml_path_holder["path"] = path_result
 
-    def _deploy_step(ac, cl):
-        if not compiled_xml_path_holder["path"]:
-            raise RuntimeError("Compiled XML path not set.")
-        deploy_mapnik_stylesheet(compiled_xml_path_holder["path"], ac, cl)
+    def _deploy_step(ac: AppSettings, cl: Optional[logging.Logger]) -> None:
+        xml_path_to_deploy = compiled_xml_path_holder["path"]
+        if not xml_path_to_deploy:
+            raise RuntimeError(
+                "Compiled XML path not set or is invalid for deployment."
+            )
+        deploy_mapnik_stylesheet(xml_path_to_deploy, ac, cl)
 
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         ("SETUP_CARTO_CLI", "Install Carto CLI", install_carto_cli),
         (
             "SETUP_CARTO_REPO",
@@ -437,45 +442,45 @@ def carto_full_setup_sequence(
     try:
         for tag, desc, func in steps:
             if not execute_step(
-                    tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
             ):
                 raise RuntimeError(f"Carto step '{desc}' failed.")
     except Exception as e:
         log_map_server(
             f"{app_cfg.symbols.get('error', '❌')} Error in Carto sequence: {e}. Finalizing.",
-            "error",
-            logger_to_use,
-            app_cfg,
+            level="error",
+            current_logger=logger_to_use,
+            app_settings=app_cfg,
         )
         try:
             finalize_carto_directory_processing(app_cfg, logger_to_use)
         except Exception as ef:
             log_map_server(
                 f"{app_cfg.symbols.get('error', '❌')} Finalization error: {ef}",
-                "error",
-                logger_to_use,
-                app_cfg,
+                level="error",
+                current_logger=logger_to_use,
+                app_settings=app_cfg,
             )
         raise
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} Carto Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def renderd_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Renderd Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_RENDERD_PKG_CHECK",
             "Check Renderd Packages",
@@ -504,28 +509,28 @@ def renderd_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"Renderd step '{desc}' failed.")
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} Renderd Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def apache_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Apache Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_APACHE_PKG_CHECK",
             "Check Apache Packages",
@@ -559,28 +564,28 @@ def apache_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"Apache step '{desc}' failed.")
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} Apache Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def nginx_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Nginx Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_NGINX_PKG_CHECK",
             "Check Nginx Package",
@@ -609,28 +614,28 @@ def nginx_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"Nginx step '{desc}' failed.")
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} Nginx Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def certbot_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Certbot Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_CERTBOT_PACKAGES",
             "Install Certbot Packages",
@@ -640,34 +645,34 @@ def certbot_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             log_map_server(
                 f"{app_cfg.symbols.get('warning', '!')} Certbot step '{desc}' failed/skipped.",
-                "warning",
-                logger_to_use,
-                app_cfg,
+                level="warning",
+                current_logger=logger_to_use,
+                app_settings=app_cfg,
             )
             break
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} Certbot Full Setup Attempted ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def pg_tileserv_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} pg_tileserv Full Setup ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    steps = [
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_PGTS_DOWNLOAD_BINARY",
             "Download pg_tileserv Binary",
@@ -701,42 +706,49 @@ def pg_tileserv_full_setup_sequence(
     ]
     for tag, desc, func in steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"pg_tileserv step '{desc}' failed.")
     log_map_server(
         f"--- {app_cfg.symbols.get('success', '✅')} pg_tileserv Full Setup Completed ---",
-        "success",
-        logger_to_use,
-        app_cfg,
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
 
 
 def osrm_full_setup_sequence(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} OSRM Full Setup & Data Processing ---",
-        "info",
-        logger_to_use,
-        app_cfg,
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
     )
-    base_pbf_path_holder = {"path": None}
+    base_pbf_path_holder: Dict[str, Optional[str]] = {"path": None}
 
-    def _download_pbf_step(ac, cl):
+    def _download_pbf_step(
+        ac: AppSettings, cl: Optional[logging.Logger]
+    ) -> None:
         base_pbf_path_holder["path"] = download_base_pbf(ac, cl)
 
-    regional_pbf_map_holder = {"map": {}}
+    regional_pbf_map_holder: Dict[str, Dict[str, str]] = {"map": {}}
 
-    def _extract_regions_step(ac, cl):
-        if not base_pbf_path_holder["path"]:
-            raise RuntimeError("Base PBF not downloaded.")
+    def _extract_regions_step(
+        ac: AppSettings, cl: Optional[logging.Logger]
+    ) -> None:
+        pbf_path = base_pbf_path_holder["path"]
+        if not pbf_path:
+            raise RuntimeError(
+                "Base PBF path not set or is invalid for extraction."
+            )
         regional_pbf_map_holder["map"] = extract_regional_pbfs_with_osmium(
-            base_pbf_path_holder["path"], ac, cl
+            pbf_path, ac, cl
         )
 
-    infra_steps = [
+    infra_steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
             "SETUP_OSRM_DEPS",
             "Ensure OSRM Dependencies",
@@ -756,118 +768,150 @@ def osrm_full_setup_sequence(
     ]
     for tag, desc, func in infra_steps:
         if not execute_step(
-                tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
         ):
             raise RuntimeError(f"OSRM infra step '{desc}' failed.")
+
     if not execute_step(
-            "DATAPROC_OSMIUM_EXTRACT_REGIONS",
-            "Extract Regional PBFs",
-            _extract_regions_step,
-            app_cfg,
-            logger_to_use,
-            cli_prompt_for_rerun,
+        "DATAPROC_OSMIUM_EXTRACT_REGIONS",
+        "Extract Regional PBFs",
+        _extract_regions_step,
+        app_cfg,
+        logger_to_use,
+        cli_prompt_for_rerun,
     ):
         raise RuntimeError("Osmium regional PBF extraction failed.")
+
     regional_map = regional_pbf_map_holder.get("map", {})
     if not regional_map:
         log_map_server(
             f"{app_cfg.symbols.get('warning', '!')} No regional PBFs extracted. Skipping OSRM graph building.",
-            "warning",
-            logger_to_use,
-            app_cfg,
+            level="warning",
+            current_logger=logger_to_use,
+            app_settings=app_cfg,
         )
         return
-    processed_regions_count = 0
-    for rn, rp_path in regional_map.items():
 
-        def _build(ac, cl, r=rn, p=rp_path):
-            return build_osrm_graphs_for_region(r, p, ac, cl)
+    processed_regions_count = 0
+    for rn_key, rp_val_path in regional_map.items():
+
+        def _build(
+            ac: AppSettings,
+            cl: Optional[logging.Logger],
+            r: str = rn_key,
+            p: str = rp_val_path,
+        ) -> None:
+            if not build_osrm_graphs_for_region(r, p, ac, cl):
+                raise RuntimeError(
+                    f"Failed to build OSRM graphs for region {r}"
+                )
 
         if not execute_step(
-                f"DATAPROC_OSRM_BUILD_GRAPH_{rn.upper()}",
-                f"Build OSRM Graphs for {rn}",
-                _build,
-                app_cfg,
-                logger_to_use,
-                cli_prompt_for_rerun,
+            f"DATAPROC_OSRM_BUILD_GRAPH_{rn_key.upper()}",
+            f"Build OSRM Graphs for {rn_key}",
+            _build,
+            app_cfg,
+            logger_to_use,
+            cli_prompt_for_rerun,
         ):
             continue
 
-        def _create_svc(ac, cl, r=rn):
+        def _create_svc(
+            ac: AppSettings, cl: Optional[logging.Logger], r: str = rn_key
+        ) -> None:
             create_osrm_routed_service_file(r, ac, cl)
 
         if not execute_step(
-                f"SETUP_OSRM_SYSTEMD_SERVICE_{rn.upper()}",
-                f"Create OSRM Service File for {rn}",
-                _create_svc,
-                app_cfg,
-                logger_to_use,
-                cli_prompt_for_rerun,
+            f"SETUP_OSRM_SYSTEMD_SERVICE_{rn_key.upper()}",
+            f"Create OSRM Service File for {rn_key}",
+            _create_svc,
+            app_cfg,
+            logger_to_use,
+            cli_prompt_for_rerun,
         ):
             continue
 
-        def _activate_svc(ac, cl, r=rn):
+        def _activate_svc(
+            ac: AppSettings, cl: Optional[logging.Logger], r: str = rn_key
+        ) -> None:
             activate_osrm_routed_service(r, ac, cl)
 
         if not execute_step(
-                f"CONFIG_OSRM_ACTIVATE_SERVICE_{rn.upper()}",
-                f"Activate OSRM Service for {rn}",
-                _activate_svc,
-                app_cfg,
-                logger_to_use,
-                cli_prompt_for_rerun,
+            f"CONFIG_OSRM_ACTIVATE_SERVICE_{rn_key.upper()}",
+            f"Activate OSRM Service for {rn_key}",
+            _activate_svc,
+            app_cfg,
+            logger_to_use,
+            cli_prompt_for_rerun,
         ):
             continue
         processed_regions_count += 1
+
     if processed_regions_count:
         log_map_server(
             f"--- {app_cfg.symbols.get('success', '✅')} OSRM Setup Completed for {processed_regions_count} region(s) ---",
-            "success",
-            logger_to_use,
-            app_cfg,
+            level="success",
+            current_logger=logger_to_use,
+            app_settings=app_cfg,
         )
     else:
         log_map_server(
             f"{app_cfg.symbols.get('warning', '!')} No OSRM services successfully processed.",
-            "warning",
-            logger_to_use,
-            app_cfg,
+            level="warning",
+            current_logger=logger_to_use,
+            app_settings=app_cfg,
         )
 
 
-def systemd_reload_step_group(
-        app_cfg: AppSettings,
-        current_logger_instance: Optional[logging.Logger] = None,
+# Wrapper for boolean-returning functions to make them StepExecutorFunc compatible
+def _wrapped_core_prerequisites_group(
+    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
+) -> None:
+    if not core_prerequisites_group(app_settings, logger_instance):
+        raise RuntimeError("Core prerequisites group failed overall.")
+
+
+def _wrapped_systemd_reload_step_group(
+    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
+) -> None:
+    if not systemd_reload_step_group(
+        app_settings, logger_instance
+    ):  # systemd_reload_step_group itself returns bool
+        raise RuntimeError("Systemd reload step group failed.")
+
+
+def _wrapped_data_prep_group(
+    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
+) -> None:
+    if not data_prep_group(
+        app_settings, logger_instance
+    ):  # data_prep_group returns bool
+        raise RuntimeError("Data preparation group failed overall.")
+
+
+def systemd_reload_step_group(  # This function actually returns bool, used as a sub-orchestrator
+    app_cfg: AppSettings,
+    current_logger_instance: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = (
         current_logger_instance if current_logger_instance else logger
     )
+    # systemd_reload (the actual action) returns None and is StepExecutorFunc compatible
     return execute_step(
         "SYSTEMD_RELOAD_MAIN",
-        "Reload Systemd Daemon",
-        systemd_reload,
+        "Reload Systemd Daemon (Core Action)",
+        systemd_reload,  # This is the (AppSettings, Logger) -> None function
         app_cfg,
         logger_to_use,
         cli_prompt_for_rerun,
     )
 
 
-def run_full_gtfs_module_wrapper(
-        app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
-):
-    """
-    Wrapper to call the main GTFS processing and setup orchestrator.
-    The orchestrator `process_and_setup_gtfs` will use app_cfg to derive
-    all its necessary configurations (GTFS URL, DB params, paths, etc.).
-    """
-    # The explicit construction of db_params, log file paths, etc., here
-    # is no longer needed for the call to process_and_setup_gtfs, as it
-    # will source these from the app_cfg (AppSettings) object directly
-    # or use defaults defined within its own modules if not specified in AppSettings.
-
+def run_full_gtfs_module_wrapper(  # This is already StepExecutorFunc compatible
+    app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
+) -> None:
     process_and_setup_gtfs(
-        app_settings=app_cfg,
-        orchestrator_logger=calling_logger
+        app_settings=app_cfg, orchestrator_logger=calling_logger
     )
 
 
@@ -879,6 +923,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         add_help=False,
     )
+    # ... (argparse setup as before) ...
     parser.add_argument(
         "-h",
         "--help",
@@ -1087,35 +1132,37 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         f"Successfully loaded and validated configuration. Log prefix: {APP_CONFIG.log_prefix}"
     )
 
+    # Corrected log_map_server call (Fix for errors at 1107 & 1108)
     log_map_server(
-        f"{APP_CONFIG.symbols.get('sparkles', '✨')} Map Server Setup (v{static_config.SCRIPT_VERSION}) HASH:{get_current_script_hash(static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger) or 'N/A'} ...",
-        logger,
-        APP_CONFIG,
+        message=f"{APP_CONFIG.symbols.get('sparkles', '✨')} Map Server Setup (v{static_config.SCRIPT_VERSION}) HASH:{get_current_script_hash(static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger) or 'N/A'} ...",
+        level="info",
+        current_logger=logger,
+        app_settings=APP_CONFIG,
     )
     if (
-            APP_CONFIG.pg.password == PGPASSWORD_DEFAULT
-            and not parsed_cli_args.view_config
-            and not APP_CONFIG.dev_override_unsafe_password
+        APP_CONFIG.pg.password == PGPASSWORD_DEFAULT
+        and not parsed_cli_args.view_config
+        and not APP_CONFIG.dev_override_unsafe_password
     ):
         log_map_server(
-            f"{APP_CONFIG.symbols.get('warning', '⚠️')} WARNING: Default PostgreSQL password in use.",
-            "warning",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('warning', '⚠️')} WARNING: Default PostgreSQL password in use.",
+            level="warning",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
     if os.geteuid() != 0:
         log_map_server(
-            f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Script not root. 'sudo' will be used.",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Script not root. 'sudo' will be used.",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
     else:
         log_map_server(
-            f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Script is root.",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Script is root.",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
 
     initialize_state_system(APP_CONFIG, logger)
@@ -1127,48 +1174,77 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     if parsed_cli_args.view_state:
         completed = view_completed_steps(APP_CONFIG, logger)
         log_map_server(
-            f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Completed steps from {static_config.STATE_FILE_PATH}:",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Completed steps from {static_config.STATE_FILE_PATH}:",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
         if completed:
-            [print(f"  {i + 1}. {s}") for i, s in enumerate(completed)]
+            for i, s_item in enumerate(completed):
+                print(f"  {i + 1}. {s_item}")  # Keep simple print
         else:
             log_map_server(
-                f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No steps completed.",
-                "info",
-                logger,
-                APP_CONFIG,
+                message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No steps completed.",
+                level="info",
+                current_logger=logger,
+                app_settings=APP_CONFIG,
             )
         return 0
     if parsed_cli_args.clear_state:
         if cli_prompt_for_rerun(
-                f"Clear state from {static_config.STATE_FILE_PATH}?",
-                APP_CONFIG,
-                logger,
+            f"Clear state from {static_config.STATE_FILE_PATH}?",
+            APP_CONFIG,
+            logger,
         ):
             h = get_current_script_hash(
                 static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger
             )
-            clear_state_file(APP_CONFIG, logger, h)
+            # Corrected clear_state_file call (Fix for errors at 1169)
+            clear_state_file(
+                app_settings=APP_CONFIG,
+                script_hash_to_write=h,
+                current_logger=logger,
+            )
         else:
             log_map_server(
-                f"{APP_CONFIG.symbols.get('info', 'ℹ️')} State clearing cancelled.",
-                "info",
-                logger,
-                APP_CONFIG,
+                message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} State clearing cancelled.",
+                level="info",
+                current_logger=logger,
+                app_settings=APP_CONFIG,
             )
         return 0
 
+    # Wrappers for boolean-returning group functions to make them StepExecutorFunc compatible
+    def _wrapped_core_prerequisites_group(
+        app_s: AppSettings, log_inst: Optional[logging.Logger]
+    ) -> None:
+        if not core_prerequisites_group(app_s, log_inst):
+            raise RuntimeError("Core prerequisites group failed overall.")
+
+    def _wrapped_systemd_reload_step_group(
+        app_s: AppSettings, log_inst: Optional[logging.Logger]
+    ) -> None:
+        # systemd_reload_step_group calls execute_step with systemd_reload which returns None.
+        # The bool from systemd_reload_step_group indicates if that execute_step call succeeded.
+        if not systemd_reload_step_group(app_s, log_inst):
+            raise RuntimeError("Systemd reload step group failed.")
+
+    def _wrapped_data_prep_group(
+        app_s: AppSettings, log_inst: Optional[logging.Logger]
+    ) -> None:
+        if not data_prep_group(
+            app_s, log_inst
+        ):  # data_prep_group returns bool
+            raise RuntimeError("Data preparation group failed overall.")
+
     defined_tasks_callable_map: Dict[
-        str, Callable[[AppSettings, Optional[logging.Logger]], Any]
-    ] = {
+        str, StepExecutorFunc
+    ] = {  # Value type is now StepExecutorFunc
         "boot_verbosity": prereq_boot_verbosity,
         "core_conflicts": core_conflict_removal,
         "docker_install": install_docker_engine,
         "nodejs_install": install_nodejs_lts,
-        "run_all_core_prerequisites": core_prerequisites_group,
+        "run_all_core_prerequisites": _wrapped_core_prerequisites_group,  # Use wrapper
         "ufw_pkg_check": ensure_ufw_package_installed,
         "ufw_rules": apply_ufw_rules,
         "ufw_activate": activate_ufw_service,
@@ -1184,29 +1260,27 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "gtfs_prep": run_full_gtfs_module_wrapper,
         "raster_prep": raster_tile_prerender,
         "website_setup": deploy_test_website_content,
-        "task_systemd_reload": systemd_reload,
+        "task_systemd_reload": systemd_reload,  # systemd_reload itself is -> None
     }
 
     cli_flag_to_task_details: Dict[str, Tuple[str, str]] = {
         item[0]: (item[1], item[2]) for item in task_flags_definitions
     }
-    cli_flag_to_task_details.update(
-        {  # Add orchestrator flags that share a dest name with a sequence
-            "run_all_core_prerequisites": (
-                ALL_CORE_PREREQUISITES_GROUP_TAG,
-                "Comprehensive Prerequisites",
-            ),
-            "ufw": ("UFW_FULL_SETUP", "UFW Full Setup"),
-            "postgres": ("POSTGRES_FULL_SETUP", "PostgreSQL Full Setup"),
-            "carto": ("CARTO_FULL_SETUP", "Carto Full Setup"),
-            "renderd": ("RENDERD_FULL_SETUP", "Renderd Full Setup"),
-            "apache": ("APACHE_FULL_SETUP", "Apache Full Setup"),
-            "nginx": ("NGINX_FULL_SETUP", "Nginx Full Setup"),
-            "certbot": ("CERTBOT_FULL_SETUP", "Certbot Full Setup"),
-            "pgtileserv": ("PGTILESERV_FULL_SETUP", "pg_tileserv Full Setup"),
-            "osrm": ("OSRM_FULL_SETUP", "OSRM Full Setup"),
-        }
-    )
+    cli_flag_to_task_details.update({
+        "run_all_core_prerequisites": (
+            ALL_CORE_PREREQUISITES_GROUP_TAG,
+            "Comprehensive Prerequisites",
+        ),
+        "ufw": ("UFW_FULL_SETUP", "UFW Full Setup"),
+        "postgres": ("POSTGRES_FULL_SETUP", "PostgreSQL Full Setup"),
+        "carto": ("CARTO_FULL_SETUP", "Carto Full Setup"),
+        "renderd": ("RENDERD_FULL_SETUP", "Renderd Full Setup"),
+        "apache": ("APACHE_FULL_SETUP", "Apache Full Setup"),
+        "nginx": ("NGINX_FULL_SETUP", "Nginx Full Setup"),
+        "certbot": ("CERTBOT_FULL_SETUP", "Certbot Full Setup"),
+        "pgtileserv": ("PGTILESERV_FULL_SETUP", "pg_tileserv Full Setup"),
+        "osrm": ("OSRM_FULL_SETUP", "OSRM Full Setup"),
+    })
 
     overall_success = True
     action_taken = False
@@ -1214,67 +1288,70 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
 
     for arg_dest_name, was_flag_set in vars(parsed_cli_args).items():
         if (
-                was_flag_set
-                and arg_dest_name in defined_tasks_callable_map
-                and arg_dest_name in cli_flag_to_task_details
+            was_flag_set
+            and arg_dest_name in defined_tasks_callable_map
+            and arg_dest_name in cli_flag_to_task_details
         ):
             action_taken = True
             task_tag, task_desc = cli_flag_to_task_details[arg_dest_name]
             step_func = defined_tasks_callable_map[arg_dest_name]
-            if not any(
-                    t["tag"] == task_tag for t in tasks_to_run
-            ):  # Avoid duplicates
-                tasks_to_run.append(
-                    {"tag": task_tag, "desc": task_desc, "func": step_func}
-                )
+            if not any(t["tag"] == task_tag for t in tasks_to_run):
+                tasks_to_run.append({
+                    "tag": task_tag,
+                    "desc": task_desc,
+                    "func": step_func,  # This should be StepExecutorFunc
+                })
 
     if parsed_cli_args.run_all_core_prerequisites and not any(
-            t["tag"] == ALL_CORE_PREREQUISITES_GROUP_TAG for t in tasks_to_run
+        t["tag"] == ALL_CORE_PREREQUISITES_GROUP_TAG for t in tasks_to_run
     ):
         action_taken = True
         tag, desc = cli_flag_to_task_details["run_all_core_prerequisites"]
+        # Ensure the func fetched here is the wrapped version
         func = defined_tasks_callable_map["run_all_core_prerequisites"]
         tasks_to_run.insert(0, {"tag": tag, "desc": desc, "func": func})
 
     if tasks_to_run:
         log_map_server(
-            f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Specified Tasks/Groups",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Specified Tasks/Groups",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
         for task in tasks_to_run:
             if not overall_success:
                 log_map_server(
-                    f"Skipping '{task['desc']}' due to prior failure.",
-                    "warning",
-                    logger,
-                    APP_CONFIG,
+                    message=f"Skipping '{task['desc']}' due to prior failure.",
+                    level="warning",
+                    current_logger=logger,
+                    app_settings=APP_CONFIG,
                 )
                 continue
+            # task["func"] should be StepExecutorFunc
             if not execute_step(
-                    task["tag"],
-                    task["desc"],
-                    task["func"],
-                    APP_CONFIG,
-                    logger,
-                    cli_prompt_for_rerun,
+                task["tag"],
+                task["desc"],
+                task["func"],  # This is where the type compatibility matters
+                APP_CONFIG,
+                logger,
+                cli_prompt_for_rerun,
             ):
                 overall_success = False
 
     elif parsed_cli_args.full:
         action_taken = True
         log_map_server(
-            f"{APP_CONFIG.symbols.get('rocket', '🚀')} Starting Full Installation",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('rocket', '🚀')} Starting Full Installation",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
-        full_install_phases = [
+        # Ensure all functions in full_install_phases are StepExecutorFunc
+        full_install_phases: List[Tuple[str, str, StepExecutorFunc]] = [
             (
                 ALL_CORE_PREREQUISITES_GROUP_TAG,
                 "Comprehensive Prerequisites",
-                core_prerequisites_group,
+                _wrapped_core_prerequisites_group,  # Fix for error 1374
             ),
             ("UFW_FULL_SETUP", "UFW Full Setup", ufw_full_setup_sequence),
             (
@@ -1325,55 +1402,58 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             (
                 GTFS_PROCESS_AND_SETUP_TAG,
                 "GTFS Data Pipeline",
-                run_full_gtfs_module_wrapper,
+                run_full_gtfs_module_wrapper,  # This is (AppSettings, Logger) -> None
             ),
             (
                 "RASTER_PREP",
                 "Raster Tile Pre-rendering",
-                raster_tile_prerender,
+                raster_tile_prerender,  # This is (AppSettings, Logger) -> None
             ),
             (
                 "SYSTEMD_RELOAD_GROUP",
                 "Systemd Reload After All Services",
-                systemd_reload_step_group,
+                _wrapped_systemd_reload_step_group,  # Use wrapper
             ),
-        ]  # SYSTEMD_RELOAD_GROUP needs to map to systemd_reload_step_group
+        ]
         for tag, desc, phase_func in full_install_phases:
             if not overall_success:
                 log_map_server(
-                    f"Skipping '{desc}' due to prior failure.",
-                    "warning",
-                    logger,
-                    APP_CONFIG,
+                    message=f"Skipping '{desc}' due to prior failure.",
+                    level="warning",
+                    current_logger=logger,
+                    app_settings=APP_CONFIG,
                 )
                 continue
             log_map_server(
-                f"--- Executing: {desc} ({tag}) ---",
-                "info",
-                logger,
-                APP_CONFIG,
+                message=f"--- Executing: {desc} ({tag}) ---",
+                level="info",
+                current_logger=logger,
+                app_settings=APP_CONFIG,
             )
             if not execute_step(
-                    tag,
-                    desc,
-                    phase_func,
-                    APP_CONFIG,
-                    logger,
-                    cli_prompt_for_rerun,
+                tag,
+                desc,
+                phase_func,  # This should be StepExecutorFunc
+                APP_CONFIG,
+                logger,
+                cli_prompt_for_rerun,
             ):
                 overall_success = False
                 log_map_server(
-                    f"Phase '{desc}' failed.", "error", logger, APP_CONFIG
+                    message=f"Phase '{desc}' failed.",
+                    level="error",
+                    current_logger=logger,
+                    app_settings=APP_CONFIG,
                 )
                 break
 
     elif parsed_cli_args.services:
         action_taken = True
         log_map_server(
-            f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running All Service Setups",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running All Service Setups",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
         service_orchestrator_cli_keys = [
             "ufw",
@@ -1391,86 +1471,93 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             if not overall_success:
                 break
             tag, desc = cli_flag_to_task_details[key]
+            # All sequence functions (ufw_full_setup_sequence etc.) return None
             func = defined_tasks_callable_map[key]
             if not execute_step(
-                    tag, desc, func, APP_CONFIG, logger, cli_prompt_for_rerun
+                tag, desc, func, APP_CONFIG, logger, cli_prompt_for_rerun
             ):
                 overall_success = False
         if overall_success:
-            tag_rl, desc_rl = cli_flag_to_task_details[
-                "task_systemd_reload"
-            ]  # Should map to a group reload tag
+            # systemd_reload_step_group returns bool, so needs wrapper (Fix for error 1421)
             if not execute_step(
-                    tag_rl,
-                    "Systemd Reload After Services",
-                    systemd_reload_step_group,
-                    APP_CONFIG,
-                    logger,
-                    cli_prompt_for_rerun,
+                cli_flag_to_task_details["task_systemd_reload"][0],
+                # Using tag for task_systemd_reload which maps to direct systemd_reload
+                "Systemd Reload After Services",
+                _wrapped_systemd_reload_step_group,  # Use wrapper
+                APP_CONFIG,
+                logger,
+                cli_prompt_for_rerun,
             ):
                 overall_success = False
 
-    elif parsed_cli_args.data:  # data_prep_group orchestrates this
+    elif parsed_cli_args.data:
         action_taken = True
         log_map_server(
-            f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Data Tasks (via data_prep_group)",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('rocket', '🚀')} Running Data Tasks (via data_prep_group)",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
-        # The data_prep_group itself can be a single step with its own tag if desired, or call its components
-        if not data_prep_group(APP_CONFIG, logger):
+        # data_prep_group returns bool, pass it to execute_step via a wrapper
+        if not execute_step(
+            "DATAPROC_GROUP_MAIN",
+            "Data Preparation Group",
+            _wrapped_data_prep_group,  # Use wrapper
+            APP_CONFIG,
+            logger,
+            cli_prompt_for_rerun,
+        ):
             overall_success = False
 
     elif parsed_cli_args.group_systemd_reload_flag:
         action_taken = True
-        tag_rl_grp, desc_rl_grp = cli_flag_to_task_details[
-            "task_systemd_reload"
-        ]  # Assuming task_systemd_reload points to group orchestrator
+        # systemd_reload_step_group returns bool, needs wrapper (Fix for error 1448)
         if not execute_step(
-                tag_rl_grp,
-                desc_rl_grp,
-                systemd_reload_step_group,
-                APP_CONFIG,
-                logger,
-                cli_prompt_for_rerun,
+            cli_flag_to_task_details["task_systemd_reload"][
+                0
+            ],  # Using tag for task_systemd_reload
+            "Systemd Reload (Group CLI Flag)",
+            _wrapped_systemd_reload_step_group,  # Use wrapper
+            APP_CONFIG,
+            logger,
+            cli_prompt_for_rerun,
         ):
             overall_success = False
 
     if not action_taken and not (
-            parsed_cli_args.view_config
-            or parsed_cli_args.view_state
-            or parsed_cli_args.clear_state
+        parsed_cli_args.view_config
+        or parsed_cli_args.view_state
+        or parsed_cli_args.clear_state
     ):
         log_map_server(
-            f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No action specified. Displaying help.",
-            "info",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No action specified. Displaying help.",
+            level="info",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
         parser.print_help(sys.stderr)
         return 2
 
     if not overall_success:
         log_map_server(
-            f"{APP_CONFIG.symbols.get('critical', '🔥')} One or more steps failed.",
-            "critical",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('critical', '🔥')} One or more steps failed.",
+            level="critical",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
         return 1
 
     if (
-            action_taken
-            or parsed_cli_args.view_config
-            or parsed_cli_args.view_state
-            or parsed_cli_args.clear_state
+        action_taken
+        or parsed_cli_args.view_config
+        or parsed_cli_args.view_state
+        or parsed_cli_args.clear_state
     ):
         log_map_server(
-            f"{APP_CONFIG.symbols.get('sparkles', '✨')} Operation(s) completed.",
-            "success",
-            logger,
-            APP_CONFIG,
+            message=f"{APP_CONFIG.symbols.get('sparkles', '✨')} Operation(s) completed.",
+            level="success",
+            current_logger=logger,
+            app_settings=APP_CONFIG,
         )
     return 0
 

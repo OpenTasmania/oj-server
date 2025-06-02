@@ -303,9 +303,9 @@ class Table:
 class Downloader:
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update(
-            {"User-Agent": "get-external-data.py/osm-carto"}
-        )
+        self.session.headers.update({
+            "User-Agent": "get-external-data.py/osm-carto"
+        })
 
     def __enter__(self):
         return self
@@ -740,9 +740,7 @@ def main():
                             logging.debug(
                                 f"ogr2ogr stdout:\n{process.stdout}"
                             )
-                        if (
-                            process.stderr
-                        ):  # ogr2ogr often prints informational messages to stderr
+                        if process.stderr:  # ogr2ogr often prints informational messages to stderr
                             logging.info(f"ogr2ogr stderr:\n{process.stderr}")
                     except subprocess.CalledProcessError as e:
                         logging.critical(
@@ -765,7 +763,7 @@ def main():
                         this_table.clean_temp()
                         raise RuntimeError(
                             "ogr2ogr error when loading table {}".format(name)
-                        )
+                        ) from e
 
                     logging.info("  Import complete")
 

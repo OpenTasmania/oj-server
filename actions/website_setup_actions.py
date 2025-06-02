@@ -3,6 +3,7 @@
 """
 Handles deployment of the static test website page.
 """
+
 import logging
 import re  # For IP check
 from pathlib import Path  # For path handling
@@ -14,7 +15,6 @@ from setup import (
     config as static_config,  # For SCRIPT_VERSION if used in {script_version_short}
 )
 from setup.config_models import VM_IP_OR_DOMAIN_DEFAULT, AppSettings
-
 
 module_logger = logging.getLogger(__name__)
 

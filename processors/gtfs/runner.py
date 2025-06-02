@@ -3,6 +3,7 @@
 """
 Handles the execution of the GTFS ETL pipeline and subsequent data verification.
 """
+
 import logging
 import os
 from typing import Optional
@@ -14,9 +15,9 @@ module_logger = logging.getLogger(__name__)
 
 
 def run_gtfs_etl_pipeline_and_verify(
-        app_settings: AppSettings,  # Changed to accept AppSettings
-        # db_params for psql verification will be sourced from app_settings.pg
-        current_logger: Optional[logging.Logger] = None,
+    app_settings: AppSettings,  # Changed to accept AppSettings
+    # db_params for psql verification will be sourced from app_settings.pg
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

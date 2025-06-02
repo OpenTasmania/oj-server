@@ -4,6 +4,7 @@
 Functions for installing ALL core system prerequisites, including initial setup,
 package installations, Docker, and Node.js.
 """
+
 import getpass
 import logging
 from typing import Optional
@@ -15,6 +16,7 @@ from common.command_utils import (
     run_elevated_command,
 )
 from common.file_utils import backup_file
+
 # installer functions for Docker and Node.js already accept app_settings
 from installer.docker_installer import install_docker_engine
 from installer.nodejs_installer import install_nodejs_lts
@@ -31,7 +33,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def boot_verbosity(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Improves boot verbosity and adds user to systemd-journal group."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -124,7 +126,7 @@ def boot_verbosity(
 
 
 def core_conflict_removal(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Removes potentially conflicting system-installed Node.js packages."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -138,7 +140,7 @@ def core_conflict_removal(
     try:
         # check_package_installed now takes app_settings
         if check_package_installed(
-                "nodejs", app_settings=app_settings, current_logger=logger_to_use
+            "nodejs", app_settings=app_settings, current_logger=logger_to_use
         ):
             log_map_server(
                 f"{symbols.get('info', 'ℹ️')} System 'nodejs' package found. Attempting removal...",
@@ -181,7 +183,7 @@ def core_conflict_removal(
 
 
 def install_essential_utilities(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -234,7 +236,7 @@ def install_essential_utilities(
 
 
 def install_python_system_packages(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -277,7 +279,7 @@ def install_python_system_packages(
 
 
 def install_postgres_packages(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -323,7 +325,7 @@ def install_postgres_packages(
 
 
 def install_mapping_and_font_packages(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -382,7 +384,7 @@ def install_mapping_and_font_packages(
 
 
 def install_unattended_upgrades(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -423,7 +425,7 @@ def install_unattended_upgrades(
 
 # Orchestrator for all core prerequisite steps
 def core_prerequisites_group(
-        app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:
     """Runs ALL core prerequisite installation steps, passing app_cfg."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -487,14 +489,14 @@ def core_prerequisites_group(
     for tag, desc, step_func_ref in prereq_steps_with_desc:
         # execute_step now takes app_cfg as its 4th argument
         if not execute_step(
-                tag,
-                desc,
-                step_func_ref,
-                app_cfg,
-                logger_to_use,
-                lambda prompt, ac, cl_prompt: cli_prompt_for_rerun(
-                    prompt, app_settings=ac, current_logger_instance=cl_prompt
-                ),
+            tag,
+            desc,
+            step_func_ref,
+            app_cfg,
+            logger_to_use,
+            lambda prompt, ac, cl_prompt: cli_prompt_for_rerun(
+                prompt, app_settings=ac, current_logger_instance=cl_prompt
+            ),
         ):  # Updated cli_prompt_for_rerun signature
             overall_success = False
             log_map_server(

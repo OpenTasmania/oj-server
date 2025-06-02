@@ -14,6 +14,7 @@ from typing import Callable, Optional
 
 # log_map_server and state_manager functions now expect AppSettings
 from common.command_utils import log_map_server
+
 # Import AppSettings for type hinting
 from setup.config_models import AppSettings
 from setup.state_manager import is_step_completed, mark_step_completed
@@ -24,16 +25,16 @@ module_logger = logging.getLogger(__name__)
 
 
 def execute_step(
-        step_tag: str,
-        step_description: str,
-        # The step_function now expects AppSettings as its first argument
-        step_function: Callable[[AppSettings, Optional[logging.Logger]], None],
-        app_settings: AppSettings,  # Added app_settings parameter
-        current_logger_instance: Optional[logging.Logger],
-        # prompt_user_for_rerun also now takes app_settings
-        prompt_user_for_rerun: Callable[
-            [str, AppSettings, Optional[logging.Logger]], bool
-        ],
+    step_tag: str,
+    step_description: str,
+    # The step_function now expects AppSettings as its first argument
+    step_function: Callable[[AppSettings, Optional[logging.Logger]], None],
+    app_settings: AppSettings,  # Added app_settings parameter
+    current_logger_instance: Optional[logging.Logger],
+    # prompt_user_for_rerun also now takes app_settings
+    prompt_user_for_rerun: Callable[
+        [str, AppSettings, Optional[logging.Logger]], bool
+    ],
 ) -> bool:
     """
     Execute a single setup step.
@@ -65,7 +66,7 @@ def execute_step(
 
     # Pass app_settings to state_manager functions
     if is_step_completed(
-            step_tag, app_settings=app_settings, current_logger=logger_to_use
+        step_tag, app_settings=app_settings, current_logger=logger_to_use
     ):
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} Step '{step_description}' ({step_tag}) is already marked as completed.",

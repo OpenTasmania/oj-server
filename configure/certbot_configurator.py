@@ -3,6 +3,7 @@
 """
 Handles configuration of SSL certificates using Certbot with the Nginx plugin.
 """
+
 import logging
 import re
 import subprocess
@@ -20,7 +21,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def run_certbot_nginx(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Runs Certbot to obtain and install SSL certificate for the configured domain,
@@ -39,7 +40,7 @@ def run_certbot_nginx(
 
     domain_to_certify = app_settings.vm_ip_or_domain
     is_default_domain = (
-            domain_to_certify == VM_IP_OR_DOMAIN_DEFAULT
+        domain_to_certify == VM_IP_OR_DOMAIN_DEFAULT
     )  # Imported default
     is_ip_address = bool(
         re.fullmatch(
@@ -48,7 +49,7 @@ def run_certbot_nginx(
     )
     is_localhost = domain_to_certify.lower() == "localhost"
     is_fqdn_like = (
-            "." in domain_to_certify and not is_ip_address and not is_localhost
+        "." in domain_to_certify and not is_ip_address and not is_localhost
     )
 
     if is_default_domain or is_ip_address or is_localhost or not is_fqdn_like:

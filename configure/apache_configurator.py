@@ -3,6 +3,7 @@
 """
 Handles configuration of Apache webserver with mod_tile.
 """
+
 import logging
 import os
 from typing import Optional
@@ -13,9 +14,11 @@ from common.command_utils import (
     run_elevated_command,
 )
 from common.file_utils import backup_file
-from common.system_utils import systemd_reload,get_current_script_hash
+from common.system_utils import get_current_script_hash, systemd_reload
+
 # Import static_config for fixed paths or truly static values
 from setup import config as static_config
+
 # Import AppSettings for type hinting
 from setup.config_models import (  # For default comparison
     VM_IP_OR_DOMAIN_DEFAULT,
@@ -34,7 +37,7 @@ APACHE_TILES_SITE_CONF_AVAILABLE_PATH = (
 
 
 def configure_apache_ports(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Modifies Apache's listening port using app_settings.apache.listen_port."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -57,17 +60,17 @@ def configure_apache_ports(
                 capture_output=True,
                 current_logger=logger_to_use,
             )
-        except Exception:
+        except Exception as e:
             log_map_server(
                 f"{symbols.get('critical', '🔥')} Apache ports configuration file {PORTS_CONF_PATH} not found.",
                 "critical",
                 logger_to_use,
                 app_settings,
             )
-            raise FileNotFoundError(f"{PORTS_CONF_PATH} not found.")
+            raise FileNotFoundError(f"{PORTS_CONF_PATH} not found.") from e
 
     if backup_file(
-            PORTS_CONF_PATH, app_settings, current_logger=logger_to_use
+        PORTS_CONF_PATH, app_settings, current_logger=logger_to_use
     ):
         # Replace "Listen 80" with "Listen <target_listen_port>"
         # And "Listen [::]:80" with "Listen [::]:<target_listen_port>"
@@ -104,18 +107,18 @@ def configure_apache_ports(
 
 
 def create_mod_tile_config(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates /etc/apache2/conf-available/mod_tile.conf using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings,
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
     log_map_server(
@@ -167,18 +170,18 @@ def create_mod_tile_config(
 
 
 def create_apache_tile_site_config(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the Apache site configuration for serving tiles using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings,
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
     log_map_server(
@@ -192,7 +195,7 @@ def create_apache_tile_site_config(
     # VM_IP_OR_DOMAIN_DEFAULT imported from config_models for comparison
     server_name_val = app_settings.vm_ip_or_domain
     if (
-            server_name_val == VM_IP_OR_DOMAIN_DEFAULT
+        server_name_val == VM_IP_OR_DOMAIN_DEFAULT
     ):  # Compare with imported default
         server_name_val = (
             "tiles.localhost"  # Default if using placeholder domain
@@ -245,7 +248,7 @@ def create_apache_tile_site_config(
 
 
 def manage_apache_modules_and_sites(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Enables necessary Apache configurations, modules, and sites."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -277,9 +280,9 @@ def manage_apache_modules_and_sites(
     default_site_enabled_path = "/etc/apache2/sites-enabled/000-default.conf"
     # elevated_command_exists now takes app_settings
     if elevated_command_exists(
-            f"test -L {default_site_enabled_path}",
-            app_settings,
-            current_logger=logger_to_use,
+        f"test -L {default_site_enabled_path}",
+        app_settings,
+        current_logger=logger_to_use,
     ):
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} Disabling default Apache site (000-default)...",
@@ -308,7 +311,7 @@ def manage_apache_modules_and_sites(
 
 
 def activate_apache_service(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reloads systemd, restarts and enables the Apache service."""
     logger_to_use = current_logger if current_logger else module_logger

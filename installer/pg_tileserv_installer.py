@@ -4,6 +4,7 @@
 Handles setup of pg_tileserv: binary installation, system user creation,
 and systemd service file definition.
 """
+
 import logging
 import os
 import shutil
@@ -29,7 +30,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def download_and_install_pg_tileserv_binary(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Downloads and installs pg_tileserv binary if not found, using paths from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -49,7 +50,7 @@ def download_and_install_pg_tileserv_binary(
     )
 
     if not command_exists(
-            binary_install_path
+        binary_install_path
     ):  # Checks if file exists and is executable
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} pg_tileserv not found, downloading from {binary_url}...",
@@ -66,7 +67,7 @@ def download_and_install_pg_tileserv_binary(
             )
 
             with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".zip", prefix="pgtileserv_dl_"
+                delete=False, suffix=".zip", prefix="pgtileserv_dl_"
             ) as temp_file_obj:
                 temp_zip_path = temp_file_obj.name
 
@@ -148,7 +149,7 @@ def download_and_install_pg_tileserv_binary(
 
 
 def create_pg_tileserv_system_user(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the system user for running pg_tileserv service, from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -207,7 +208,7 @@ def create_pg_tileserv_system_user(
 
 
 def setup_pg_tileserv_binary_permissions(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Sets ownership and permissions for the pg_tileserv binary using paths from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -255,18 +256,18 @@ def setup_pg_tileserv_binary_permissions(
 
 
 def create_pg_tileserv_systemd_service_file(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the systemd service file for pg_tileserv using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings,
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
     pgts_settings = app_settings.pg_tileserv

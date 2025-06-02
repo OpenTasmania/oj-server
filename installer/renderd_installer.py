@@ -4,19 +4,21 @@
 Handles setup of Renderd: package checks, directory creation,
 and systemd service file definition.
 """
+
 import logging
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
 from common.command_utils import (
     check_package_installed,
     log_map_server,
     run_elevated_command,
 )
+from common.system_utils import get_current_script_hash
 from setup import (
     config as static_config,  # For SCRIPT_VERSION via get_current_script_hash indirectly
 )
 from setup.config_models import AppSettings  # For type hinting
-from common.system_utils import get_current_script_hash
 
 module_logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ RENDERD_CONF_FILE_SYSTEM_PATH = (
 
 
 def ensure_renderd_packages_installed(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Confirms Renderd and mapnik-utils packages are installed."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -52,7 +54,7 @@ def ensure_renderd_packages_installed(
     all_found = True
     for pkg in packages_to_check:
         if check_package_installed(
-                pkg, app_settings=app_settings, current_logger=logger_to_use
+            pkg, app_settings=app_settings, current_logger=logger_to_use
         ):
             log_map_server(
                 f"{symbols.get('success', '✅')} Package '{pkg}' is installed.",
@@ -82,7 +84,7 @@ def ensure_renderd_packages_installed(
 
 
 def create_renderd_directories(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates necessary directories for Renderd and sets permissions, using paths from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -130,18 +132,18 @@ def create_renderd_directories(
 
 
 def create_renderd_systemd_service_file(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the systemd service file for Renderd."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings,
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
     log_map_server(

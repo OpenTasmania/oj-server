@@ -7,7 +7,7 @@ from common.core_utils import DEFAULT_DB_PARAMS, module_logger
 
 
 def get_db_connection(
-        db_params: Optional[Dict[str, str]] = None,
+    db_params: Optional[Dict[str, str]] = None,
 ) -> Optional[psycopg.Connection]:
     """
     Establish and return a PostgreSQL database connection using Psycopg 3.
@@ -27,10 +27,10 @@ def get_db_connection(
         params_to_use.update(db_params)
 
     if (
-            params_to_use.get("password") == "yourStrongPasswordHere"
-            and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
-            and os.environ.get("PGPASSWORD")
-            == "yourStrongPasswordHere"  # Check PGPASSWORD too
+        params_to_use.get("password") == "yourStrongPasswordHere"
+        and os.environ.get("PG_OSM_PASSWORD") == "yourStrongPasswordHere"
+        and os.environ.get("PGPASSWORD")
+        == "yourStrongPasswordHere"  # Check PGPASSWORD too
     ):
         module_logger.critical(
             "CRITICAL: Default placeholder password is being used for database "
@@ -38,29 +38,43 @@ def get_db_connection(
             "or via PG_OSM_PASSWORD/PGPASSWORD environment variables."
         )
 
+    # These are standard connection string parameters
     conn_kwargs = {
         "dbname": params_to_use.get("dbname"),
         "user": params_to_use.get("user"),
         "password": params_to_use.get("password"),
         "host": params_to_use.get("host"),
-        "port": params_to_use.get("port"),
+        "port": params_to_use.get(
+            "port"
+        ),  # This is typically a string from env/defaults
     }
+    # Filter out any keys that have None values
     conn_kwargs_filtered = {
         k: v for k, v in conn_kwargs.items() if v is not None
     }
 
+    # Construct a DSN connection string
+    # e.g., "dbname=gis user=osmuser host=localhost port=5432 password=xxx"
+    # Values in conn_kwargs_filtered are already strings.
+    dsn_parts = [
+        f"{key}={value}" for key, value in conn_kwargs_filtered.items()
+    ]
+    conninfo_str = " ".join(dsn_parts)
+
     try:
         module_logger.debug(
-            f"Attempting to connect to database using Psycopg 3: "
-            f"dbname='{conn_kwargs_filtered.get('dbname')}', "
-            f"user='{conn_kwargs_filtered.get('user')}', "
-            f"host='{conn_kwargs_filtered.get('host')}', "
-            f"port='{conn_kwargs_filtered.get('port')}'"
+            f"Attempting to connect to database using Psycopg 3 with DSN: '{conninfo_str}'"
         )
-        conn = psycopg.connect(**conn_kwargs_filtered)
+        # Pass the DSN string to psycopg.connect
+        conn = psycopg.connect(conninfo_str)
+        # Extract actual dbname, host, port for logging if possible, from the connection object itself
+        # or from conn_kwargs_filtered as before, as conninfo_str might hide password for logs.
+        log_db_details = {
+            k: v for k, v in conn_kwargs_filtered.items() if k != "password"
+        }
         module_logger.info(
-            f"Connected to database {conn_kwargs_filtered.get('dbname')} on "
-            f"{conn_kwargs_filtered.get('host')}:{conn_kwargs_filtered.get('port')} using Psycopg 3."
+            f"Connected to database {log_db_details.get('dbname', 'N/A')} on "
+            f"{log_db_details.get('host', 'N/A')}:{log_db_details.get('port', 'N/A')} using Psycopg 3."
         )
         return conn
     except psycopg.OperationalError as e:  # More specific Psycopg 3 error

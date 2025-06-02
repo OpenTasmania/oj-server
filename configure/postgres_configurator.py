@@ -4,6 +4,7 @@
 Handles configuration of PostgreSQL, including users, databases, extensions,
 permissions, and server configuration files.
 """
+
 import logging
 import os
 import subprocess
@@ -16,20 +17,24 @@ from common.command_utils import (
 )
 from common.file_utils import backup_file
 from common.network_utils import validate_cidr
-from setup import config as static_config # For OSM_PROJECT_ROOT (via get_current_script_hash)
+from common.system_utils import (
+    get_current_script_hash,  # For template versioning
+)
+from setup import (
+    config as static_config,  # For OSM_PROJECT_ROOT (via get_current_script_hash)
+)
 from setup.config_models import AppSettings
-from common.system_utils import get_current_script_hash # For template versioning
 
 module_logger = logging.getLogger(__name__)
 
-PG_VERSION_DEFAULT = "17" # This could also come from AppSettings if it needs to be more dynamic than pg.version
+PG_VERSION_DEFAULT = "17"  # This could also come from AppSettings if it needs to be more dynamic than pg.version
 PG_CONF_DIR_TEMPLATE = "/etc/postgresql/{version}/main"
 PG_CONF_FILE_TEMPLATE = os.path.join(PG_CONF_DIR_TEMPLATE, "postgresql.conf")
 PG_HBA_FILE_TEMPLATE = os.path.join(PG_CONF_DIR_TEMPLATE, "pg_hba.conf")
 
 
 def _get_pg_config_path_params(
-        app_settings: AppSettings,
+    app_settings: AppSettings,
 ) -> tuple[str, str, str, str]:
     pg_version = getattr(app_settings.pg, "version", PG_VERSION_DEFAULT)
     pg_conf_dir = PG_CONF_DIR_TEMPLATE.format(version=pg_version)
@@ -39,20 +44,22 @@ def _get_pg_config_path_params(
 
 
 def _check_pg_config_dir_exists(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     pg_version, pg_conf_dir, _, _ = _get_pg_config_path_params(app_settings)
     symbols = app_settings.symbols
     # Check with os.path.isdir first, as it doesn't require sudo for a read-only check
-    if not os.path.isdir(pg_conf_dir): # This check might fail if current user can't see /etc/postgresql
+    if not os.path.isdir(
+        pg_conf_dir
+    ):  # This check might fail if current user can't see /etc/postgresql
         try:
             # Use run_elevated_command to test directory existence if direct check fails
             run_elevated_command(
                 ["test", "-d", pg_conf_dir],
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
                 check=True,
-                capture_output=True, # Suppress output unless error
+                capture_output=True,  # Suppress output unless error
                 current_logger=logger_to_use,
             )
         except subprocess.CalledProcessError as e:
@@ -61,7 +68,7 @@ def _check_pg_config_dir_exists(
                 f"Is PostgreSQL v{pg_version} installed correctly?",
                 "error",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             raise FileNotFoundError(
                 f"PostgreSQL config directory {pg_conf_dir} not found."
@@ -69,11 +76,13 @@ def _check_pg_config_dir_exists(
 
 
 def create_postgres_user_and_db(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the PostgreSQL user and database if they don't exist."""
     logger_to_use = current_logger if current_logger else module_logger
-    _check_pg_config_dir_exists(app_settings, logger_to_use) # This already passes app_settings
+    _check_pg_config_dir_exists(
+        app_settings, logger_to_use
+    )  # This already passes app_settings
 
     pg_user = app_settings.pg.user
     pg_password = app_settings.pg.password
@@ -86,7 +95,7 @@ def create_postgres_user_and_db(
             f"{symbols.get('gear', '')} Creating PostgreSQL user '{pg_user}'...",
             "info",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         run_command(
             [
@@ -97,7 +106,7 @@ def create_postgres_user_and_db(
                 "-c",
                 f"CREATE USER {pg_user} WITH PASSWORD '{pg_password}';",
             ],
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
             capture_output=True,
             current_logger=logger_to_use,
         )
@@ -105,7 +114,7 @@ def create_postgres_user_and_db(
             f"{symbols.get('success', '')} PostgreSQL user '{pg_user}' created.",
             "success",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
     except subprocess.CalledProcessError as e:
         if e.stderr and "already exists" in e.stderr.lower():
@@ -113,7 +122,7 @@ def create_postgres_user_and_db(
                 f"{symbols.get('info', '')} PostgreSQL user '{pg_user}' already exists. Attempting to update password.",
                 "info",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             run_command(
                 [
@@ -124,7 +133,7 @@ def create_postgres_user_and_db(
                     "-c",
                     f"ALTER USER {pg_user} WITH PASSWORD '{pg_password}';",
                 ],
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
                 capture_output=True,
                 current_logger=logger_to_use,
             )
@@ -132,7 +141,7 @@ def create_postgres_user_and_db(
                 f"{symbols.get('success', '')} Password for PostgreSQL user '{pg_user}' updated.",
                 "success",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
         else:
             err_msg = (
@@ -144,7 +153,7 @@ def create_postgres_user_and_db(
                 f"{symbols.get('error', '')} Failed to create/alter PostgreSQL user '{pg_user}'. Error: {err_msg}",
                 "error",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             raise
 
@@ -154,7 +163,7 @@ def create_postgres_user_and_db(
             f"{symbols.get('gear', '')} Creating PostgreSQL database '{pg_database}'...",
             "info",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         run_command(
             [
@@ -165,7 +174,7 @@ def create_postgres_user_and_db(
                 "-c",
                 f"CREATE DATABASE {pg_database} WITH OWNER {pg_user} ENCODING 'UTF8' LC_COLLATE='en_AU.UTF-8' LC_CTYPE='en_AU.UTF-8' TEMPLATE template0;",
             ],
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
             capture_output=True,
             current_logger=logger_to_use,
         )
@@ -173,7 +182,7 @@ def create_postgres_user_and_db(
             f"{symbols.get('success', '')} PostgreSQL database '{pg_database}' created.",
             "success",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
     except subprocess.CalledProcessError as e:
         if e.stderr and "already exists" in e.stderr.lower():
@@ -181,7 +190,7 @@ def create_postgres_user_and_db(
                 f"{symbols.get('info', '')} PostgreSQL database '{pg_database}' already exists.",
                 "info",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
         else:
             err_msg = (
@@ -193,13 +202,13 @@ def create_postgres_user_and_db(
                 f"{symbols.get('error', '')} Failed to create PostgreSQL database '{pg_database}'. Error: {err_msg}",
                 "error",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             raise
 
 
 def enable_postgres_extensions(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Ensures necessary PostgreSQL extensions (PostGIS, Hstore) are enabled."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -214,7 +223,7 @@ def enable_postgres_extensions(
             f"{symbols.get('gear', '')} Ensuring PostgreSQL extension '{ext}' is available in database '{pg_database}'...",
             "info",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         try:
             run_command(
@@ -228,14 +237,14 @@ def enable_postgres_extensions(
                     "-c",
                     f"CREATE EXTENSION IF NOT EXISTS {ext};",
                 ],
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
                 current_logger=logger_to_use,
             )
             log_map_server(
                 f"{symbols.get('success', '')} PostgreSQL extension '{ext}' ensured.",
                 "success",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
         except subprocess.CalledProcessError as e:
             err_msg = (
@@ -247,13 +256,13 @@ def enable_postgres_extensions(
                 f"{symbols.get('error', '')} Failed to enable PostgreSQL extension '{ext}'. Error: {err_msg}",
                 "error",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             raise
 
 
 def set_postgres_permissions(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Sets database permissions for the application user."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -267,7 +276,7 @@ def set_postgres_permissions(
         f"{symbols.get('gear', '')} Setting database permissions for user '{pg_user}' on database '{pg_database}'...",
         "info",
         logger_to_use,
-        app_settings, # Pass app_settings
+        app_settings,  # Pass app_settings
     )
     db_permission_commands = [
         f"ALTER SCHEMA public OWNER TO {pg_user};",
@@ -289,14 +298,14 @@ def set_postgres_permissions(
                     "-c",
                     cmd_sql,
                 ],
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
                 current_logger=logger_to_use,
             )
         log_map_server(
             f"{symbols.get('success', '')} Database permissions set for user '{pg_user}'.",
             "success",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
     except subprocess.CalledProcessError as e:
         err_msg = (
@@ -308,13 +317,13 @@ def set_postgres_permissions(
             f"{symbols.get('error', '')} Failed to set PostgreSQL permissions. Error: {err_msg}",
             "error",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         raise
 
 
 def customize_postgresql_conf(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     _check_pg_config_dir_exists(app_settings, logger_to_use)
@@ -322,24 +331,28 @@ def customize_postgresql_conf(
     _, _, pg_conf_file, _ = _get_pg_config_path_params(app_settings)
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings, # get_current_script_hash expects app_settings
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,  # get_current_script_hash expects app_settings
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
-    conf_additions_template = app_settings.pg.postgresql_conf_additions_template
+    conf_additions_template = (
+        app_settings.pg.postgresql_conf_additions_template
+    )
 
-    if backup_file(pg_conf_file, app_settings, current_logger=logger_to_use): # Pass app_settings
+    if backup_file(
+        pg_conf_file, app_settings, current_logger=logger_to_use
+    ):  # Pass app_settings
         customisation_marker = (
             "# --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V"
         )
 
         grep_result = run_elevated_command(
             ["grep", "-qF", customisation_marker, pg_conf_file],
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
             check=False,
             capture_output=True,
             current_logger=logger_to_use,
@@ -352,7 +365,7 @@ def customize_postgresql_conf(
                 )
                 run_elevated_command(
                     ["tee", "-a", pg_conf_file],
-                    app_settings, # Pass app_settings
+                    app_settings,  # Pass app_settings
                     cmd_input=content_to_append_final,
                     current_logger=logger_to_use,
                 )
@@ -360,14 +373,14 @@ def customize_postgresql_conf(
                     f"{symbols.get('success', '')} Appended custom settings to {pg_conf_file} from configuration template.",
                     "success",
                     logger_to_use,
-                    app_settings, # Pass app_settings
+                    app_settings,  # Pass app_settings
                 )
             except KeyError as e_key:
                 log_map_server(
                     f"{symbols.get('error', '')} Missing placeholder key '{e_key}' for postgresql.conf template. Check config.yaml and config_models.py.",
                     "error",
                     logger_to_use,
-                    app_settings, # Pass app_settings
+                    app_settings,  # Pass app_settings
                 )
                 raise
             except Exception as e:
@@ -375,7 +388,7 @@ def customize_postgresql_conf(
                     f"{symbols.get('error', '')} Error updating {pg_conf_file}: {e}",
                     "error",
                     logger_to_use,
-                    app_settings, # Pass app_settings
+                    app_settings,  # Pass app_settings
                 )
                 raise
         else:
@@ -383,12 +396,12 @@ def customize_postgresql_conf(
                 f"{symbols.get('info', '')} Customizations marker already found in {pg_conf_file}. Assuming settings are applied or managed manually.",
                 "info",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
 
 
 def customize_pg_hba_conf(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     _check_pg_config_dir_exists(app_settings, logger_to_use)
@@ -396,12 +409,12 @@ def customize_pg_hba_conf(
     _, _, _, pg_hba_file = _get_pg_config_path_params(app_settings)
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings, # get_current_script_hash expects app_settings
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,  # get_current_script_hash expects app_settings
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
     hba_template = app_settings.pg.hba_template
@@ -412,23 +425,29 @@ def customize_pg_hba_conf(
         "admin_group_ip": app_settings.admin_group_ip,
     }
 
-    if not validate_cidr(app_settings.admin_group_ip, app_settings, current_logger=logger_to_use): # Pass app_settings
+    if not validate_cidr(
+        app_settings.admin_group_ip,
+        app_settings,
+        current_logger=logger_to_use,
+    ):  # Pass app_settings
         log_map_server(
             f"{symbols.get('error', '')} Invalid ADMIN_GROUP_IP '{app_settings.admin_group_ip}' for pg_hba.conf. Skipping HBA update.",
             "error",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         raise ValueError(
             f"Invalid ADMIN_GROUP_IP '{app_settings.admin_group_ip}' for pg_hba.conf."
         )
 
-    if backup_file(pg_hba_file, app_settings, current_logger=logger_to_use): # Pass app_settings
+    if backup_file(
+        pg_hba_file, app_settings, current_logger=logger_to_use
+    ):  # Pass app_settings
         try:
             hba_content_final = hba_template.format(**format_vars)
             run_elevated_command(
                 ["tee", pg_hba_file],
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
                 cmd_input=hba_content_final,
                 current_logger=logger_to_use,
             )
@@ -436,14 +455,14 @@ def customize_pg_hba_conf(
                 f"{symbols.get('success', '')} Wrote pg_hba.conf using template from configuration.",
                 "success",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
         except KeyError as e_key:
             log_map_server(
                 f"{symbols.get('error', '')} Missing placeholder key '{e_key}' for HBA template. Check config.yaml and config_models.py.",
                 "error",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             raise
         except Exception as e:
@@ -451,13 +470,13 @@ def customize_pg_hba_conf(
                 f"{symbols.get('error', '')} Error writing {pg_hba_file}: {e}",
                 "error",
                 logger_to_use,
-                app_settings, # Pass app_settings
+                app_settings,  # Pass app_settings
             )
             raise
 
 
 def restart_and_enable_postgres_service(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -465,42 +484,43 @@ def restart_and_enable_postgres_service(
         f"{symbols.get('gear', '')} Restarting and enabling PostgreSQL service...",
         "info",
         logger_to_use,
-        app_settings, # Pass app_settings
+        app_settings,  # Pass app_settings
     )
     try:
         run_elevated_command(
             ["systemctl", "restart", "postgresql"],
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
             current_logger=logger_to_use,
         )
         run_elevated_command(
             ["systemctl", "enable", "postgresql"],
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
             current_logger=logger_to_use,
         )
         log_map_server(
             f"{symbols.get('info', '')} PostgreSQL service status:",
             "info",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         run_elevated_command(
             ["systemctl", "status", "postgresql", "--no-pager", "-l"],
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
             current_logger=logger_to_use,
-            check=False # Status can return non-zero, don't fail the script here
+            check=False,  # Status can return non-zero, don't fail the script here
         )
         log_map_server(
             f"{symbols.get('success', '')} PostgreSQL service restarted and enabled.",
             "success",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
     except subprocess.CalledProcessError as e:
         log_map_server(
-            f"{symbols.get('error', '')} Failed to restart/enable PostgreSQL service. Error: {e.stderr or e.stdout}", # Ensure stderr/stdout are checked
+            f"{symbols.get('error', '')} Failed to restart/enable PostgreSQL service. Error: {e.stderr or e.stdout}",
+            # Ensure stderr/stdout are checked
             "error",
             logger_to_use,
-            app_settings, # Pass app_settings
+            app_settings,  # Pass app_settings
         )
         raise

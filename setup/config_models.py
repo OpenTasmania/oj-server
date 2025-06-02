@@ -479,7 +479,6 @@ class NginxSettings(BaseSettings):
     )
 
 
-
 class OsrmServiceSettings(
     BaseSettings
 ):  # Renamed from OsrmSettings to avoid conflict

@@ -15,7 +15,11 @@ from typing import List, Optional
 
 # Import static_config for OSM_PROJECT_ROOT, as it's a fixed project path
 # Import AppSettings for type hinting
-from setup.config_models import AppSettings
+from setup.config_models import (
+    SYMBOLS_DEFAULT,
+    AppSettings,
+)  # Added SYMBOLS_DEFAULT
+
 # Import command utilities that now also expect app_settings
 from .command_utils import log_map_server, run_command, run_elevated_command
 
@@ -27,9 +31,9 @@ CACHED_SCRIPT_HASH: Optional[str] = None
 
 
 def calculate_project_hash(
-        project_root_dir: Path,
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None,
+    project_root_dir: Path,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """
     Calculate a SHA256 hash of all .py files within the project directory.
@@ -93,7 +97,7 @@ def calculate_project_hash(
                 file_content = file_path.read_bytes()
                 hasher.update(file_content)
             except (
-                    Exception
+                Exception
             ) as e_file:  # Handle errors reading individual files
                 log_map_server(
                     f"{symbols.get('error', '❌')} Error reading file {file_path} for hashing: {e_file}",
@@ -112,7 +116,7 @@ def calculate_project_hash(
         )
         return final_hash
     except (
-            Exception
+        Exception
     ) as e_hash:  # Catch-all for other errors during hashing process
         log_map_server(
             f"{symbols.get('error', '❌')} Critical error during project hashing: {e_hash}",
@@ -125,9 +129,9 @@ def calculate_project_hash(
 
 
 def get_current_script_hash(
-        project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
-        app_settings: AppSettings,
-        logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
+    project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
+    app_settings: AppSettings,
+    logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
 ) -> Optional[str]:
     """
     Get the current script hash, calculating it if not already cached.
@@ -145,7 +149,7 @@ def get_current_script_hash(
 
 
 def systemd_reload(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
     Reload the systemd daemon.
@@ -183,24 +187,34 @@ def systemd_reload(
 
 
 def get_debian_codename(
-        app_settings: Optional[AppSettings], current_logger: Optional[logging.Logger] = None
+    app_settings: Optional[AppSettings],
+    current_logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """
     Get the Debian codename (e.g., 'bookworm', 'bullseye').
     Uses app_settings for logging symbols.
     """
     logger_to_use = current_logger if current_logger else module_logger
-    symbols = app_settings.symbols
+    # Use default symbols if app_settings or app_settings.symbols is None
+    symbols = (
+        app_settings.symbols
+        if app_settings and app_settings.symbols
+        else SYMBOLS_DEFAULT
+    )
     try:
         # run_command now takes app_settings
-        result = run_command(
+        result: subprocess.CompletedProcess = run_command(
             ["lsb_release", "-cs"],
-            app_settings,
+            app_settings,  # Can be None, run_command should handle this
             capture_output=True,
             check=True,
             current_logger=logger_to_use,
         )
-        return result.stdout.strip()
+        # result.stdout is Optional[str] when text=True (default in run_command)
+        stdout_val: Optional[str] = result.stdout
+        if stdout_val is not None:
+            return stdout_val.strip()
+        return None  # Should not be reached if check=True and command succeeds with output
     except FileNotFoundError:  # lsb_release not found
         log_map_server(
             f"{symbols.get('warning', '!')} lsb_release command not found. Cannot determine Debian codename.",
@@ -210,7 +224,10 @@ def get_debian_codename(
         )
         return None
     except subprocess.CalledProcessError:  # Command failed
-        # Error is already logged by run_command if check=True
+        # Error is already logged by run_command if check=True and it raises
+        # If check=False, or if run_command itself handles and logs, then this might be redundant or not hit.
+        # Assuming run_command with check=True re-raises CalledProcessError
+        # and its logging within run_command is sufficient.
         return None
     except Exception as e:  # Other errors
         log_map_server(

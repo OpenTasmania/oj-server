@@ -77,7 +77,7 @@ def create_point_wkt(lon: Any, lat: Any, srid: int = 4326) -> Optional[str]:
 
 
 def transform_dataframe(
-        df: pd.DataFrame, file_schema_info: Dict[str, Any]
+    df: pd.DataFrame, file_schema_info: Dict[str, Any]
 ) -> pd.DataFrame:
     """
     Transform a DataFrame to align with a database schema definition.
@@ -109,8 +109,8 @@ def transform_dataframe(
             "geom_config", {}
         ).get("geom_col")
         if (
-                geom_col_name_from_config
-                and geom_col_name_from_config not in expected_cols
+            geom_col_name_from_config
+            and geom_col_name_from_config not in expected_cols
         ):
             expected_cols.append(geom_col_name_from_config)
         return pd.DataFrame(columns=expected_cols)
@@ -131,7 +131,7 @@ def transform_dataframe(
 
     geom_config = file_schema_info.get("geom_config")
     # noinspection PyUnusedLocal
-    db_geom_col_name: Optional[str] = None # pylint: disable=unused-variable
+    db_geom_col_name: Optional[str] = None  # pylint: disable=unused-variable
 
     if geom_config:
         db_geom_col_name = geom_config.get("geom_col")
@@ -142,7 +142,7 @@ def transform_dataframe(
             srid = geom_config.get("srid", 4326)
 
             if (
-                    "geometry" in transformed_df.columns
+                "geometry" in transformed_df.columns
             ):  # Source column from gtfs-kit often named 'geometry'
                 module_logger.debug(
                     f"Converting 'geometry' (Shapely objects) to WKT for target column '{db_geom_col_name}' in {table_name_for_log}"
@@ -157,20 +157,20 @@ def transform_dataframe(
                     )
                 )
             elif (
-                    db_geom_col_name in transformed_df.columns
-                    and transformed_df[db_geom_col_name].dtype == "object"
+                db_geom_col_name in transformed_df.columns
+                and transformed_df[db_geom_col_name].dtype == "object"
             ):
                 module_logger.debug(
                     f"Target geometry column '{db_geom_col_name}' already exists in DataFrame for {table_name_for_log}, assuming it's WKT."
                 )
             elif geom_config.get("lat_col") and geom_config.get(
-                    "lon_col"
+                "lon_col"
             ):  # Fallback if no pre-computed geometry
                 lat_col = geom_config["lat_col"]
                 lon_col = geom_config["lon_col"]
                 if (
-                        lat_col in transformed_df.columns
-                        and lon_col in transformed_df.columns
+                    lat_col in transformed_df.columns
+                    and lon_col in transformed_df.columns
                 ):
                     module_logger.info(
                         f"Creating WKT for '{db_geom_col_name}' from source columns '{lat_col}' and '{lon_col}' in {table_name_for_log}."
@@ -187,7 +187,7 @@ def transform_dataframe(
                     )
                     transformed_df[db_geom_col_name] = None
             elif (
-                    db_geom_col_name not in transformed_df.columns
+                db_geom_col_name not in transformed_df.columns
             ):  # If no geometry source, ensure column exists
                 module_logger.debug(
                     f"No source identified for geometry column '{db_geom_col_name}' in {table_name_for_log}. Column will be added with None values."

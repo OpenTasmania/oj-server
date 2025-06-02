@@ -20,7 +20,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def download_gtfs_feed(
-        feed_url: str, download_to_path: Union[str, Path]
+    feed_url: str, download_to_path: Union[str, Path]
 ) -> bool:
     """
     Download a GTFS feed from a given URL to a specified path.
@@ -74,7 +74,7 @@ def download_gtfs_feed(
 
 
 def extract_gtfs_feed(
-        zip_file_path: Union[str, Path], extract_to_dir: Union[str, Path]
+    zip_file_path: Union[str, Path], extract_to_dir: Union[str, Path]
 ) -> bool:
     """
     Extract a GTFS zip file to a specified directory.

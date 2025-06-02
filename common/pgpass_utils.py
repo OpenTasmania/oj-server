@@ -10,14 +10,15 @@ import os
 from typing import List, Optional
 
 from setup.config_models import PGPASSWORD_DEFAULT, AppSettings
+
 from .command_utils import log_map_server
 
 module_logger = logging.getLogger(__name__)
 
 
 def setup_pgpass(
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -37,9 +38,9 @@ def setup_pgpass(
     if pg_password and pg_password != PGPASSWORD_DEFAULT:
         can_create_pgpass = True
     elif (
-            pg_password
-            and pg_password == PGPASSWORD_DEFAULT
-            and allow_default_for_dev
+        pg_password
+        and pg_password == PGPASSWORD_DEFAULT
+        and allow_default_for_dev
     ):
         log_map_server(
             f"{symbols.get('warning', '!')} DEV OVERRIDE: Proceeding with .pgpass creation using the default (unsafe) password.",
@@ -58,7 +59,7 @@ def setup_pgpass(
             app_settings,
         )
         if (
-                pg_password == PGPASSWORD_DEFAULT and not allow_default_for_dev
+            pg_password == PGPASSWORD_DEFAULT and not allow_default_for_dev
         ):  # Check against imported default
             log_map_server(
                 "   Specify a unique password (CLI -W, config.yaml, or PG_PASSWORD ENV) or use --dev-override-unsafe-password.",
@@ -105,7 +106,7 @@ def setup_pgpass(
                         line.strip() for line in f_read if line.strip()
                     ]
             except (
-                    Exception
+                Exception
             ) as e_read:  # Catch more general errors during read
                 log_map_server(
                     f"{symbols.get('warning', '!')} Could not read existing .pgpass file at {pgpass_file_path}: {e_read}",

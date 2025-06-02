@@ -13,10 +13,12 @@ from typing import List, Optional
 
 # common.command_utils.log_map_server now takes app_settings
 from common.command_utils import log_map_server, run_elevated_command
+
 # get_current_script_hash is now imported from common.system_utils
 from common.system_utils import (
     get_current_script_hash as common_get_current_script_hash,
 )
+
 # Import static_config for STATE_FILE_PATH, SCRIPT_VERSION, OSM_PROJECT_ROOT
 from setup import config as static_config
 from setup.config_models import AppSettings  # For type hinting
@@ -29,8 +31,8 @@ module_logger = logging.getLogger(__name__)
 
 
 def initialize_state_system(
-        app_settings: AppSettings,  # Added app_settings
-        current_logger: Optional[logging.Logger] = None,
+    app_settings: AppSettings,  # Added app_settings
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
     Initialize the state management system.
@@ -107,11 +109,11 @@ def initialize_state_system(
         temp_file_path = ""
         try:
             with tempfile.NamedTemporaryFile(
-                    mode="w",
-                    delete=False,
-                    prefix="mapstate_init_",
-                    suffix=".txt",
-                    encoding="utf-8",
+                mode="w",
+                delete=False,
+                prefix="mapstate_init_",
+                suffix=".txt",
+                encoding="utf-8",
             ) as temp_f:
                 temp_f.write(state_file_header)
                 temp_f.write(human_readable_version_line)
@@ -188,9 +190,9 @@ def initialize_state_system(
 
 
 def clear_state_file(
-        app_settings: AppSettings,  # Added app_settings
-        script_hash_to_write: Optional[str] = None,
-        current_logger: Optional[logging.Logger] = None,
+    app_settings: AppSettings,  # Added app_settings
+    script_hash_to_write: Optional[str] = None,
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -204,12 +206,12 @@ def clear_state_file(
     effective_hash = script_hash_to_write
     if effective_hash is None:
         effective_hash = (
-                common_get_current_script_hash(
-                    project_root_dir=static_config.OSM_PROJECT_ROOT,
-                    app_settings=app_settings,
-                    logger_instance=logger_to_use,
-                )
-                or "UNKNOWN_HASH_AT_CLEAR"
+            common_get_current_script_hash(
+                project_root_dir=static_config.OSM_PROJECT_ROOT,
+                app_settings=app_settings,
+                logger_instance=logger_to_use,
+            )
+            or "UNKNOWN_HASH_AT_CLEAR"
         )
 
     content_to_write = f"# SCRIPT_HASH: {effective_hash}\n"
@@ -221,11 +223,11 @@ def clear_state_file(
     temp_file_path = ""
     try:
         with tempfile.NamedTemporaryFile(
-                mode="w",
-                delete=False,
-                prefix="mapstate_clear_",
-                suffix=".txt",
-                encoding="utf-8",
+            mode="w",
+            delete=False,
+            prefix="mapstate_clear_",
+            suffix=".txt",
+            encoding="utf-8",
         ) as temp_f:
             temp_f.write(content_to_write)
             temp_file_path = temp_f.name
@@ -253,9 +255,9 @@ def clear_state_file(
 
 
 def mark_step_completed(
-        step_tag: str,
-        app_settings: AppSettings,  # Added app_settings
-        current_logger: Optional[logging.Logger] = None,
+    step_tag: str,
+    app_settings: AppSettings,  # Added app_settings
+    current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -298,9 +300,9 @@ def mark_step_completed(
 
 
 def is_step_completed(
-        step_tag: str,
-        app_settings: AppSettings,  # Added app_settings
-        current_logger: Optional[logging.Logger] = None,
+    step_tag: str,
+    app_settings: AppSettings,  # Added app_settings
+    current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -324,8 +326,8 @@ def is_step_completed(
 
 
 def view_completed_steps(
-        app_settings: AppSettings,  # Added app_settings
-        current_logger: Optional[logging.Logger] = None,
+    app_settings: AppSettings,  # Added app_settings
+    current_logger: Optional[logging.Logger] = None,
 ) -> List[str]:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

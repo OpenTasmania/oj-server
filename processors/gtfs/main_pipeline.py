@@ -11,31 +11,35 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import gtfs_kit
+import gtfs_kit  # type: ignore[import-untyped]
 import pandas as pd
 import psycopg
 
 from common.core_utils import setup_logging as common_setup_logging
 from common.db_utils import get_db_connection
-from common.file_utils import cleanup_directory # Updated cleanup_directory is used here
+from common.file_utils import (
+    cleanup_directory,  # Updated cleanup_directory is used here
+)
 from processors.gtfs import download, load, transform
 from processors.gtfs import schema_definitions as schemas
+
 from .db_setup import (
     add_foreign_keys_from_schema,
     create_tables_from_schema,
 )
 from .pipeline_definitions import GTFS_LOAD_ORDER
 
-module_logger = logging.getLogger(__name__) # Used for cleanup_directory call
+module_logger = logging.getLogger(__name__)
 
-try:
-    from setup.config import GTFS_FEED_URL as CONFIG_GTFS_FEED_URL
-except ImportError:
-    CONFIG_GTFS_FEED_URL = "https://example.com/default_gtfs_feed.zip"
+# Default GTFS feed URL if not provided by environment variable
+# The attempt to import from setup.config has been removed as GTFS_FEED_URL is a runtime configuration.
+DEFAULT_GTFS_FEED_URL_CONFIG = "https://example.com/default_gtfs_feed.zip"
 
-GTFS_FEED_URL_MODULE_LEVEL_VAR = os.environ.get(
-    "GTFS_FEED_URL", CONFIG_GTFS_FEED_URL
-)
+# This module-level variable is primarily for understanding the source if needed,
+# but the run_full_gtfs_etl_pipeline function will fetch the current value from ENV.
+# GTFS_FEED_URL_MODULE_LEVEL_VAR = os.environ.get( # This variable is not strictly necessary anymore
+#     "GTFS_FEED_URL", DEFAULT_GTFS_FEED_URL_CONFIG
+# )
 
 DB_PARAMS: dict[str, str] = {
     "dbname": os.environ.get("PG_GIS_DB", "gis"),
@@ -54,13 +58,18 @@ TEMP_DOWNLOAD_PATH = TEMP_DOWNLOAD_DIR / TEMP_ZIP_FILENAME
 TEMP_EXTRACT_PATH = TEMP_DOWNLOAD_DIR / TEMP_EXTRACT_DIR_NAME
 
 
-def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSettings
+def run_full_gtfs_etl_pipeline() -> (
+    bool
+):  # This function does not take AppSettings
     start_time = datetime.now()
     module_logger.info(
         f"===== GTFS ETL Pipeline (gtfs-kit) Started at {start_time.isoformat()} ====="
     )
+    # Get the GTFS_FEED_URL from environment variable, with a fallback to the default.
+    # This environment variable is expected to be set by the calling script (e.g., runner.py)
+    # which gets the value from AppSettings.
     current_gtfs_feed_url = os.environ.get(
-        "GTFS_FEED_URL", CONFIG_GTFS_FEED_URL
+        "GTFS_FEED_URL", DEFAULT_GTFS_FEED_URL_CONFIG
     )
     module_logger.info(f"Using GTFS_FEED_URL: {current_gtfs_feed_url}")
 
@@ -79,14 +88,14 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
             "--- Step 1: Downloading and Extracting GTFS Feed ---"
         )
         if not download.download_gtfs_feed(
-                current_gtfs_feed_url, TEMP_DOWNLOAD_PATH
+            current_gtfs_feed_url, TEMP_DOWNLOAD_PATH
         ):
             module_logger.critical(
                 "Failed to download GTFS feed. Pipeline aborted."
             )
             return False
         if not download.extract_gtfs_feed(
-                TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH
+            TEMP_DOWNLOAD_PATH, TEMP_EXTRACT_PATH
         ):
             module_logger.critical(
                 "Failed to extract GTFS feed. Pipeline aborted."
@@ -95,9 +104,11 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
         module_logger.info("GTFS feed downloaded and extracted successfully.")
 
         module_logger.info("--- Step 2: Reading Feed with gtfs-kit ---")
-        feed: gtfs_kit.Feed = gtfs_kit.read_feed(str(TEMP_EXTRACT_PATH), dist_units="km") # type: ignore[assignment]
+        feed: gtfs_kit.Feed = gtfs_kit.read_feed(
+            str(TEMP_EXTRACT_PATH), dist_units="km"
+        )  # type: ignore[assignment]
         module_logger.info(
-            f"Feed loaded. Detected tables: {list(feed.list_fields().keys())}" # type: ignore[attr-defined]
+            f"Feed loaded. Detected tables: {list(feed.list_fields().keys())}"  # type: ignore[attr-defined]
         )
         module_logger.warning(
             "--- Feed Validation Responsibility --- This pipeline assumes input GTFS data has been validated. Proceeding."
@@ -134,15 +145,15 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
 
                 if df_original is None or df_original.empty:
                     if (
-                            table_base_name == "shapes"
-                            and gtfs_filename_key == "shapes.txt"
+                        table_base_name == "shapes"
+                        and gtfs_filename_key == "shapes.txt"
                     ):
                         module_logger.info(
                             "Table 'shapes' (points data from shapes.txt) not found or empty. If lines are derived, this might be fine."
                         )
                     elif (
-                            table_base_name == "gtfs_shapes_lines"
-                            and gtfs_filename_key == "gtfs_shapes_lines.txt"
+                        table_base_name == "gtfs_shapes_lines"
+                        and gtfs_filename_key == "gtfs_shapes_lines.txt"
                     ):
                         module_logger.info(
                             "Conceptual table 'gtfs_shapes_lines' - actual data processing happens under 'shapes.txt' key."
@@ -183,8 +194,8 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
 
                 df_transformed: pd.DataFrame
                 if table_base_name == "stops":
-                    if feed.stops is not None and not feed.stops.empty: # type: ignore[attr-defined]
-                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops) # type: ignore[attr-defined]
+                    if feed.stops is not None and not feed.stops.empty:  # type: ignore[attr-defined]
+                        stops_gdf = gtfs_kit.geometrize_stops(feed.stops)  # type: ignore[attr-defined]
                         df_transformed = (
                             stops_gdf.copy()
                             if stops_gdf is not None
@@ -196,16 +207,16 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
                         )
                         df_transformed = df_for_processing.copy()
                 elif (
-                        table_base_name == "shapes"
-                        and gtfs_filename_key == "shapes.txt"
+                    table_base_name == "shapes"
+                    and gtfs_filename_key == "shapes.txt"
                 ):
-                    if feed.shapes is not None and not feed.shapes.empty: # type: ignore[attr-defined]
+                    if feed.shapes is not None and not feed.shapes.empty:  # type: ignore[attr-defined]
                         shapes_lines_gdf = gtfs_kit.geometrize_shapes(
-                            feed.shapes # type: ignore[attr-defined]
+                            feed.shapes  # type: ignore[attr-defined]
                         )
                         if (
-                                shapes_lines_gdf is not None
-                                and not shapes_lines_gdf.empty
+                            shapes_lines_gdf is not None
+                            and not shapes_lines_gdf.empty
                         ):
                             module_logger.info(
                                 f"Processing {len(shapes_lines_gdf)} shape geometries into 'gtfs_shapes_lines'."
@@ -220,7 +231,9 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
                                 module_logger.error(
                                     "Schema for 'gtfs_shapes_lines.txt' not found. Cannot load shape lines."
                                 )
-                                df_transformed = df_for_processing.copy() # Fallback to original points if lines fail
+                                df_transformed = (
+                                    df_for_processing.copy()
+                                )  # Fallback to original points if lines fail
                             else:
                                 final_shapes_lines_df = (
                                     transform.transform_dataframe(
@@ -242,7 +255,9 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
                             module_logger.info(
                                 "No shape geometries computed or result is empty for 'gtfs_shapes_lines'."
                             )
-                            df_transformed = df_for_processing.copy() # Process original points
+                            df_transformed = (
+                                df_for_processing.copy()
+                            )  # Process original points
                     else:
                         module_logger.info(
                             "No shapes data in feed. Skipping line geometrization. Original shapes.txt points will be processed if they exist."
@@ -256,9 +271,9 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
                 # This check was specific to shapes.txt points after attempting line geometrization.
                 # If df_transformed (original shapes.txt points) is empty, it should be skipped.
                 if (
-                        df_transformed.empty
-                        and table_base_name == "shapes"
-                        and gtfs_filename_key == "shapes.txt"
+                    df_transformed.empty
+                    and table_base_name == "shapes"
+                    and gtfs_filename_key == "shapes.txt"
                 ):
                     module_logger.info(
                         f"Skipping loading for original points in '{table_base_name}' (from shapes.txt) as its DataFrame is empty after (optional) line processing."
@@ -324,9 +339,9 @@ def run_full_gtfs_etl_pipeline() -> bool: # This function does not take AppSetti
             # Corrected call to cleanup_directory:
             cleanup_directory(
                 TEMP_EXTRACT_PATH,
-                app_settings=None, # Pass None as AppSettings is not available here
+                app_settings=None,  # Pass None as AppSettings is not available here
                 ensure_dir_exists_after=True,
-                current_logger=module_logger # Pass this module's logger
+                current_logger=module_logger,  # Pass this module's logger
             )
         end_time = datetime.now()
         duration = end_time - start_time
@@ -344,7 +359,11 @@ if __name__ == "__main__":
             log_prefix="[GTFS-PIPELINE-DIRECT]",
         )
 
-    _feed_url_check = os.environ.get("GTFS_FEED_URL", CONFIG_GTFS_FEED_URL)
+    # When run directly, GTFS_FEED_URL should be set in the environment,
+    # otherwise it uses the hardcoded DEFAULT_GTFS_FEED_URL_CONFIG.
+    _feed_url_check = os.environ.get(
+        "GTFS_FEED_URL", DEFAULT_GTFS_FEED_URL_CONFIG
+    )
     if _feed_url_check == "https://example.com/default_gtfs_feed.zip":
         module_logger.warning(
             "CRITICAL: GTFS_FEED_URL is a placeholder. Pipeline might fail."
@@ -354,7 +373,7 @@ if __name__ == "__main__":
         )
 
     if DB_PARAMS.get(
-            "password"
+        "password"
     ) == "yourStrongPasswordHere" and not os.environ.get("PG_OSM_PASSWORD"):
         module_logger.warning(
             "CRITICAL: PostgreSQL password is a placeholder. Set PG_OSM_PASSWORD or update DB_PARAMS."

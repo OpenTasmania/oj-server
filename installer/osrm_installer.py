@@ -4,6 +4,7 @@
 Handles initial setup for OSRM: dependency checks, directory creation,
 PBF download, and region boundary file preparation.
 """
+
 import logging
 import os
 import shutil
@@ -28,7 +29,7 @@ module_logger = logging.getLogger(__name__)
 
 
 def ensure_osrm_dependencies(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Ensures configured container runtime and Osmium (via osmium-tool) are available."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -60,7 +61,7 @@ def ensure_osrm_dependencies(
     )
 
     if not check_package_installed(
-            "osmium-tool", app_settings=app_settings, current_logger=logger_to_use
+        "osmium-tool", app_settings=app_settings, current_logger=logger_to_use
     ):
         log_map_server(
             f"{symbols.get('error', '❌')} 'osmium-tool' not installed. Required for PBF extraction.",
@@ -95,7 +96,7 @@ def ensure_osrm_dependencies(
 
 
 def setup_osrm_data_directories(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates base directories for OSRM source data and processed files from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -161,7 +162,7 @@ def setup_osrm_data_directories(
 
 
 def download_base_pbf(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> str:
     """Downloads the base PBF file using URLs and paths from app_settings.osrm_data."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -215,7 +216,7 @@ def download_base_pbf(
 
 
 def prepare_region_boundaries(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Copies GeoJSON region boundary files from project assets to OSRM data regions directory."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -231,7 +232,7 @@ def prepare_region_boundaries(
 
     # OSM_PROJECT_ROOT comes from static_config
     assets_source_regions_dir = (
-            static_config.OSM_PROJECT_ROOT / "assets" / "regions"
+        static_config.OSM_PROJECT_ROOT / "assets" / "regions"
     )
     # Target is base_dir / "regions" (standardized sub-path)
     target_osm_data_regions_dir = Path(osrm_data_cfg.base_dir) / "regions"
@@ -257,18 +258,18 @@ def prepare_region_boundaries(
             assets_source_regions_dir
         )
         target_current_dir = (
-                target_osm_data_regions_dir / relative_path_from_assets
+            target_osm_data_regions_dir / relative_path_from_assets
         )
 
         if (
-                not target_current_dir.exists()
+            not target_current_dir.exists()
         ):  # Create subdirectories in target if they don't exist
             target_current_dir.mkdir(parents=True, exist_ok=True)
             # Ownership should be fine due to parent dir permissions.
 
         for file_name in files:
             if file_name.endswith(
-                    ".json"
+                ".json"
             ):  # Assuming GeoJSON files end with .json
                 source_file = source_root_path / file_name
                 target_file = target_current_dir / file_name

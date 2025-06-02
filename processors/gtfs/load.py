@@ -25,9 +25,9 @@ module_logger = logging.getLogger(__name__)
 
 
 def get_table_columns(
-        cursor: PgCursor,
-        table_name: str,
-        schema: str = "public",
+    cursor: PgCursor,
+    table_name: str,
+    schema: str = "public",
 ) -> Optional[List[str]]:
     """
     Fetch column names for a given table from the information_schema.
@@ -69,11 +69,11 @@ def get_table_columns(
 
 
 def load_dataframe_to_db(
-        conn: PgConnection,
-        df: pd.DataFrame,
-        table_name: str,
-        schema_definition: Dict[str, Any],
-        dlq_table_name: Optional[str] = None,
+    conn: PgConnection,
+    df: pd.DataFrame,
+    table_name: str,
+    schema_definition: Dict[str, Any],
+    dlq_table_name: Optional[str] = None,
 ) -> Tuple[int, int]:
     """
     Load a Pandas DataFrame into a specified PostgreSQL table using Psycopg 3.
@@ -132,14 +132,12 @@ def load_dataframe_to_db(
     try:
         data_tuples = [
             tuple(x)
-            for x in df_to_load_final.replace(
-                {
-                    pd.NA: None,
-                    float("nan"): None,
-                    float("inf"): None,
-                    float("-inf"): None,
-                }
-            ).to_numpy()
+            for x in df_to_load_final.replace({
+                pd.NA: None,
+                float("nan"): None,
+                float("inf"): None,
+                float("-inf"): None,
+            }).to_numpy()
         ]
     except Exception as e:
         module_logger.error(
@@ -184,7 +182,7 @@ def load_dataframe_to_db(
                 module_logger.info(
                     f"Attempting to load {len(data_tuples)} records into {table_name} using executemany..."
                 )
-                cursor.executemany(insert_query_string, data_tuples) # type: ignore[arg-type]
+                cursor.executemany(insert_query_string, data_tuples)  # type: ignore[arg-type]
                 successful_loads = (
                     cursor.rowcount
                     if cursor.rowcount != -1
@@ -228,11 +226,11 @@ def load_dataframe_to_db(
 
 
 def log_to_dlq(
-        conn: PgConnection,
-        dlq_table_name: str,
-        failed_record_data: Dict,
-        error_reason: str,
-        source_info: str,  # Renamed from 'notes' to be more descriptive of its use
+    conn: PgConnection,
+    dlq_table_name: str,
+    failed_record_data: Dict,
+    error_reason: str,
+    source_info: str,  # Renamed from 'notes' to be more descriptive of its use
 ) -> None:
     """
     Log a failed record or batch failure information to a Dead-Letter Queue (DLQ) table.
@@ -255,7 +253,7 @@ def log_to_dlq(
     # A check for table existence or dynamic creation of DLQ tables might be needed.
 
     dlq_insert_stmt = sql.SQL(
-        "INSERT INTO {} (original_row_data, error_reason, notes, error_timestamp) " # type: ignore[misc] # psycoph3 linter confusion
+        "INSERT INTO {} (original_row_data, error_reason, notes, error_timestamp) "  # type: ignore[misc] # psycoph3 linter confusion
         "VALUES (%s, %s, %s, %s);"
     ).format(
         sql.Identifier(dlq_table_name)
@@ -272,15 +270,15 @@ def log_to_dlq(
 
         # To ensure DLQ write happens even if main transaction failed:
         is_main_transaction_active = (
-                conn.info.transaction_status
-                == psycopg.pq.TransactionStatus.INTRANS
+            conn.info.transaction_status
+            == psycopg.pq.TransactionStatus.INTRANS
         )
 
         with conn.cursor() as cursor:
             if (
-                    not is_main_transaction_active
-                    and conn.info.transaction_status
-                    != psycopg.pq.TransactionStatus.IDLE
+                not is_main_transaction_active
+                and conn.info.transaction_status
+                != psycopg.pq.TransactionStatus.IDLE
             ):
                 try:
                     conn.rollback()  # Attempt to clear failed transaction state if any

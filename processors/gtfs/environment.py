@@ -4,6 +4,7 @@
 Handles environment setup for GTFS processing, including logging and
 setting OS environment variables required by the pipeline.
 """
+
 import logging
 import os
 from getpass import getuser
@@ -21,12 +22,12 @@ DEFAULT_GTFS_PROCESSOR_LOG_FILE = "/var/log/gtfs_processor_app.log"
 
 
 def setup_gtfs_environment(
-        app_settings: AppSettings,  # Changed to accept AppSettings
-        # Parameters like feed_url, db_params, log_file_path, log_level, log_prefix
-        # will now be sourced from app_settings.
-        current_logger_for_setup: Optional[
-            logging.Logger
-        ] = None,  # Logger for this setup function's messages
+    app_settings: AppSettings,  # Changed to accept AppSettings
+    # Parameters like feed_url, db_params, log_file_path, log_level, log_prefix
+    # will now be sourced from app_settings.
+    current_logger_for_setup: Optional[
+        logging.Logger
+    ] = None,  # Logger for this setup function's messages
 ) -> None:
     """
     Sets up logging for GTFS processing and exports necessary OS environment

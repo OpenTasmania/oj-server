@@ -3,20 +3,22 @@
 """
 Network-related utility functions.
 """
+
 import logging
 import re
 from typing import Optional
 
 from setup.config_models import AppSettings
+
 from .command_utils import log_map_server
 
 module_logger = logging.getLogger(__name__)
 
 
 def validate_cidr(
-        cidr: str,
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None,
+    cidr: str,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -57,7 +59,7 @@ def validate_cidr(
 
         octets_str = ip_part.split(".")
         if (
-                len(octets_str) != 4
+            len(octets_str) != 4
         ):  # Should be caught by regex, but good for robustness
             log_map_server(
                 f"{symbols.get('warning', '!')} CIDR IP part '{ip_part}' does not have 4 octets.",

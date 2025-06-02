@@ -3,6 +3,7 @@
 """
 Handles OSRM data processing: Osmium extraction and OSRM graph building using container runtime.
 """
+
 import logging
 import os
 import subprocess
@@ -20,14 +21,14 @@ module_logger = logging.getLogger(__name__)
 
 
 def _run_osrm_container_command_internal(
-        command_args: List[str],
-        app_settings: AppSettings,
-        region_osrm_data_dir_host: str,
-        pbf_host_path_for_mount: Optional[str],
-        pbf_filename_in_container_mount: Optional[str],
-        current_logger: Optional[logging.Logger],
-        step_name: str,
-        region_name_log: str,
+    command_args: List[str],
+    app_settings: AppSettings,
+    region_osrm_data_dir_host: str,
+    pbf_host_path_for_mount: Optional[str],
+    pbf_filename_in_container_mount: Optional[str],
+    current_logger: Optional[logging.Logger],
+    step_name: str,
+    region_name_log: str,
 ) -> bool:
     """Helper to run OSRM tools via configured container runtime."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -48,23 +49,22 @@ def _run_osrm_container_command_internal(
     volume_mounts = []
 
     if pbf_host_path_for_mount and pbf_filename_in_container_mount:
-        volume_mounts.extend(
-            [
-                "-v",
-                f"{pbf_host_path_for_mount}:/mnt_readonly_pbf/{pbf_filename_in_container_mount}:ro",
-            ]
-        )
+        volume_mounts.extend([
+            "-v",
+            f"{pbf_host_path_for_mount}:/mnt_readonly_pbf/{pbf_filename_in_container_mount}:ro",
+        ])
 
     Path(region_osrm_data_dir_host).mkdir(parents=True, exist_ok=True)
-    volume_mounts.extend(
-        ["-v", f"{region_osrm_data_dir_host}:/data_processing"]
-    )
+    volume_mounts.extend([
+        "-v",
+        f"{region_osrm_data_dir_host}:/data_processing",
+    ])
 
     full_container_cmd = (
-            container_base_cmd
-            + volume_mounts
-            + ["-w", "/data_processing", osrm_image]
-            + command_args
+        container_base_cmd
+        + volume_mounts
+        + ["-w", "/data_processing", osrm_image]
+        + command_args
     )
 
     log_map_server(
@@ -96,7 +96,7 @@ def _run_osrm_container_command_internal(
         )
         return True
     except (
-            subprocess.CalledProcessError
+        subprocess.CalledProcessError
     ):  # Error logged by run_elevated_command
         log_map_server(
             f"{symbols.get('critical', '🔥')} {container_cmd} {step_name} for {region_name_log} FAILED. Check logs.",
@@ -117,9 +117,9 @@ def _run_osrm_container_command_internal(
 
 
 def extract_regional_pbfs_with_osmium(
-        base_pbf_full_path: str,
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None,
+    base_pbf_full_path: str,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
 ) -> Dict[str, str]:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -174,7 +174,7 @@ def extract_regional_pbfs_with_osmium(
 
                 output_pbf_filename = f"{unique_region_key}.osm.pbf"
                 output_pbf_full_path = (
-                        geojson_full_path.parent / output_pbf_filename
+                    geojson_full_path.parent / output_pbf_filename
                 )
 
                 log_map_server(
@@ -251,10 +251,10 @@ def extract_regional_pbfs_with_osmium(
 
 
 def build_osrm_graphs_for_region(
-        region_name_key: str,
-        regional_pbf_host_path: str,
-        app_settings: AppSettings,
-        current_logger: Optional[logging.Logger] = None,
+    region_name_key: str,
+    regional_pbf_host_path: str,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -283,14 +283,14 @@ def build_osrm_graphs_for_region(
         pbf_path_for_extract_in_container,
     ]
     if not _run_osrm_container_command_internal(
-            extract_cmd_args,
-            app_settings,
-            region_processed_output_dir_host,
-            regional_pbf_host_path,
-            pbf_filename_on_host,
-            logger_to_use,
-            "osrm-extract",
-            region_name_key,
+        extract_cmd_args,
+        app_settings,
+        region_processed_output_dir_host,
+        regional_pbf_host_path,
+        pbf_filename_on_host,
+        logger_to_use,
+        "osrm-extract",
+        region_name_key,
     ):
         return False
 
@@ -311,14 +311,14 @@ def build_osrm_graphs_for_region(
         f"./{osrm_base_filename_in_container}.osrm",
     ]
     if not _run_osrm_container_command_internal(
-            partition_cmd_args,
-            app_settings,
-            region_processed_output_dir_host,
-            None,
-            None,
-            logger_to_use,
-            "osrm-partition",
-            region_name_key,
+        partition_cmd_args,
+        app_settings,
+        region_processed_output_dir_host,
+        None,
+        None,
+        logger_to_use,
+        "osrm-partition",
+        region_name_key,
     ):
         return False
 
@@ -327,14 +327,14 @@ def build_osrm_graphs_for_region(
         f"./{osrm_base_filename_in_container}.osrm",
     ]
     if not _run_osrm_container_command_internal(
-            customize_cmd_args,
-            app_settings,
-            region_processed_output_dir_host,
-            None,
-            None,
-            logger_to_use,
-            "osrm-customize",
-            region_name_key,
+        customize_cmd_args,
+        app_settings,
+        region_processed_output_dir_host,
+        None,
+        None,
+        logger_to_use,
+        "osrm-customize",
+        region_name_key,
     ):
         return False
 

@@ -155,7 +155,9 @@ def _install_uv_with_pipx_prereq(logger_instance: logging.Logger) -> bool:
             if command_exists("apt"):
                 try:
                     run_elevated_command(
-                        ["apt", "update"], app_settings=None, current_logger=logger_instance
+                        ["apt", "update"],
+                        app_settings=None,
+                        current_logger=logger_instance,
                     )
                     run_elevated_command(
                         ["apt", "install", "-y", "pipx"],
@@ -296,7 +298,9 @@ def install_uv_prereq(logger_instance: logging.Logger) -> bool:
         current_logger=logger_instance,
         app_settings=None,
     )
-    codename = get_debian_codename(app_settings=None, current_logger=logger_instance)
+    codename = get_debian_codename(
+        app_settings=None, current_logger=logger_instance
+    )
 
     if codename in ["trixie", "forky", "sid"]:  # pragma: no cover
         log_map_server(
@@ -307,7 +311,9 @@ def install_uv_prereq(logger_instance: logging.Logger) -> bool:
         )
         try:
             run_elevated_command(
-                ["apt", "update"], app_settings=None, current_logger=logger_instance
+                ["apt", "update"],
+                app_settings=None,
+                current_logger=logger_instance,
             )
             run_elevated_command(
                 ["apt", "install", "-y", "uv"],
@@ -340,7 +346,7 @@ def install_uv_prereq(logger_instance: logging.Logger) -> bool:
 
 
 def ensure_pg_config_or_libpq_dev_installed_prereq(
-        logger_instance: logging.Logger,
+    logger_instance: logging.Logger,
 ) -> bool:
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'pg_config' (for psycopg compilation)...",
@@ -518,7 +524,9 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         app_settings=None,
     )
 
-    if not ensure_pg_config_or_libpq_dev_installed_prereq(prereq_script_logger):
+    if not ensure_pg_config_or_libpq_dev_installed_prereq(
+        prereq_script_logger
+    ):
         log_map_server(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to ensure 'pg_config' (via 'libpq-dev'). Python DB drivers may fail to build. Aborting.",
             "critical",
@@ -528,7 +536,9 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         return 1
 
     venv_path = os.path.join(project_root, VENV_DIR)
-    venv_python_executable = get_venv_python_executable(project_root, VENV_DIR)
+    venv_python_executable = get_venv_python_executable(
+        project_root, VENV_DIR
+    )
 
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} Setting up virtual environment in '{venv_path}'...",
@@ -601,10 +611,10 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         ]
 
         cmd_to_run_main_installer = [
-                                        venv_python_executable,
-                                        "-m",
-                                        MAP_SERVER_INSTALLER_NAME,
-                                    ] + args_for_main_installer
+            venv_python_executable,
+            "-m",
+            MAP_SERVER_INSTALLER_NAME,
+        ] + args_for_main_installer
         log_map_server(
             f"{SYMBOLS_OUTER.get('link', '>>')} Launching: {' '.join(cmd_to_run_main_installer)}",
             "debug",

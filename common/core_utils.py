@@ -35,11 +35,11 @@ SIMPLE_LOG_FORMAT_NO_PREFIX = (
 
 
 def setup_logging(
-        log_level: int = logging.INFO,
-        log_file: Optional[str] = None,
-        log_to_console: bool = True,
-        log_format_str: Optional[str] = None,
-        log_prefix: Optional[str] = None,
+    log_level: int = logging.INFO,
+    log_file: Optional[str] = None,
+    log_to_console: bool = True,
+    log_format_str: Optional[str] = None,
+    log_prefix: Optional[str] = None,
 ) -> None:
     """
     Set up basic logging configuration for the application.
@@ -100,12 +100,13 @@ def setup_logging(
 
     logger_for_this_message = logging.getLogger(__name__)
     if not logger_for_this_message.isEnabledFor(
-            logging.INFO
+        logging.INFO
     ):  # pragma: no cover
         logger_for_this_message.setLevel(logging.INFO)
 
     logger_for_this_message.info(
         f"Logging configured. Level: {logging.getLevelName(log_level)}. Format: '{final_format_str}'"
     )
+
 
 # REMOVE cleanup_directory function from here.

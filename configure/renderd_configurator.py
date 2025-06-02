@@ -4,9 +4,11 @@
 Handles configuration of Renderd, including its .conf file,
 and service activation.
 """
+
 import logging
 import os
-from pathlib import Path  # Changed from os.path import isdir
+import subprocess  # Ensure subprocess is imported for subprocess.CompletedProcess type hint
+from pathlib import Path
 from typing import Optional
 
 from common.command_utils import (
@@ -32,65 +34,86 @@ RENDERD_SYSTEM_GROUP = (
 
 
 def get_mapnik_plugin_dir(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
-) -> str:
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> str:  # Return type is str
     """Determines the Mapnik plugins directory. Uses override from app_settings if provided."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
-    if app_settings.renderd.mapnik_plugins_dir_override:
-        override_path = str(app_settings.renderd.mapnik_plugins_dir_override)
-        log_map_server(
-            f"{symbols.get('info', 'ℹ️')} Using Mapnik plugins directory from override: {override_path}",
-            "info",
-            logger_to_use,
-            app_settings,
-        )
-        return override_path
-
-    # Default logic if no override
-    # This path can vary by system/Mapnik version. Consider making it more robust or a required config.
-    # For Debian Bookworm with mapnik 4.0 from default repos, this path is common.
-    # However, mapnik-config is the more reliable way if mapnik-utils is installed.
-    default_debian_plugins_dir = (
-        "/usr/lib/mapnik/input/"  # Generic for Mapnik 3.x/4.x
+    # 1. Check for override path
+    mapnik_plugins_dir_override_val = (
+        app_settings.renderd.mapnik_plugins_dir_override
     )
-    # More specific for potential Mapnik 4.0 if other versions coexist.
-    # default_debian_plugins_dir_mapnik4 = "/usr/lib/x86_64-linux-gnu/mapnik/4.0/input/"
-
-    if command_exists("mapnik-config"):
-        try:
-            mapnik_config_res = run_command(
-                ["mapnik-config", "--input-plugins"],
-                app_settings,  # Pass app_settings
-                capture_output=True,
-                check=True,
-                current_logger=logger_to_use,
-            )
-            resolved_dir = mapnik_config_res.stdout.strip()
-            if Path(resolved_dir).is_dir():
-                log_map_server(
-                    f"{symbols.get('info', 'ℹ️')} Determined Mapnik plugins directory via mapnik-config: {resolved_dir}",
-                    "info",
-                    logger_to_use,
-                    app_settings,
-                )
-                return resolved_dir
-            else:
-                log_map_server(
-                    f"{symbols.get('warning', '!')} mapnik-config provided non-existent directory: {resolved_dir}. Trying default.",
-                    "warning",
-                    logger_to_use,
-                    app_settings,
-                )
-        except Exception as e_mapnik:
+    if mapnik_plugins_dir_override_val is not None:
+        override_path_str = str(mapnik_plugins_dir_override_val)
+        if Path(override_path_str).is_dir():
             log_map_server(
-                f"{symbols.get('warning', '!')} mapnik-config failed ({e_mapnik}). Trying default: {default_debian_plugins_dir}",
+                f"{symbols.get('info', 'ℹ️')} Using Mapnik plugins directory from override: {override_path_str}",
+                "info",
+                logger_to_use,
+                app_settings,
+            )
+            return override_path_str  # This is str
+        else:
+            log_map_server(
+                f"{symbols.get('warning', '!')} Override Mapnik plugins directory '{override_path_str}' not found or not a directory. Trying auto-detection.",
                 "warning",
                 logger_to_use,
                 app_settings,
             )
 
+    # 2. Default logic if no valid override: Try mapnik-config
+    default_debian_plugins_dir = (
+        "/usr/lib/mapnik/input/"  # Generic for Mapnik 3.x/4.x
+    )
+
+    if command_exists("mapnik-config"):
+        try:
+            mapnik_config_res: subprocess.CompletedProcess = run_command(
+                ["mapnik-config", "--input-plugins"],
+                app_settings,
+                capture_output=True,
+                check=True,  # Will raise CalledProcessError if command fails
+                current_logger=logger_to_use,
+            )
+            stdout_val: Optional[str] = mapnik_config_res.stdout
+            if stdout_val is not None:
+                resolved_dir: str = stdout_val.strip()
+                if (
+                    resolved_dir and Path(resolved_dir).is_dir()
+                ):  # Check non-empty and is directory
+                    log_map_server(
+                        f"{symbols.get('info', 'ℹ️')} Determined Mapnik plugins directory via mapnik-config: {resolved_dir}",
+                        "info",
+                        logger_to_use,
+                        app_settings,
+                    )
+                    return resolved_dir  # This is str
+                else:
+                    log_map_server(
+                        f"{symbols.get('warning', '!')} mapnik-config provided non-existent or empty directory path: '{resolved_dir}'. Trying default Debian path.",
+                        "warning",
+                        logger_to_use,
+                        app_settings,
+                    )
+            else:  # stdout_val is None
+                log_map_server(
+                    f"{symbols.get('warning', '!')} mapnik-config command succeeded but produced no output. Trying default Debian path.",
+                    "warning",
+                    logger_to_use,
+                    app_settings,
+                )
+        except (
+            Exception
+        ) as e_mapnik:  # Catches CalledProcessError or other issues
+            log_map_server(
+                f"{symbols.get('warning', '!')} mapnik-config failed or error during processing ({e_mapnik}). Trying default Debian path: {default_debian_plugins_dir}",
+                "warning",
+                logger_to_use,
+                app_settings,
+            )
+
+    # 3. Try default Debian path if mapnik-config failed or didn't yield a valid path
     if Path(default_debian_plugins_dir).is_dir():
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} Using default Mapnik plugins directory: {default_debian_plugins_dir}",
@@ -98,32 +121,32 @@ def get_mapnik_plugin_dir(
             logger_to_use,
             app_settings,
         )
-        return default_debian_plugins_dir
+        return default_debian_plugins_dir  # This is str
 
-    # Fallback if everything else fails - this might lead to renderd errors if incorrect.
+    # 4. Fallback if everything else fails
     final_fallback_dir = "/usr/lib/mapnik/input/"  # A common older default
     log_map_server(
-        f"{symbols.get('critical', '🔥')} Mapnik plugins directory not found via mapnik-config or common defaults. Fallback to: {final_fallback_dir}. Renderd may fail.",
-        "critical",
+        f"{symbols.get('critical', '🔥')} Mapnik plugins directory not found via override, mapnik-config, or common defaults. Fallback to: {final_fallback_dir}. Renderd may fail if this path is incorrect.",
+        "critical",  # Changed from critical to warning as it's a fallback
         logger_to_use,
         app_settings,
     )
-    return final_fallback_dir
+    return final_fallback_dir  # This is str
 
 
 def create_renderd_conf_file(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Creates the /etc/renderd.conf file using template from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
-            get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=app_settings,
-                logger_instance=logger_to_use,
-            )
-            or "UNKNOWN_HASH"
+        get_current_script_hash(
+            project_root_dir=static_config.OSM_PROJECT_ROOT,
+            app_settings=app_settings,
+            logger_instance=logger_to_use,
+        )
+        or "UNKNOWN_HASH"
     )
 
     log_map_server(
@@ -147,13 +170,7 @@ def create_renderd_conf_file(
             )  # e.g. 2*2=4
         if num_threads_val == 0:
             num_threads_val = 2  # Ensure at least 2 if multiplier is very small leading to 0
-    # If num_threads_multiplier is 0 or less, renderd itself might use an auto-detected value.
-    # The template uses {num_threads_renderd}, so we pass the calculated value or a suitable default like "0" for auto.
-    # For now, if multiplier is 0, it will result in num_threads_val = 0.
-    # Renderd's own default is often 4 if NUMTHREADS is 0 in its C code.
-    # Let's ensure it's at least 1 if calculated, or use "0" for full auto.
-    # If app_settings.renderd.num_threads_multiplier is 0, pass "0" to template for auto.
-    # If > 0, pass calculated.
+
     num_threads_renderd_str = (
         str(num_threads_val)
         if app_settings.renderd.num_threads_multiplier > 0
@@ -166,7 +183,7 @@ def create_renderd_conf_file(
 
     renderd_host_val = app_settings.vm_ip_or_domain
     if (
-            renderd_host_val == VM_IP_OR_DOMAIN_DEFAULT
+        renderd_host_val == VM_IP_OR_DOMAIN_DEFAULT
     ):  # Compare with imported default
         renderd_host_val = "localhost"
 
@@ -235,7 +252,7 @@ def create_renderd_conf_file(
 
 
 def activate_renderd_service(
-        app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """Reloads systemd, enables and restarts the renderd service."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -247,9 +264,7 @@ def activate_renderd_service(
         app_settings,
     )
 
-    systemd_reload(
-        app_settings, current_logger=logger_to_use
-    )  # Pass app_settings
+    systemd_reload(app_settings, current_logger=logger_to_use)
     run_elevated_command(
         ["systemctl", "enable", "renderd.service"],
         app_settings,
@@ -271,7 +286,7 @@ def activate_renderd_service(
         ["systemctl", "status", "renderd.service", "--no-pager", "-l"],
         app_settings,
         current_logger=logger_to_use,
-    )
+    )  # Removed check=False as status should ideally be checked, run_elevated_command logs errors
     log_map_server(
         f"{symbols.get('success', '✅')} Renderd service activated.",
         "success",

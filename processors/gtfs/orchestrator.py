@@ -3,11 +3,13 @@
 """
 Main orchestrator for all GTFS-related setup and processing tasks.
 """
+
 import logging
 from typing import Optional
 
 from common.command_utils import log_map_server
 from setup.config_models import AppSettings  # Import AppSettings
+
 from .automation import configure_gtfs_update_cronjob
 from .environment import setup_gtfs_environment
 from .runner import run_gtfs_etl_pipeline_and_verify
@@ -20,12 +22,12 @@ class GTFSConfigError(Exception):
 
 
 def process_and_setup_gtfs(
-        app_settings: AppSettings,  # Changed to accept AppSettings
-        # Individual parameters like gtfs_feed_url, db_params, project_root, etc.
-        # will be sourced from app_settings.
-        orchestrator_logger: Optional[
-            logging.Logger
-        ] = None,  # Logger for this orchestrator's messages
+    app_settings: AppSettings,  # Changed to accept AppSettings
+    # Individual parameters like gtfs_feed_url, db_params, project_root, etc.
+    # will be sourced from app_settings.
+    orchestrator_logger: Optional[
+        logging.Logger
+    ] = None,  # Logger for this orchestrator's messages
 ) -> None:
     """
     Main public function to set up environment, run GTFS ETL, verify, and configure cron job.
