@@ -126,12 +126,12 @@ build_docs_builder_image:
         uv --version
       else
         echo "USE_CUSTOM_CI_IMAGES is false/unset. Setting up Python environment on stock debian:trixie..."
-        apt-get update -y
+        apt update -y
         echo "Performing full system upgrade on stock image (this may take some time)..."
-        apt-get upgrade -y
-        apt-get dist-upgrade -y
+        apt upgrade -y
+        apt dist-upgrade -y
         echo "Installing base dependencies..."
-        apt-get install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
+        apt install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
         echo "--- Pipx version ---"
         pipx --version
         echo "--- Installing uv using pipx ---"
@@ -200,12 +200,12 @@ generate_documentation:
         echo "Using custom docs builder image (trixie-based). System dependencies, todocheck, and git-cliff are pre-installed."
       else
         echo "USE_CUSTOM_CI_IMAGES is false/unset. Setting up tools on stock debian:trixie..."
-        apt-get update -y
+        apt update -y
         echo "Performing full system upgrade on stock image (this may take some time)..."
-        apt-get upgrade -y
-        apt-get dist-upgrade -y
+        apt upgrade -y
+        apt dist-upgrade -y
         echo "Installing base dependencies for docs..."
-        apt-get install -y --no-install-recommends git curl python3-full python3-pipx
+        apt install -y --no-install-recommends git curl python3-full python3-pipx
         # Ensure pipx-installed binaries are in PATH
         if ! command -v todocheck &> /dev/null && [ -d "$HOME/.local/bin" ]; then
           export PATH="$HOME/.local/bin:$PATH"
@@ -281,12 +281,12 @@ commit_documentation:
         echo "Using custom docs builder image (trixie-based). Git is pre-installed."
       else
         echo "USE_CUSTOM_CI_IMAGES is false/unset. Installing git on stock debian:trixie..."
-        apt-get update -y
+        apt update -y
         echo "Performing full system upgrade on stock image (this may take some time)..."
-        apt-get upgrade -y
-        apt-get dist-upgrade -y
+        apt upgrade -y
+        apt dist-upgrade -y
         echo "Installing git..."
-        apt-get install -y --no-install-recommends git
+        apt install -y --no-install-recommends git
       fi
     - git config --global user.email "${GIT_USER_EMAIL}"
     - git config --global user.name "${GIT_USER_NAME}"
