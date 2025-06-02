@@ -44,7 +44,7 @@ cache:
   before_script:
     - echo "Setting up Python environment with uv..."
     - apt-get update -y
-    - apt-get install -y curl git python3-full pipx postgresql-common
+    - apt-get install -y curl git python3-full pipx postgresql-common libpq-dev
     - echo "--- Pipx version ---"
     - pipx --version
     - echo "--- Installing uv using pipx ---"
