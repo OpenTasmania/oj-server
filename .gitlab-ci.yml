@@ -131,7 +131,7 @@ build_docs_builder_image:
         apt upgrade -y
         apt dist-upgrade -y
         echo "Installing base dependencies..."
-        apt install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
+        DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev build-essential libpython3-dev
         echo "--- Pipx version ---"
         pipx --version
         echo "--- Installing uv using pipx ---"
@@ -205,7 +205,7 @@ generate_documentation:
         apt upgrade -y
         apt dist-upgrade -y
         echo "Installing base dependencies for docs..."
-        apt install -y --no-install-recommends git curl python3-full python3-pipx
+        DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends git curl python3-full python3-pipx
         # Ensure pipx-installed binaries are in PATH
         if ! command -v todocheck &> /dev/null && [ -d "$HOME/.local/bin" ]; then
           export PATH="$HOME/.local/bin:$PATH"
@@ -286,7 +286,7 @@ commit_documentation:
         apt upgrade -y
         apt dist-upgrade -y
         echo "Installing git..."
-        apt install -y --no-install-recommends git
+        DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends git
       fi
     - git config --global user.email "${GIT_USER_EMAIL}"
     - git config --global user.name "${GIT_USER_NAME}"

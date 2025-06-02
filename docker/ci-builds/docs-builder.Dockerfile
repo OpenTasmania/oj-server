@@ -6,7 +6,8 @@ ENV PIPX_HOME=/opt/pipx
 ENV PIPX_BIN_DIR=/usr/local/bin
 ENV PATH="${PATH}:${PIPX_BIN_DIR}"
 
-RUN apt-get update -y && \
+RUN DEBIAN_FRONTEND=noninteractive && \
+    apt-get update -y && \
     apt-get upgrade -y && \
     apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
