@@ -170,7 +170,6 @@ Type checking:
 
 Testing:
   rules:
-    - when: manual
     - if: $CI_COMMIT_TAG
   extends: .uv_setup
   stage: test
