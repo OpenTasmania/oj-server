@@ -534,7 +534,7 @@ wheels = [
 
 [[package]]
 name = "osm-osrm-server"
-version = "0.5.6"
+version = "0.5.8"
 source = { editable = "." }
 dependencies = [
     { name = "cython" },
