@@ -45,7 +45,8 @@ variables:
   # (like .uv_setup, generate_documentation, commit_documentation),
   # and ensure the 'build_..._image' jobs ran successfully.
   # If "false", ensure the stock 'image:' lines are active in those jobs.
-  USE_CUSTOM_CI_IMAGES: "false"
+  # USE_CUSTOM_CI_IMAGES: "false"
+  USE_CUSTOM_CI_IMAGES: "true"
 
 cache:
   key:
@@ -116,8 +117,8 @@ build_docs_builder_image:
 
 .uv_setup:
   # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
-  image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready
-  # image: ${PYTHON_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND python-builder image is built
+  # image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready
+  image: ${PYTHON_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND python-builder image is built
   before_script:
     - |
       if [ "$USE_CUSTOM_CI_IMAGES" = "true" ]; then
@@ -188,8 +189,8 @@ Testing:
 generate_documentation:
   stage: docs
   # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
-  image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready (Standardized to trixie)
-  # image: ${DOCS_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND docs-builder (trixie-based) image is built
+  # image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready (Standardized to trixie)
+  image: ${DOCS_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND docs-builder (trixie-based) image is built
   rules:
     - when: manual
     - if: "$CI_COMMIT_TAG"
@@ -266,8 +267,8 @@ generate_documentation:
 commit_documentation:
   stage: commit_docs
   # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
-  image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready (Standardized to trixie)
-  # image: ${DOCS_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND docs-builder (trixie-based) image is built
+  # image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready (Standardized to trixie)
+  image: ${DOCS_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND docs-builder (trixie-based) image is built
   rules:
     - when: manual
     - if: "$CI_COMMIT_TAG"
