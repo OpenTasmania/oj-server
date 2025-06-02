@@ -12,6 +12,7 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+# Import all individual step functions
 from actions.website_setup_actions import deploy_test_website_content
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
@@ -58,9 +59,9 @@ from configure.renderd_configurator import (
     create_renderd_conf_file,
 )
 from configure.ufw_configurator import activate_ufw_service, apply_ufw_rules
-from dataproc.data_processing import data_prep_group
+from dataproc.data_processing import data_prep_group  # Returns bool
 from dataproc.osrm_data_processor import (
-    build_osrm_graphs_for_region,
+    build_osrm_graphs_for_region,  # Returns bool
     extract_regional_pbfs_with_osmium,
 )
 from dataproc.raster_processor import raster_tile_prerender
@@ -76,7 +77,7 @@ from installer.docker_installer import install_docker_engine
 from installer.nginx_installer import ensure_nginx_package_installed
 from installer.nodejs_installer import install_nodejs_lts
 from installer.osrm_installer import (
-    download_base_pbf,
+    download_base_pbf,  # Returns str
     ensure_osrm_dependencies,
     prepare_region_boundaries,
     setup_osrm_data_directories,
@@ -135,13 +136,113 @@ from setup.step_executor import execute_step
 logger = logging.getLogger(__name__)
 APP_CONFIG: Optional[AppSettings] = None
 
+# Module-level type alias for step functions passed to execute_step
 StepExecutorFunc = Callable[[AppSettings, Optional[logging.Logger]], None]
 
 # --- Task Tags ---
-GTFS_PROCESS_AND_SETUP_TAG = "GTFS_PROCESS_AND_SETUP"
-ALL_CORE_PREREQUISITES_GROUP_TAG = "ALL_CORE_PREREQUISITES_GROUP"
+# Prerequisite Tasks
+PREREQ_BOOT_VERBOSITY_TAG = "PREREQ_BOOT_VERBOSITY_TAG"
+PREREQ_CORE_CONFLICTS_TAG = "PREREQ_CORE_CONFLICTS_TAG"
+PREREQ_DOCKER_ENGINE_TAG = "PREREQ_DOCKER_ENGINE_TAG"
+PREREQ_NODEJS_LTS_TAG = "PREREQ_NODEJS_LTS_TAG"
+ALL_CORE_PREREQUISITES_GROUP_TAG = (
+    "ALL_CORE_PREREQUISITES_GROUP"  # Orchestrates above + more
+)
+
+# UFW Tasks
 UFW_PACKAGE_CHECK_TAG = "SETUP_UFW_PKG_CHECK"
+CONFIG_UFW_RULES = "CONFIG_UFW_RULES"
 UFW_ACTIVATE_SERVICE_TAG = "SERVICE_UFW_ACTIVATE"
+UFW_FULL_SETUP = "UFW_FULL_SETUP"  # Orchestrator tag
+
+# PostgreSQL Tasks (Individual tags for sub-steps if needed, plus orchestrator)
+SETUP_POSTGRES_PKG_CHECK = "SETUP_POSTGRES_PKG_CHECK"
+CONFIG_POSTGRES_USER_DB = "CONFIG_POSTGRES_USER_DB"
+CONFIG_POSTGRES_EXTENSIONS = "CONFIG_POSTGRES_EXTENSIONS"
+CONFIG_POSTGRES_PERMISSIONS = "CONFIG_POSTGRES_PERMISSIONS"
+CONFIG_POSTGRESQL_CONF = "CONFIG_POSTGRESQL_CONF"
+CONFIG_PG_HBA_CONF = "CONFIG_PG_HBA_CONF"
+SERVICE_POSTGRES_RESTART_ENABLE = "SERVICE_POSTGRES_RESTART_ENABLE"
+POSTGRES_FULL_SETUP = "POSTGRES_FULL_SETUP"  # Orchestrator tag
+
+# pg_tileserv Tasks
+SETUP_PGTS_DOWNLOAD_BINARY = "SETUP_PGTS_DOWNLOAD_BINARY"
+SETUP_PGTS_CREATE_USER = "SETUP_PGTS_CREATE_USER"
+SETUP_PGTS_BINARY_PERMS = "SETUP_PGTS_BINARY_PERMS"
+SETUP_PGTS_SYSTEMD_FILE = "SETUP_PGTS_SYSTEMD_FILE"
+CONFIG_PGTS_CONFIG_FILE = "CONFIG_PGTS_CONFIG_FILE"
+SERVICE_PGTS_ACTIVATE = "SERVICE_PGTS_ACTIVATE"
+PGTILESERV_FULL_SETUP = "PGTILESERV_FULL_SETUP"  # Orchestrator tag
+
+# Carto Tasks
+SETUP_CARTO_CLI = "SETUP_CARTO_CLI"
+SETUP_CARTO_REPO = "SETUP_CARTO_REPO"
+SETUP_CARTO_PREPARE_DIR = "SETUP_CARTO_PREPARE_DIR"
+SETUP_CARTO_FETCH_DATA = "SETUP_CARTO_FETCH_DATA"
+CONFIG_CARTO_COMPILE = "CONFIG_CARTO_COMPILE"
+CONFIG_CARTO_DEPLOY_XML = "CONFIG_CARTO_DEPLOY_XML"
+CONFIG_CARTO_FINALIZE_DIR = "CONFIG_CARTO_FINALIZE_DIR"
+CONFIG_SYSTEM_FONT_CACHE = "CONFIG_SYSTEM_FONT_CACHE"
+CARTO_FULL_SETUP = "CARTO_FULL_SETUP"  # Orchestrator tag
+
+# Renderd Tasks
+SETUP_RENDERD_PKG_CHECK = "SETUP_RENDERD_PKG_CHECK"
+SETUP_RENDERD_DIRS = "SETUP_RENDERD_DIRS"
+SETUP_RENDERD_SYSTEMD_FILE = "SETUP_RENDERD_SYSTEMD_FILE"
+CONFIG_RENDERD_CONF_FILE = "CONFIG_RENDERD_CONF_FILE"
+SERVICE_RENDERD_ACTIVATE = "SERVICE_RENDERD_ACTIVATE"
+RENDERD_FULL_SETUP = "RENDERD_FULL_SETUP"  # Orchestrator tag
+
+# OSRM Tasks (Orchestrator tag and potential sub-tags if exposed individually)
+SETUP_OSRM_DEPS = "SETUP_OSRM_DEPS"
+SETUP_OSRM_DIRS = "SETUP_OSRM_DIRS"
+SETUP_OSRM_DOWNLOAD_PBF = "SETUP_OSRM_DOWNLOAD_PBF"
+SETUP_OSRM_REGION_BOUNDARIES = "SETUP_OSRM_REGION_BOUNDARIES"
+DATAPROC_OSMIUM_EXTRACT_REGIONS = "DATAPROC_OSMIUM_EXTRACT_REGIONS"
+DATAPROC_OSRM_BUILD_GRAPHS_ALL_REGIONS = (
+    "DATAPROC_OSRM_BUILD_GRAPHS_ALL_REGIONS"  # This is conceptual
+)
+SETUP_OSRM_SYSTEMD_SERVICES_ALL_REGIONS = (
+    "SETUP_OSRM_SYSTEMD_SERVICES_ALL_REGIONS"  # Conceptual
+)
+CONFIG_OSRM_ACTIVATE_SERVICES_ALL_REGIONS = (
+    "CONFIG_OSRM_ACTIVATE_SERVICES_ALL_REGIONS"  # Conceptual
+)
+OSRM_FULL_SETUP = "OSRM_FULL_SETUP"  # Orchestrator tag
+
+# Apache Tasks
+SETUP_APACHE_PKG_CHECK = "SETUP_APACHE_PKG_CHECK"
+CONFIG_APACHE_PORTS = "CONFIG_APACHE_PORTS"
+CONFIG_APACHE_MOD_TILE_CONF = "CONFIG_APACHE_MOD_TILE_CONF"
+CONFIG_APACHE_TILE_SITE_CONF = "CONFIG_APACHE_TILE_SITE_CONF"
+CONFIG_APACHE_MODULES_SITES = "CONFIG_APACHE_MODULES_SITES"
+SERVICE_APACHE_ACTIVATE = "SERVICE_APACHE_ACTIVATE"
+APACHE_FULL_SETUP = "APACHE_FULL_SETUP"  # Orchestrator tag
+
+# Nginx Tasks
+SETUP_NGINX_PKG_CHECK = "SETUP_NGINX_PKG_CHECK"
+CONFIG_NGINX_PROXY_SITE = "CONFIG_NGINX_PROXY_SITE"
+CONFIG_NGINX_MANAGE_SITES = "CONFIG_NGINX_MANAGE_SITES"
+CONFIG_NGINX_TEST_CONFIG = "CONFIG_NGINX_TEST_CONFIG"
+SERVICE_NGINX_ACTIVATE = "SERVICE_NGINX_ACTIVATE"
+NGINX_FULL_SETUP = "NGINX_FULL_SETUP"  # Orchestrator tag
+
+# Certbot Tasks
+SETUP_CERTBOT_PACKAGES = "SETUP_CERTBOT_PACKAGES"
+CONFIG_CERTBOT_RUN = "CONFIG_CERTBOT_RUN"
+CERTBOT_FULL_SETUP = "CERTBOT_FULL_SETUP"  # Orchestrator tag
+
+# Data Processing & Content Tasks
+GTFS_PROCESS_AND_SETUP_TAG = "GTFS_PROCESS_AND_SETUP"
+RASTER_PREP_TAG = "RASTER_PREP"
+WEBSITE_CONTENT_DEPLOY_TAG = (
+    "WEBSITE_CONTENT_DEPLOY"  # Renamed from WEBSITE_CONTENT_DEPLOY
+)
+
+# System Tasks
+SYSTEMD_RELOAD_TASK_TAG = (
+    "SYSTEMD_RELOAD_TASK"  # Renamed from SYSTEMD_RELOAD_TASK
+)
 
 # --- Installation Group Order ---
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
@@ -153,98 +254,98 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
         "name": "Firewall Service (UFW)",
         "steps": [
             UFW_PACKAGE_CHECK_TAG,
-            "CONFIG_UFW_RULES",
+            CONFIG_UFW_RULES,
             UFW_ACTIVATE_SERVICE_TAG,
         ],
     },
     {
         "name": "Database Service (PostgreSQL)",
         "steps": [
-            "SETUP_POSTGRES_PKG_CHECK",
-            "CONFIG_POSTGRES_USER_DB",
-            "CONFIG_POSTGRES_EXTENSIONS",
-            "CONFIG_POSTGRES_PERMISSIONS",
-            "CONFIG_POSTGRESQL_CONF",
-            "CONFIG_PG_HBA_CONF",
-            "SERVICE_POSTGRES_RESTART_ENABLE",
+            SETUP_POSTGRES_PKG_CHECK,
+            CONFIG_POSTGRES_USER_DB,
+            CONFIG_POSTGRES_EXTENSIONS,
+            CONFIG_POSTGRES_PERMISSIONS,
+            CONFIG_POSTGRESQL_CONF,
+            CONFIG_PG_HBA_CONF,
+            SERVICE_POSTGRES_RESTART_ENABLE,
         ],
     },
     {
         "name": "pg_tileserv Service",
         "steps": [
-            "SETUP_PGTS_DOWNLOAD_BINARY",
-            "SETUP_PGTS_CREATE_USER",
-            "SETUP_PGTS_BINARY_PERMS",
-            "SETUP_PGTS_SYSTEMD_FILE",
-            "CONFIG_PGTS_CONFIG_FILE",
-            "SERVICE_PGTS_ACTIVATE",
+            SETUP_PGTS_DOWNLOAD_BINARY,
+            SETUP_PGTS_CREATE_USER,
+            SETUP_PGTS_BINARY_PERMS,
+            SETUP_PGTS_SYSTEMD_FILE,
+            CONFIG_PGTS_CONFIG_FILE,
+            SERVICE_PGTS_ACTIVATE,
         ],
     },
     {
         "name": "Carto Service",
         "steps": [
-            "SETUP_CARTO_CLI",
-            "SETUP_CARTO_REPO",
-            "SETUP_CARTO_PREPARE_DIR",
-            "SETUP_CARTO_FETCH_DATA",
-            "CONFIG_CARTO_COMPILE",
-            "CONFIG_CARTO_DEPLOY_XML",
-            "CONFIG_CARTO_FINALIZE_DIR",
-            "CONFIG_SYSTEM_FONT_CACHE",
+            SETUP_CARTO_CLI,
+            SETUP_CARTO_REPO,
+            SETUP_CARTO_PREPARE_DIR,
+            SETUP_CARTO_FETCH_DATA,
+            CONFIG_CARTO_COMPILE,
+            CONFIG_CARTO_DEPLOY_XML,
+            CONFIG_CARTO_FINALIZE_DIR,
+            CONFIG_SYSTEM_FONT_CACHE,
         ],
     },
     {
         "name": "Renderd Service",
         "steps": [
-            "SETUP_RENDERD_PKG_CHECK",
-            "SETUP_RENDERD_DIRS",
-            "SETUP_RENDERD_SYSTEMD_FILE",
-            "CONFIG_RENDERD_CONF_FILE",
-            "SERVICE_RENDERD_ACTIVATE",
+            SETUP_RENDERD_PKG_CHECK,
+            SETUP_RENDERD_DIRS,
+            SETUP_RENDERD_SYSTEMD_FILE,
+            CONFIG_RENDERD_CONF_FILE,
+            SERVICE_RENDERD_ACTIVATE,
         ],
     },
     {
         "name": "OSRM Service & Data Processing",
         "steps": [
-            "SETUP_OSRM_DEPS",
-            "SETUP_OSRM_DIRS",
-            "SETUP_OSRM_DOWNLOAD_PBF",
-            "SETUP_OSRM_REGION_BOUNDARIES",
-            "DATAPROC_OSMIUM_EXTRACT_REGIONS",
-            "DATAPROC_OSRM_BUILD_GRAPHS_ALL_REGIONS",
-            "SETUP_OSRM_SYSTEMD_SERVICES_ALL_REGIONS",
-            "CONFIG_OSRM_ACTIVATE_SERVICES_ALL_REGIONS",
+            SETUP_OSRM_DEPS,
+            SETUP_OSRM_DIRS,
+            SETUP_OSRM_DOWNLOAD_PBF,
+            SETUP_OSRM_REGION_BOUNDARIES,
+            DATAPROC_OSMIUM_EXTRACT_REGIONS,
+            DATAPROC_OSRM_BUILD_GRAPHS_ALL_REGIONS,  # Conceptual Grouping
+            SETUP_OSRM_SYSTEMD_SERVICES_ALL_REGIONS,  # Conceptual Grouping
+            CONFIG_OSRM_ACTIVATE_SERVICES_ALL_REGIONS,  # Conceptual Grouping
         ],
     },
     {
         "name": "Apache Service",
         "steps": [
-            "SETUP_APACHE_PKG_CHECK",
-            "CONFIG_APACHE_PORTS",
-            "CONFIG_APACHE_MOD_TILE_CONF",
-            "CONFIG_APACHE_TILE_SITE_CONF",
-            "CONFIG_APACHE_MODULES_SITES",
-            "SERVICE_APACHE_ACTIVATE",
+            SETUP_APACHE_PKG_CHECK,
+            CONFIG_APACHE_PORTS,
+            CONFIG_APACHE_MOD_TILE_CONF,
+            CONFIG_APACHE_TILE_SITE_CONF,
+            CONFIG_APACHE_MODULES_SITES,
+            SERVICE_APACHE_ACTIVATE,
         ],
     },
     {
         "name": "Nginx Service",
         "steps": [
-            "SETUP_NGINX_PKG_CHECK",
-            "CONFIG_NGINX_PROXY_SITE",
-            "CONFIG_NGINX_MANAGE_SITES",
-            "CONFIG_NGINX_TEST_CONFIG",
-            "SERVICE_NGINX_ACTIVATE",
+            SETUP_NGINX_PKG_CHECK,
+            CONFIG_NGINX_PROXY_SITE,
+            CONFIG_NGINX_MANAGE_SITES,
+            CONFIG_NGINX_TEST_CONFIG,
+            SERVICE_NGINX_ACTIVATE,
         ],
     },
     {
         "name": "Certbot Service",
-        "steps": ["SETUP_CERTBOT_PACKAGES", "CONFIG_CERTBOT_RUN"],
+        "steps": [SETUP_CERTBOT_PACKAGES, CONFIG_CERTBOT_RUN],
     },
-    {"name": "Application Content", "steps": ["WEBSITE_CONTENT_DEPLOY"]},
+    {"name": "Application Content", "steps": [WEBSITE_CONTENT_DEPLOY_TAG]},
     {"name": "GTFS Data Pipeline", "steps": [GTFS_PROCESS_AND_SETUP_TAG]},
-    {"name": "Raster Tile Pre-rendering", "steps": ["RASTER_PREP"]},
-    {"name": "Systemd Reload", "steps": ["SYSTEMD_RELOAD_TASK"]},
+    {"name": "Raster Tile Pre-rendering", "steps": [RASTER_PREP_TAG]},
+    {"name": "Systemd Reload", "steps": [SYSTEMD_RELOAD_TASK_TAG]},
 ]
 
 task_execution_details_lookup: Dict[str, Tuple[str, int]] = {
@@ -252,17 +353,19 @@ task_execution_details_lookup: Dict[str, Tuple[str, int]] = {
     for group_info in INSTALLATION_GROUPS_ORDER
     for step_idx, step_tag in enumerate(group_info["steps"])
 }
+# Add orchestrator tags
 task_execution_details_lookup.update({
     ALL_CORE_PREREQUISITES_GROUP_TAG: ("Comprehensive Prerequisites", 0),
-    "UFW_FULL_SETUP": ("Firewall Service (UFW)", 0),
-    "POSTGRES_FULL_SETUP": ("Database Service (PostgreSQL)", 0),
-    "CARTO_FULL_SETUP": ("Carto Service", 0),
-    "RENDERD_FULL_SETUP": ("Renderd Service", 0),
-    "NGINX_FULL_SETUP": ("Nginx Service", 0),
-    "PGTILESERV_FULL_SETUP": ("pg_tileserv Service", 0),
-    "OSRM_FULL_SETUP": ("OSRM Service & Data Processing", 0),
-    "APACHE_FULL_SETUP": ("Apache Service", 0),
-    "CERTBOT_FULL_SETUP": ("Certbot Service", 0),
+    UFW_FULL_SETUP: ("Firewall Service (UFW)", 0),
+    POSTGRES_FULL_SETUP: ("Database Service (PostgreSQL)", 0),
+    CARTO_FULL_SETUP: ("Carto Service", 0),
+    RENDERD_FULL_SETUP: ("Renderd Service", 0),
+    NGINX_FULL_SETUP: ("Nginx Service", 0),
+    PGTILESERV_FULL_SETUP: ("pg_tileserv Service", 0),
+    OSRM_FULL_SETUP: ("OSRM Service & Data Processing", 0),
+    APACHE_FULL_SETUP: ("Apache Service", 0),
+    CERTBOT_FULL_SETUP: ("Certbot Service", 0),
+    # Add other group orchestrator tags if they exist and are used as keys
 })
 
 group_order_lookup: Dict[str, int] = {
@@ -273,15 +376,14 @@ group_order_lookup: Dict[str, int] = {
 
 def get_dynamic_help(base_help: str, task_tag: str) -> str:
     details = task_execution_details_lookup.get(task_tag)
-    if details and details[1] > 0:
-        return (
-            f"{base_help} (Part of: '{details[0]}', Sub-step: {details[1]})"
-        )
-    elif (
-        details and details[1] == 0
-    ):  # Indicates it's a group orchestrator tag
+    if details and details[1] > 0:  # It's a sub-step of a main group
+        return f"{base_help} (Part of Group: '{details[0]}', Sub-step: {details[1]})"
+    elif details and details[1] == 0:  # It's an orchestrator for a main group
         return f"{base_help} (Orchestrates Group: '{details[0]}')"
-    return f"{base_help} (Standalone or specific task)"
+    # Fallback for tags not directly in INSTALLATION_GROUPS_ORDER's steps or as main group orchestrators
+    # This might apply to very granular, standalone tasks if any are defined that way,
+    # or if a tag is for a function used by an orchestrator but not listed as a "step" itself.
+    return f"{base_help} (Specific task or component)"
 
 
 # --- Orchestrator Sequences (accept app_cfg and pass it to execute_step) ---
@@ -301,7 +403,7 @@ def ufw_full_setup_sequence(
             "Check UFW Package Installation",
             ensure_ufw_package_installed,
         ),
-        ("CONFIG_UFW_RULES", "Configure UFW Rules", apply_ufw_rules),
+        (CONFIG_UFW_RULES, "Configure UFW Rules", apply_ufw_rules),
         (
             UFW_ACTIVATE_SERVICE_TAG,
             "Activate UFW Service",
@@ -333,37 +435,37 @@ def postgres_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_POSTGRES_PKG_CHECK",
+            SETUP_POSTGRES_PKG_CHECK,
             "Check PostgreSQL Packages",
             ensure_postgres_packages_are_installed,
         ),
         (
-            "CONFIG_POSTGRES_USER_DB",
+            CONFIG_POSTGRES_USER_DB,
             "Create PostgreSQL User & Database",
             create_postgres_user_and_db,
         ),
         (
-            "CONFIG_POSTGRES_EXTENSIONS",
+            CONFIG_POSTGRES_EXTENSIONS,
             "Enable PostgreSQL Extensions",
             enable_postgres_extensions,
         ),
         (
-            "CONFIG_POSTGRES_PERMISSIONS",
+            CONFIG_POSTGRES_PERMISSIONS,
             "Set PostgreSQL Permissions",
             set_postgres_permissions,
         ),
         (
-            "CONFIG_POSTGRESQL_CONF",
+            CONFIG_POSTGRESQL_CONF,
             "Customize postgresql.conf",
             customize_postgresql_conf,
         ),
         (
-            "CONFIG_PG_HBA_CONF",
+            CONFIG_PG_HBA_CONF,
             "Customize pg_hba.conf",
             customize_pg_hba_conf,
         ),
         (
-            "SERVICE_POSTGRES_RESTART_ENABLE",
+            SERVICE_POSTGRES_RESTART_ENABLE,
             "Restart & Enable PostgreSQL",
             restart_and_enable_postgres_service,
         ),
@@ -410,34 +512,34 @@ def carto_full_setup_sequence(
         deploy_mapnik_stylesheet(xml_path_to_deploy, ac, cl)
 
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
-        ("SETUP_CARTO_CLI", "Install Carto CLI", install_carto_cli),
+        (SETUP_CARTO_CLI, "Install Carto CLI", install_carto_cli),
         (
-            "SETUP_CARTO_REPO",
+            SETUP_CARTO_REPO,
             "Setup OSM-Carto Repository",
             setup_osm_carto_repository,
         ),
         (
-            "SETUP_CARTO_PREPARE_DIR",
+            SETUP_CARTO_PREPARE_DIR,
             "Prepare Carto Directory",
             prepare_carto_directory_for_processing,
         ),
         (
-            "SETUP_CARTO_FETCH_DATA",
+            SETUP_CARTO_FETCH_DATA,
             "Fetch Carto External Data",
             fetch_carto_external_data,
         ),
         (
-            "CONFIG_CARTO_COMPILE",
+            CONFIG_CARTO_COMPILE,
             "Compile OSM Carto Stylesheet",
             _compile_step,
         ),
-        ("CONFIG_CARTO_DEPLOY_XML", "Deploy Mapnik Stylesheet", _deploy_step),
+        (CONFIG_CARTO_DEPLOY_XML, "Deploy Mapnik Stylesheet", _deploy_step),
         (
-            "CONFIG_CARTO_FINALIZE_DIR",
+            CONFIG_CARTO_FINALIZE_DIR,
             "Finalize Carto Directory",
             finalize_carto_directory_processing,
         ),
-        ("CONFIG_SYSTEM_FONT_CACHE", "Update Font Cache", update_font_cache),
+        (CONFIG_SYSTEM_FONT_CACHE, "Update Font Cache", update_font_cache),
     ]
     try:
         for tag, desc, func in steps:
@@ -482,27 +584,27 @@ def renderd_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_RENDERD_PKG_CHECK",
+            SETUP_RENDERD_PKG_CHECK,
             "Check Renderd Packages",
             ensure_renderd_packages_installed,
         ),
         (
-            "SETUP_RENDERD_DIRS",
+            SETUP_RENDERD_DIRS,
             "Create Renderd Directories",
             create_renderd_directories,
         ),
         (
-            "SETUP_RENDERD_SYSTEMD_FILE",
+            SETUP_RENDERD_SYSTEMD_FILE,
             "Create Renderd Systemd File",
             create_renderd_systemd_service_file,
         ),
         (
-            "CONFIG_RENDERD_CONF_FILE",
+            CONFIG_RENDERD_CONF_FILE,
             "Create renderd.conf",
             create_renderd_conf_file,
         ),
         (
-            "SERVICE_RENDERD_ACTIVATE",
+            SERVICE_RENDERD_ACTIVATE,
             "Activate Renderd Service",
             activate_renderd_service,
         ),
@@ -532,32 +634,32 @@ def apache_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_APACHE_PKG_CHECK",
+            SETUP_APACHE_PKG_CHECK,
             "Check Apache Packages",
             ensure_apache_packages_installed,
         ),
         (
-            "CONFIG_APACHE_PORTS",
+            CONFIG_APACHE_PORTS,
             "Configure Apache Ports",
             configure_apache_ports,
         ),
         (
-            "CONFIG_APACHE_MOD_TILE_CONF",
+            CONFIG_APACHE_MOD_TILE_CONF,
             "Create mod_tile.conf",
             create_mod_tile_config,
         ),
         (
-            "CONFIG_APACHE_TILE_SITE_CONF",
+            CONFIG_APACHE_TILE_SITE_CONF,
             "Create Apache Tile Site",
             create_apache_tile_site_config,
         ),
         (
-            "CONFIG_APACHE_MODULES_SITES",
+            CONFIG_APACHE_MODULES_SITES,
             "Manage Apache Modules/Sites",
             manage_apache_modules_and_sites,
         ),
         (
-            "SERVICE_APACHE_ACTIVATE",
+            SERVICE_APACHE_ACTIVATE,
             "Activate Apache Service",
             activate_apache_service,
         ),
@@ -587,27 +689,27 @@ def nginx_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_NGINX_PKG_CHECK",
+            SETUP_NGINX_PKG_CHECK,
             "Check Nginx Package",
             ensure_nginx_package_installed,
         ),
         (
-            "CONFIG_NGINX_PROXY_SITE",
+            CONFIG_NGINX_PROXY_SITE,
             "Create Nginx Proxy Site",
             create_nginx_proxy_site_config,
         ),
         (
-            "CONFIG_NGINX_MANAGE_SITES",
+            CONFIG_NGINX_MANAGE_SITES,
             "Manage Nginx Sites",
             manage_nginx_sites,
         ),
         (
-            "CONFIG_NGINX_TEST_CONFIG",
+            CONFIG_NGINX_TEST_CONFIG,
             "Test Nginx Configuration",
             test_nginx_configuration,
         ),
         (
-            "SERVICE_NGINX_ACTIVATE",
+            SERVICE_NGINX_ACTIVATE,
             "Activate Nginx Service",
             activate_nginx_service,
         ),
@@ -637,11 +739,11 @@ def certbot_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_CERTBOT_PACKAGES",
+            SETUP_CERTBOT_PACKAGES,
             "Install Certbot Packages",
             install_certbot_packages,
         ),
-        ("CONFIG_CERTBOT_RUN", "Run Certbot for Nginx", run_certbot_nginx),
+        (CONFIG_CERTBOT_RUN, "Run Certbot for Nginx", run_certbot_nginx),
     ]
     for tag, desc, func in steps:
         if not execute_step(
@@ -674,32 +776,32 @@ def pg_tileserv_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_PGTS_DOWNLOAD_BINARY",
+            SETUP_PGTS_DOWNLOAD_BINARY,
             "Download pg_tileserv Binary",
             download_and_install_pg_tileserv_binary,
         ),
         (
-            "SETUP_PGTS_CREATE_USER",
+            SETUP_PGTS_CREATE_USER,
             "Create pg_tileserv User",
             create_pg_tileserv_system_user,
         ),
         (
-            "SETUP_PGTS_BINARY_PERMS",
+            SETUP_PGTS_BINARY_PERMS,
             "Set pg_tileserv Permissions",
             setup_pg_tileserv_binary_permissions,
         ),
         (
-            "SETUP_PGTS_SYSTEMD_FILE",
+            SETUP_PGTS_SYSTEMD_FILE,
             "Create pg_tileserv Systemd File",
             create_pg_tileserv_systemd_service_file,
         ),
         (
-            "CONFIG_PGTS_CONFIG_FILE",
+            CONFIG_PGTS_CONFIG_FILE,
             "Create pg_tileserv config.toml",
             create_pg_tileserv_config_file,
         ),
         (
-            "SERVICE_PGTS_ACTIVATE",
+            SERVICE_PGTS_ACTIVATE,
             "Activate pg_tileserv Service",
             activate_pg_tileserv_service,
         ),
@@ -750,18 +852,18 @@ def osrm_full_setup_sequence(
 
     infra_steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            "SETUP_OSRM_DEPS",
+            SETUP_OSRM_DEPS,
             "Ensure OSRM Dependencies",
             ensure_osrm_dependencies,
         ),
         (
-            "SETUP_OSRM_DIRS",
+            SETUP_OSRM_DIRS,
             "Setup OSRM Data Directories",
             setup_osrm_data_directories,
         ),
-        ("SETUP_OSRM_DOWNLOAD_PBF", "Download Base PBF", _download_pbf_step),
+        (SETUP_OSRM_DOWNLOAD_PBF, "Download Base PBF", _download_pbf_step),
         (
-            "SETUP_OSRM_REGION_BOUNDARIES",
+            SETUP_OSRM_REGION_BOUNDARIES,
             "Prepare Region Boundaries",
             prepare_region_boundaries,
         ),
@@ -773,7 +875,7 @@ def osrm_full_setup_sequence(
             raise RuntimeError(f"OSRM infra step '{desc}' failed.")
 
     if not execute_step(
-        "DATAPROC_OSMIUM_EXTRACT_REGIONS",
+        DATAPROC_OSMIUM_EXTRACT_REGIONS,
         "Extract Regional PBFs",
         _extract_regions_step,
         app_cfg,
@@ -806,45 +908,54 @@ def osrm_full_setup_sequence(
                     f"Failed to build OSRM graphs for region {r}"
                 )
 
+        # Dynamically create tag for this specific region's build step
+        # This assumes DATAPROC_OSRM_BUILD_GRAPHS_ALL_REGIONS is a conceptual parent
+        current_build_tag = f"DATAPROC_OSRM_BUILD_GRAPH_{rn_key.upper()}"
         if not execute_step(
-            f"DATAPROC_OSRM_BUILD_GRAPH_{rn_key.upper()}",
+            current_build_tag,
             f"Build OSRM Graphs for {rn_key}",
             _build,
             app_cfg,
             logger_to_use,
             cli_prompt_for_rerun,
         ):
-            continue
+            continue  # Skip to next region if build fails
 
         def _create_svc(
             ac: AppSettings, cl: Optional[logging.Logger], r: str = rn_key
         ) -> None:
             create_osrm_routed_service_file(r, ac, cl)
 
+        current_service_create_tag = (
+            f"SETUP_OSRM_SYSTEMD_SERVICE_{rn_key.upper()}"
+        )
         if not execute_step(
-            f"SETUP_OSRM_SYSTEMD_SERVICE_{rn_key.upper()}",
+            current_service_create_tag,
             f"Create OSRM Service File for {rn_key}",
             _create_svc,
             app_cfg,
             logger_to_use,
             cli_prompt_for_rerun,
         ):
-            continue
+            continue  # Skip to next region
 
         def _activate_svc(
             ac: AppSettings, cl: Optional[logging.Logger], r: str = rn_key
         ) -> None:
             activate_osrm_routed_service(r, ac, cl)
 
+        current_service_activate_tag = (
+            f"CONFIG_OSRM_ACTIVATE_SERVICE_{rn_key.upper()}"
+        )
         if not execute_step(
-            f"CONFIG_OSRM_ACTIVATE_SERVICE_{rn_key.upper()}",
+            current_service_activate_tag,
             f"Activate OSRM Service for {rn_key}",
             _activate_svc,
             app_cfg,
             logger_to_use,
             cli_prompt_for_rerun,
         ):
-            continue
+            continue  # Skip to next region
         processed_regions_count += 1
 
     if processed_regions_count:
@@ -856,8 +967,8 @@ def osrm_full_setup_sequence(
         )
     else:
         log_map_server(
-            f"{app_cfg.symbols.get('warning', '!')} No OSRM services successfully processed.",
-            level="warning",
+            f"{app_cfg.symbols.get('warning', '!')} No OSRM services successfully processed for any region.",
+            level="warning",  # Changed from just "No OSRM services successfully processed."
             current_logger=logger_to_use,
             app_settings=app_cfg,
         )
@@ -874,40 +985,35 @@ def _wrapped_core_prerequisites_group(
 def _wrapped_systemd_reload_step_group(
     app_settings: AppSettings, logger_instance: Optional[logging.Logger]
 ) -> None:
-    if not systemd_reload_step_group(
-        app_settings, logger_instance
-    ):  # systemd_reload_step_group itself returns bool
+    if not systemd_reload_step_group(app_settings, logger_instance):
         raise RuntimeError("Systemd reload step group failed.")
 
 
 def _wrapped_data_prep_group(
     app_settings: AppSettings, logger_instance: Optional[logging.Logger]
 ) -> None:
-    if not data_prep_group(
-        app_settings, logger_instance
-    ):  # data_prep_group returns bool
+    if not data_prep_group(app_settings, logger_instance):
         raise RuntimeError("Data preparation group failed overall.")
 
 
-def systemd_reload_step_group(  # This function actually returns bool, used as a sub-orchestrator
+def systemd_reload_step_group(
     app_cfg: AppSettings,
     current_logger_instance: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = (
         current_logger_instance if current_logger_instance else logger
     )
-    # systemd_reload (the actual action) returns None and is StepExecutorFunc compatible
     return execute_step(
-        "SYSTEMD_RELOAD_MAIN",
+        SYSTEMD_RELOAD_TASK_TAG,  # Use defined constant for the tag
         "Reload Systemd Daemon (Core Action)",
-        systemd_reload,  # This is the (AppSettings, Logger) -> None function
+        systemd_reload,
         app_cfg,
         logger_to_use,
         cli_prompt_for_rerun,
     )
 
 
-def run_full_gtfs_module_wrapper(  # This is already StepExecutorFunc compatible
+def run_full_gtfs_module_wrapper(
     app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
 ) -> None:
     process_and_setup_gtfs(
@@ -1037,52 +1143,116 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     task_flags_definitions: List[Tuple[str, str, str]] = [
         (
             "boot_verbosity",
-            "PREREQ_BOOT_VERBOSITY_TAG",
+            PREREQ_BOOT_VERBOSITY_TAG,  # Use constant
             "Boot verbosity setup.",
         ),
         (
             "core_conflicts",
-            "PREREQ_CORE_CONFLICTS_TAG",
+            PREREQ_CORE_CONFLICTS_TAG,  # Use constant
             "Core conflict removal.",
         ),
         (
             "docker_install",
-            "PREREQ_DOCKER_ENGINE_TAG",
+            PREREQ_DOCKER_ENGINE_TAG,  # Use constant
             "Docker installation.",
         ),
-        ("nodejs_install", "PREREQ_NODEJS_LTS_TAG", "Node.js installation."),
-        ("ufw_pkg_check", UFW_PACKAGE_CHECK_TAG, "UFW Package Check."),
-        ("ufw_rules", "CONFIG_UFW_RULES", "Configure UFW Rules."),
-        ("ufw_activate", UFW_ACTIVATE_SERVICE_TAG, "Activate UFW Service."),
-        ("ufw", "UFW_FULL_SETUP", "UFW full setup."),
-        ("postgres", "POSTGRES_FULL_SETUP", "PostgreSQL full setup."),
-        ("carto", "CARTO_FULL_SETUP", "Carto full setup."),
-        ("renderd", "RENDERD_FULL_SETUP", "Renderd full setup."),
-        ("apache", "APACHE_FULL_SETUP", "Apache & mod_tile full setup."),
-        ("nginx", "NGINX_FULL_SETUP", "Nginx full setup."),
-        ("certbot", "CERTBOT_FULL_SETUP", "Certbot full setup."),
-        ("pgtileserv", "PGTILESERV_FULL_SETUP", "pg_tileserv full setup."),
-        ("osrm", "OSRM_FULL_SETUP", "OSRM full setup & data processing."),
-        ("gtfs_prep", GTFS_PROCESS_AND_SETUP_TAG, "Full GTFS Pipeline."),
-        ("raster_prep", "RASTER_PREP", "Raster tile pre-rendering."),
-        ("website_setup", "WEBSITE_CONTENT_DEPLOY", "Deploy test website."),
-        # Renamed dest from website-prep to website_setup to match service_orchestrator_cli_keys
+        (
+            "nodejs_install",
+            PREREQ_NODEJS_LTS_TAG,  # Use constant
+            "Node.js installation.",
+        ),
+        (
+            "ufw_pkg_check",
+            UFW_PACKAGE_CHECK_TAG,  # Use constant
+            "UFW Package Check.",
+        ),
+        (
+            "ufw_rules",
+            CONFIG_UFW_RULES,  # Use constant
+            "Configure UFW Rules.",
+        ),
+        (
+            "ufw_activate",
+            UFW_ACTIVATE_SERVICE_TAG,  # Use constant
+            "Activate UFW Service.",
+        ),
+        (
+            "ufw",
+            UFW_FULL_SETUP,  # Use constant
+            "UFW full setup.",
+        ),
+        (
+            "postgres",
+            POSTGRES_FULL_SETUP,  # Use constant
+            "PostgreSQL full setup.",
+        ),
+        (
+            "carto",
+            CARTO_FULL_SETUP,  # Use constant
+            "Carto full setup.",
+        ),
+        (
+            "renderd",
+            RENDERD_FULL_SETUP,  # Use constant
+            "Renderd full setup.",
+        ),
+        (
+            "apache",
+            APACHE_FULL_SETUP,  # Use constant
+            "Apache & mod_tile full setup.",
+        ),
+        (
+            "nginx",
+            NGINX_FULL_SETUP,  # Use constant
+            "Nginx full setup.",
+        ),
+        (
+            "certbot",
+            CERTBOT_FULL_SETUP,  # Use constant
+            "Certbot full setup.",
+        ),
+        (
+            "pgtileserv",
+            PGTILESERV_FULL_SETUP,  # Use constant
+            "pg_tileserv full setup.",
+        ),
+        (
+            "osrm",
+            OSRM_FULL_SETUP,  # Use constant
+            "OSRM full setup & data processing.",
+        ),
+        (
+            "gtfs_prep",
+            GTFS_PROCESS_AND_SETUP_TAG,  # Use constant
+            "Full GTFS Pipeline.",
+        ),
+        (
+            "raster_prep",
+            RASTER_PREP_TAG,  # Use constant
+            "Raster tile pre-rendering.",
+        ),
+        (
+            "website_setup",
+            WEBSITE_CONTENT_DEPLOY_TAG,  # Use constant
+            "Deploy test website.",
+        ),
         (
             "task_systemd_reload",
-            "SYSTEMD_RELOAD_TASK",
+            SYSTEMD_RELOAD_TASK_TAG,  # Use constant
             "Systemd reload task.",
         ),
     ]
     task_group = parser.add_argument_group("Individual Task Flags")
-    for dest_name, task_tag, base_desc in task_flags_definitions:
+    for dest_name, task_tag_const, base_desc in task_flags_definitions:
         task_group.add_argument(
             f"--{dest_name.replace('_', '-')}",
             action="store_true",
-            dest=dest_name,  # Ensure dest matches the key in defined_tasks_callable_map
-            help=get_dynamic_help(base_desc, task_tag),
+            dest=dest_name,
+            help=get_dynamic_help(
+                base_desc, task_tag_const
+            ),  # Pass the constant
         )
 
-    # --- Enhanced Help Texts for Group Flags ---
     prereqs_help_detail = (
         "Run 'Comprehensive Prerequisites' group. Includes: --boot-verbosity, --core-conflicts, "
         "--docker-install, --nodejs-install, and setup for essential utilities, Python, "
@@ -1245,7 +1415,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             )
         return 0
 
-    # Wrappers for boolean-returning group functions to make them StepExecutorFunc compatible
     def _wrapped_core_prerequisites_group(
         app_s: AppSettings, log_inst: Optional[logging.Logger]
     ) -> None:
@@ -1255,8 +1424,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     def _wrapped_systemd_reload_step_group(
         app_s: AppSettings, log_inst: Optional[logging.Logger]
     ) -> None:
-        # systemd_reload_step_group calls execute_step with systemd_reload which returns None.
-        # The bool from systemd_reload_step_group indicates if that execute_step call succeeded.
         if not systemd_reload_step_group(app_s, log_inst):
             raise RuntimeError("Systemd reload step group failed.")
 
@@ -1291,23 +1458,24 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     }
 
     cli_flag_to_task_details: Dict[str, Tuple[str, str]] = {
-        item[0]: (item[1], item[2]) for item in task_flags_definitions
+        item[0]: (item[1], item[2])
+        for item in task_flags_definitions  # item[1] is now the constant
     }
     cli_flag_to_task_details.update({
         "run_all_core_prerequisites": (
             ALL_CORE_PREREQUISITES_GROUP_TAG,
             "Comprehensive Prerequisites",
         ),
-        "ufw": ("UFW_FULL_SETUP", "UFW Full Setup"),
-        "postgres": ("POSTGRES_FULL_SETUP", "PostgreSQL Full Setup"),
-        "carto": ("CARTO_FULL_SETUP", "Carto Full Setup"),
-        "renderd": ("RENDERD_FULL_SETUP", "Renderd Full Setup"),
-        "apache": ("APACHE_FULL_SETUP", "Apache Full Setup"),
-        "nginx": ("NGINX_FULL_SETUP", "Nginx Full Setup"),
-        "certbot": ("CERTBOT_FULL_SETUP", "Certbot Full Setup"),
-        "pgtileserv": ("PGTILESERV_FULL_SETUP", "pg_tileserv Full Setup"),
-        "osrm": ("OSRM_FULL_SETUP", "OSRM Full Setup"),
-        "website_setup": ("WEBSITE_CONTENT_DEPLOY", "Deploy test website"),
+        "ufw": (UFW_FULL_SETUP, "UFW Full Setup"),
+        "postgres": (POSTGRES_FULL_SETUP, "PostgreSQL Full Setup"),
+        "carto": (CARTO_FULL_SETUP, "Carto Full Setup"),
+        "renderd": (RENDERD_FULL_SETUP, "Renderd Full Setup"),
+        "apache": (APACHE_FULL_SETUP, "Apache Full Setup"),
+        "nginx": (NGINX_FULL_SETUP, "Nginx Full Setup"),
+        "certbot": (CERTBOT_FULL_SETUP, "Certbot Full Setup"),
+        "pgtileserv": (PGTILESERV_FULL_SETUP, "pg_tileserv Full Setup"),
+        "osrm": (OSRM_FULL_SETUP, "OSRM Full Setup"),
+        "website_setup": (WEBSITE_CONTENT_DEPLOY_TAG, "Deploy test website"),
     })
 
     overall_success = True
@@ -1339,7 +1507,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         tasks_to_run.insert(0, {"tag": tag, "desc": desc, "func": func})
 
     if tasks_to_run:
-        # Sort tasks based on INSTALLATION_GROUPS_ORDER
+
         def get_sort_key(task_item: Dict[str, Any]) -> Tuple[int, int]:
             task_tag = task_item["tag"]
             details = task_execution_details_lookup.get(task_tag)
@@ -1349,10 +1517,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                     group_name, sys.maxsize
                 )
                 return (group_main_order, step_index_in_group)
-            return (
-                sys.maxsize,
-                0,
-            )
+            return (sys.maxsize, 0)
 
         tasks_to_run.sort(key=get_sort_key)
 
@@ -1395,49 +1560,49 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 "Comprehensive Prerequisites",
                 _wrapped_core_prerequisites_group,
             ),
-            ("UFW_FULL_SETUP", "UFW Full Setup", ufw_full_setup_sequence),
+            (UFW_FULL_SETUP, "UFW Full Setup", ufw_full_setup_sequence),
             (
-                "POSTGRES_FULL_SETUP",
+                POSTGRES_FULL_SETUP,
                 "PostgreSQL Full Setup",
                 postgres_full_setup_sequence,
             ),
             (
-                "PGTILESERV_FULL_SETUP",
+                PGTILESERV_FULL_SETUP,
                 "pg_tileserv Full Setup",
                 pg_tileserv_full_setup_sequence,
             ),
             (
-                "CARTO_FULL_SETUP",
+                CARTO_FULL_SETUP,
                 "Carto Full Setup",
                 carto_full_setup_sequence,
             ),
             (
-                "RENDERD_FULL_SETUP",
+                RENDERD_FULL_SETUP,
                 "Renderd Full Setup",
                 renderd_full_setup_sequence,
             ),
             (
-                "OSRM_FULL_SETUP",
+                OSRM_FULL_SETUP,
                 "OSRM Full Setup & Data Processing",
                 osrm_full_setup_sequence,
             ),
             (
-                "APACHE_FULL_SETUP",
+                APACHE_FULL_SETUP,
                 "Apache Full Setup",
                 apache_full_setup_sequence,
             ),
             (
-                "NGINX_FULL_SETUP",
+                NGINX_FULL_SETUP,
                 "Nginx Full Setup",
                 nginx_full_setup_sequence,
             ),
             (
-                "CERTBOT_FULL_SETUP",
+                CERTBOT_FULL_SETUP,
                 "Certbot Full Setup",
                 certbot_full_setup_sequence,
             ),
             (
-                "WEBSITE_CONTENT_DEPLOY",
+                WEBSITE_CONTENT_DEPLOY_TAG,
                 "Deploy Website Content",
                 deploy_test_website_content,
             ),
@@ -1447,12 +1612,13 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 run_full_gtfs_module_wrapper,
             ),
             (
-                "RASTER_PREP",
+                RASTER_PREP_TAG,
                 "Raster Tile Pre-rendering",
                 raster_tile_prerender,
             ),
             (
-                "SYSTEMD_RELOAD_GROUP",
+                # Using SYSTEMD_RELOAD_TASK_TAG here for consistency, assuming it maps to the group wrapper
+                SYSTEMD_RELOAD_TASK_TAG,  # Changed from "SYSTEMD_RELOAD_GROUP" to the defined constant
                 "Systemd Reload After All Services",
                 _wrapped_systemd_reload_step_group,
             ),
@@ -1534,7 +1700,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 overall_success = False
         if overall_success:
             if not execute_step(
-                cli_flag_to_task_details["task_systemd_reload"][0],
+                SYSTEMD_RELOAD_TASK_TAG,  # Use constant
                 "Systemd Reload After Services",
                 _wrapped_systemd_reload_step_group,
                 APP_CONFIG,
@@ -1552,7 +1718,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             app_settings=APP_CONFIG,
         )
         if not execute_step(
-            "DATAPROC_GROUP_MAIN",
+            "DATAPROC_GROUP_MAIN",  # This tag is fine as it's for the orchestrator itself
             "Data Preparation Group",
             _wrapped_data_prep_group,
             APP_CONFIG,
@@ -1564,7 +1730,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     elif parsed_cli_args.group_systemd_reload_flag:
         action_taken = True
         if not execute_step(
-            cli_flag_to_task_details["task_systemd_reload"][0],
+            SYSTEMD_RELOAD_TASK_TAG,  # Use constant
             "Systemd Reload (Group CLI Flag)",
             _wrapped_systemd_reload_step_group,
             APP_CONFIG,

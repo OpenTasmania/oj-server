@@ -7,7 +7,12 @@ package installations, Docker, and Node.js.
 
 import getpass
 import logging
-from typing import Optional
+from typing import (  # Added List, Tuple, Callable
+    Callable,
+    List,
+    Optional,
+    Tuple,
+)
 
 # check_package_installed is in common.command_utils and now takes app_settings
 from common.command_utils import (
@@ -22,14 +27,28 @@ from installer.docker_installer import install_docker_engine
 from installer.nodejs_installer import install_nodejs_lts
 from setup import config as static_config  # For package lists, static paths
 from setup.cli_handler import (
-    cli_prompt_for_rerun,  # cli_prompt_for_rerun now takes app_settings
+    cli_prompt_for_rerun,
 )
 from setup.config_models import AppSettings
 from setup.step_executor import (
-    execute_step,  # execute_step now takes app_settings
+    execute_step,
 )
 
 module_logger = logging.getLogger(__name__)
+
+# Define Task Tags as constants to be used internally and for import by tests
+PREREQ_BOOT_VERBOSITY_TAG = "PREREQ_BOOT_VERBOSITY_TAG"
+PREREQ_CORE_CONFLICTS_TAG = "PREREQ_CORE_CONFLICTS_TAG"
+PREREQ_ESSENTIAL_UTILS_TAG = "PREREQ_ESSENTIAL_UTILS_TAG"
+PREREQ_PYTHON_PACKAGES_TAG = "PREREQ_PYTHON_PACKAGES_TAG"
+PREREQ_POSTGRES_PACKAGES_TAG = "PREREQ_POSTGRES_PACKAGES_TAG"
+PREREQ_MAPPING_FONT_PACKAGES_TAG = "PREREQ_MAPPING_FONT_PACKAGES_TAG"
+PREREQ_UNATTENDED_UPGRADES_TAG = "PREREQ_UNATTENDED_UPGRADES_TAG"
+PREREQ_DOCKER_ENGINE_TAG = "PREREQ_DOCKER_ENGINE_TAG"
+PREREQ_NODEJS_LTS_TAG = "PREREQ_NODEJS_LTS_TAG"
+
+
+StepExecutorFuncCore = Callable[[AppSettings, Optional[logging.Logger]], None]
 
 
 def boot_verbosity(
@@ -45,8 +64,7 @@ def boot_verbosity(
         app_settings,
     )
 
-    grub_file = "/etc/default/grub"  # Static system path
-    # backup_file now takes app_settings
+    grub_file = "/etc/default/grub"
     if backup_file(grub_file, app_settings, current_logger=logger_to_use):
         try:
             sed_expressions = [
@@ -61,7 +79,6 @@ def boot_verbosity(
                 r"-e",
                 r'/^GRUB_CMDLINE_LINUX_DEFAULT=/s/ "/"/g',
             ]
-            # run_elevated_command now takes app_settings
             run_elevated_command(
                 ["sed", "-i"] + sed_expressions + [grub_file],
                 app_settings,
@@ -89,7 +106,6 @@ def boot_verbosity(
                 app_settings,
                 exc_info=True,
             )
-            # Non-fatal for now, allow script to continue
 
     current_user_name = getpass.getuser()
     log_map_server(
@@ -138,7 +154,6 @@ def core_conflict_removal(
         app_settings,
     )
     try:
-        # check_package_installed now takes app_settings
         if check_package_installed(
             "nodejs", app_settings=app_settings, current_logger=logger_to_use
         ):
@@ -179,7 +194,6 @@ def core_conflict_removal(
             app_settings,
             exc_info=True,
         )
-        # Potentially non-fatal, allow continuation if this specific removal fails
 
 
 def install_essential_utilities(
@@ -203,7 +217,6 @@ def install_essential_utilities(
             current_logger=logger_to_use,
         )
 
-        # Package list from static_config (not runtime configurable via AppSettings)
         essential_utils = list(set(static_config.CORE_PREREQ_PACKAGES))
 
         if essential_utils:
@@ -232,7 +245,7 @@ def install_essential_utilities(
             app_settings,
             exc_info=True,
         )
-        raise  # This step is critical
+        raise
 
 
 def install_python_system_packages(
@@ -284,8 +297,6 @@ def install_postgres_packages(
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     pg_version = app_settings.pg.version
-    # Package names in static_config.POSTGRES_PACKAGES are assumed to be versioned correctly
-    # or are generic. If they need to change based on app_settings.pg.version, logic would be needed here.
     pg_pkgs = static_config.POSTGRES_PACKAGES
     if not pg_pkgs:
         log_map_server(
@@ -420,10 +431,8 @@ def install_unattended_upgrades(
             app_settings,
             exc_info=True,
         )
-        # Non-critical, don't raise
 
 
-# Orchestrator for all core prerequisite steps
 def core_prerequisites_group(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:
@@ -437,57 +446,55 @@ def core_prerequisites_group(
     )
     overall_success = True
 
-    # All these step functions now expect (AppSettings, Optional[logging.Logger])
-    prereq_steps_with_desc = [
+    prereq_steps_with_desc: List[Tuple[str, str, StepExecutorFuncCore]] = [
         (
-            "PREREQ_BOOT_VERBOSITY",
+            PREREQ_BOOT_VERBOSITY_TAG,
             "Improve Boot Verbosity & Journal Group",
             boot_verbosity,
         ),
         (
-            "PREREQ_CORE_CONFLICTS",
+            PREREQ_CORE_CONFLICTS_TAG,
             "Remove Core Node.js Conflicts",
             core_conflict_removal,
         ),
         (
-            "PREREQ_ESSENTIAL_UTILS",
+            PREREQ_ESSENTIAL_UTILS_TAG,
             "Install Essential Utilities & Update System",
             install_essential_utilities,
         ),
         (
-            "PREREQ_PYTHON_PACKAGES",
+            PREREQ_PYTHON_PACKAGES_TAG,
             "Install Python System Packages",
             install_python_system_packages,
         ),
         (
-            "PREREQ_POSTGRES_PACKAGES",
+            PREREQ_POSTGRES_PACKAGES_TAG,
             "Install PostgreSQL Packages",
             install_postgres_packages,
         ),
         (
-            "PREREQ_MAPPING_FONT_PACKAGES",
+            PREREQ_MAPPING_FONT_PACKAGES_TAG,
             "Install Mapping & Font Packages",
             install_mapping_and_font_packages,
         ),
         (
-            "PREREQ_UNATTENDED_UPGRADES",
+            PREREQ_UNATTENDED_UPGRADES_TAG,
             "Install Unattended Upgrades",
             install_unattended_upgrades,
         ),
         (
-            "PREREQ_DOCKER_ENGINE",
+            PREREQ_DOCKER_ENGINE_TAG,
             "Install Docker Engine",
             install_docker_engine,
-        ),  # From installer/
+        ),
         (
-            "PREREQ_NODEJS_LTS",
+            PREREQ_NODEJS_LTS_TAG,
             "Install Node.js LTS",
             install_nodejs_lts,
-        ),  # From installer/
+        ),
     ]
 
     for tag, desc, step_func_ref in prereq_steps_with_desc:
-        # execute_step now takes app_cfg as its 4th argument
         if not execute_step(
             tag,
             desc,
@@ -497,7 +504,7 @@ def core_prerequisites_group(
             lambda prompt, ac, cl_prompt: cli_prompt_for_rerun(
                 prompt, app_settings=ac, current_logger_instance=cl_prompt
             ),
-        ):  # Updated cli_prompt_for_rerun signature
+        ):
             overall_success = False
             log_map_server(
                 f"{app_cfg.symbols.get('error', '❌')} Prerequisite step '{desc}' ({tag}) failed. Group aborted.",
