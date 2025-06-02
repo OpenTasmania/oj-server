@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osm_osrm_server"
-version = "0.5.0"
+version = "0.5.5"
 description = "An Open Street Map and Open Source Routing Machine"
 readme = "README.md"
 authors = [
