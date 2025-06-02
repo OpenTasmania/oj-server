@@ -1,17 +1,20 @@
+# Default image - can be overridden per job.
 image: debian:trixie
 
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_MESSAGE =~ /skip ci/
       when: never
+    - if: $CI_COMMIT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BEFORE_SHA == "0000000000000000000000000000000000000000"
+      when: always # Always run for the first push to a new branch
     - if: $CI_COMMIT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BEFORE_SHA != "0000000000000000000000000000000000000000"
       changes:
         - "*.md"
       when: never
-    - when: always
-
+    - when: always # Default rule
 
 stages:
+  - build_images # New stage for building custom Docker images
   - ".pre"
   - lint
   - type
@@ -26,11 +29,29 @@ variables:
   GIT_USER_EMAIL: "gitlab-ci@opentasmania.net"
   GIT_USER_NAME: "GitLab CI Bot"
 
+  # Define names for custom Docker images
+  PYTHON_BUILDER_IMAGE_BASE: $CI_REGISTRY_IMAGE/python-builder
+  DOCS_BUILDER_IMAGE_BASE: $CI_REGISTRY_IMAGE/docs-builder
+
+  # Docker-in-Docker settings
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_DRIVER: overlay2
+
+  # --- TOGGLE FOR CUSTOM DOCKER IMAGES ---
+  # Set to "true" to build and use custom CI images.
+  # Set to "false" (or leave unset) to use stock Debian images and install tools on-the-fly.
+  # REMEMBER: If "true", you must also uncomment the custom 'image:' lines in relevant jobs
+  # (like .uv_setup, generate_documentation, commit_documentation),
+  # and ensure the 'build_..._image' jobs ran successfully.
+  # If "false", ensure the stock 'image:' lines are active in those jobs.
+  USE_CUSTOM_CI_IMAGES: "false"
+
 cache:
   key:
-    files :
-    - pyproject.toml
-    - uv.lock
+    files:
+      - pyproject.toml
+      - uv.lock
   paths:
     - ".cache/pip"
     - ".cache/uv"
@@ -38,22 +59,96 @@ cache:
     - ".pytest_cache"
     - ".ruff_cache"
     - ".venv"
-    - "$HOME/.local/pipx"
+    - "$HOME/.local/pipx" # Caches tools installed by pipx if not using custom images
+  policy: pull-push
+
+# Job to build and push the custom Python builder image
+build_python_builder_image:
+  stage: build_images
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    TARGET_IMAGE: $PYTHON_BUILDER_IMAGE_BASE
+    DOCKERFILE_PATH: dockerfiles/ci-images/python-builder.Dockerfile
+    IMAGE_OS_TAG: trixie
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - IMAGE_TAG_SHA="$TARGET_IMAGE:$IMAGE_OS_TAG-$CI_COMMIT_SHA"
+    - IMAGE_TAG_LATEST="$TARGET_IMAGE:$IMAGE_OS_TAG-latest"
+    - echo "Building $DOCKERFILE_PATH and tagging as $IMAGE_TAG_SHA and $IMAGE_TAG_LATEST"
+    - docker build -f $DOCKERFILE_PATH -t $IMAGE_TAG_SHA -t $IMAGE_TAG_LATEST .
+    - docker push $IMAGE_TAG_SHA
+    - docker push $IMAGE_TAG_LATEST
+  rules:
+    - if: $USE_CUSTOM_CI_IMAGES == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - dockerfiles/ci-images/python-builder.Dockerfile
+    - if: $USE_CUSTOM_CI_IMAGES == "true"
+      when: manual
+
+# Job to build and push the custom docs builder image (now trixie-based)
+build_docs_builder_image:
+  stage: build_images
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    TARGET_IMAGE: $DOCS_BUILDER_IMAGE_BASE
+    DOCKERFILE_PATH: dockerfiles/ci-images/docs-builder.Dockerfile
+    IMAGE_OS_TAG: trixie # Standardized to trixie
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - IMAGE_TAG_SHA="$TARGET_IMAGE:$IMAGE_OS_TAG-$CI_COMMIT_SHA"
+    - IMAGE_TAG_LATEST="$TARGET_IMAGE:$IMAGE_OS_TAG-latest" # Will be docs-builder:trixie-latest
+    - echo "Building $DOCKERFILE_PATH and tagging as $IMAGE_TAG_SHA and $IMAGE_TAG_LATEST"
+    - docker build -f $DOCKERFILE_PATH -t $IMAGE_TAG_SHA -t $IMAGE_TAG_LATEST .
+    - docker push $IMAGE_TAG_SHA
+    - docker push $IMAGE_TAG_LATEST
+  rules:
+    - if: $USE_CUSTOM_CI_IMAGES == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - dockerfiles/ci-images/docs-builder.Dockerfile
+    - if: $USE_CUSTOM_CI_IMAGES == "true"
+      when: manual
 
 .uv_setup:
+  # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
+  image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready
+  # image: ${PYTHON_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND python-builder image is built
   before_script:
-    - echo "Setting up Python environment with uv..."
-    - apt-get update -y
-    - apt-get install -y build-essential curl git python3-full pipx postgresql-common libpq-dev libpython3-dev
-    - echo "--- Pipx version ---"
-    - pipx --version
-    - echo "--- Installing uv using pipx ---"
-    - pipx install uv
-    - export PATH="/root/.local/bin:$PATH"
-    - echo "--- uv version ---"
-    - uv --version
+    - |
+      if [ "$USE_CUSTOM_CI_IMAGES" = "true" ]; then
+        echo "Using custom Python builder image. System dependencies and uv are pre-installed."
+        echo "--- uv version from image ---"
+        uv --version
+      else
+        echo "USE_CUSTOM_CI_IMAGES is false/unset. Setting up Python environment on stock debian:trixie..."
+        apt-get update -y
+        echo "Performing full system upgrade on stock image (this may take some time)..."
+        apt-get upgrade -y
+        apt-get dist-upgrade -y
+        echo "Installing base dependencies..."
+        apt-get install -y --no-install-recommends curl git python3-full pipx postgresql-common libpq-dev
+        echo "--- Pipx version ---"
+        pipx --version
+        echo "--- Installing uv using pipx ---"
+        pipx install uv
+        # Ensure pipx-installed binaries are in PATH (typically $HOME/.local/bin for user, /root/.local/bin for root)
+        if ! command -v uv &> /dev/null && [ -d "$HOME/.local/bin" ]; then # Check $HOME first
+          export PATH="$HOME/.local/bin:$PATH"
+        elif ! command -v uv &> /dev/null && [ -d "/root/.local/bin" ]; then # Fallback for root if $HOME isn't /root
+           export PATH="/root/.local/bin:$PATH"
+        fi
+        echo "--- uv version ---"
+        uv --version
+      fi
     - echo "--- Creating virtual environment with uv ---"
-    - uv venv --python $(which python3)
+    - uv venv --python $(which python3) # .venv directory will be cached by GitLab CI cache
+    - echo "--- Activating virtual environment (for context) ---"
+    - source .venv/bin/activate
     - echo "--- Installing project dependencies with uv ---"
     - uv pip install .[dev]
 
@@ -65,9 +160,11 @@ Linting:
     - uv run ruff check .
     - echo "Checking Ruff formatting (ruff format --check)..."
     - uv run ruff format --check .
+    - echo "Checking Black formatting (black --check)..."
+    - uv run black --check .
 
 Type checking:
-  extends: .uv_setup #
+  extends: .uv_setup
   stage: type
   script:
     - echo "Running Mypy type checker..."
@@ -75,6 +172,7 @@ Type checking:
 
 Testing:
   rules:
+    - when: manual
     - if: $CI_COMMIT_TAG
   extends: .uv_setup
   stage: test
@@ -92,22 +190,38 @@ Testing:
 
 generate_documentation:
   stage: docs
-  image: debian:bookworm # Stays on debian:bookworm
+  # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
+  image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready (Standardized to trixie)
+  # image: ${DOCS_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND docs-builder (trixie-based) image is built
   rules:
     - when: manual
     - if: "$CI_COMMIT_TAG"
   before_script:
-    - echo "Starting documentation generation for tag $CI_COMMIT_TAG"
-    - apt-get update -y
-    - apt-get install -y git curl python3-pipx
-    - pipx --version
-    - echo "--- Installing todocheck and git-cliff using pipx ---"
-    - pipx install todocheck
-    - pipx install git-cliff
+    - |
+      if [ "$USE_CUSTOM_CI_IMAGES" = "true" ]; then
+        echo "Using custom docs builder image (trixie-based). System dependencies, todocheck, and git-cliff are pre-installed."
+      else
+        echo "USE_CUSTOM_CI_IMAGES is false/unset. Setting up tools on stock debian:trixie..."
+        apt-get update -y
+        echo "Performing full system upgrade on stock image (this may take some time)..."
+        apt-get upgrade -y
+        apt-get dist-upgrade -y
+        echo "Installing base dependencies for docs..."
+        apt-get install -y --no-install-recommends git curl python3-full python3-pipx
+        # Ensure pipx-installed binaries are in PATH
+        if ! command -v todocheck &> /dev/null && [ -d "$HOME/.local/bin" ]; then
+          export PATH="$HOME/.local/bin:$PATH"
+        elif ! command -v todocheck &> /dev/null && [ -d "/root/.local/bin" ]; then
+           export PATH="/root/.local/bin:$PATH"
+        fi
+        pipx install todocheck
+        pipx install git-cliff
+      fi
     - echo "--- todocheck version ---"
     - todocheck --version
     - echo "--- git-cliff version ---"
     - git-cliff --version
+    - echo "Starting documentation generation for tag $CI_COMMIT_TAG"
   script:
     - echo "Generating CHANGELOG.md..."
     - git fetch --tags --depth=200
@@ -154,15 +268,28 @@ generate_documentation:
 
 commit_documentation:
   stage: commit_docs
+  # CHOOSE ONE IMAGE LINE based on $USE_CUSTOM_CI_IMAGES setting:
+  image: debian:trixie # ACTIVE if $USE_CUSTOM_CI_IMAGES is "false" or custom image not ready (Standardized to trixie)
+  # image: ${DOCS_BUILDER_IMAGE_BASE}:trixie-latest # ACTIVE if $USE_CUSTOM_CI_IMAGES is "true" AND docs-builder (trixie-based) image is built
   rules:
     - when: manual
     - if: "$CI_COMMIT_TAG"
-  image: debian:bookworm
   needs:
     - job: generate_documentation
       artifacts: true
   before_script:
-    - apt-get update -y && apt-get install -y git
+    - |
+      if [ "$USE_CUSTOM_CI_IMAGES" = "true" ]; then
+        echo "Using custom docs builder image (trixie-based). Git is pre-installed."
+      else
+        echo "USE_CUSTOM_CI_IMAGES is false/unset. Installing git on stock debian:trixie..."
+        apt-get update -y
+        echo "Performing full system upgrade on stock image (this may take some time)..."
+        apt-get upgrade -y
+        apt-get dist-upgrade -y
+        echo "Installing git..."
+        apt-get install -y --no-install-recommends git
+      fi
     - git config --global user.email "${GIT_USER_EMAIL}"
     - git config --global user.name "${GIT_USER_NAME}"
     - git remote set-url origin "https://gitlab-ci-token:${GITLAB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
