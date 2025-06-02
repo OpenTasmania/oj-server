@@ -82,7 +82,7 @@ exclude = ["tests*"]
 python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
-exclude = ['\.git','\.venv', 'build', 'dist']
+exclude = ['\.git', '\.venv', 'build', 'dist']
 
 [tool.pytest.ini_options]
 addopts = """
@@ -93,6 +93,7 @@ addopts = """
 
 [tool.coverage.report]
 show_missing = true
+omit = ["/etc/python3.13/sitecustomize.py", ]
 
 [tool.coverage.xml]
 output = "coverage.xml"
