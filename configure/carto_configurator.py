@@ -25,7 +25,6 @@ from setup.config_models import (
 
 module_logger = logging.getLogger(__name__)
 
-
 OSM_CARTO_BASE_DIR_CONFIG = "/opt/openstreetmap-carto"  # Matches installer
 MAPNIK_STYLE_TARGET_DIR_CONFIG = (
     "/usr/local/share/maps/style/openstreetmap-carto"
