@@ -13,20 +13,18 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-# Import static_config for OSM_PROJECT_ROOT, as it's a fixed project path
-# Import AppSettings for type hinting
+from common.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from setup.config_models import (
     SYMBOLS_DEFAULT,
     AppSettings,
-)  # Added SYMBOLS_DEFAULT
-
-# Import command utilities that now also expect app_settings
-from .command_utils import log_map_server, run_command, run_elevated_command
+)
 
 module_logger = logging.getLogger(__name__)
 
-# --- Script Hashing (moved from state_manager) ---
-# Global variable to cache the calculated script hash.
 CACHED_SCRIPT_HASH: Optional[str] = None
 
 
@@ -129,7 +127,7 @@ def calculate_project_hash(
 
 
 def get_current_script_hash(
-    project_root_dir: Path,  # Expected to be static_config.OSM_PROJECT_ROOT
+    project_root_dir: Path,
     app_settings: AppSettings,
     logger_instance: Optional[logging.Logger] = None,  # Renamed for clarity
 ) -> Optional[str]:
@@ -143,9 +141,6 @@ def get_current_script_hash(
             project_root_dir, app_settings, current_logger=logger_instance
         )
     return CACHED_SCRIPT_HASH
-
-
-# --- Other System Utilities ---
 
 
 def systemd_reload(
@@ -164,7 +159,6 @@ def systemd_reload(
         app_settings,
     )
     try:
-        # run_elevated_command now takes app_settings
         run_elevated_command(
             ["systemctl", "daemon-reload"],
             app_settings,
@@ -183,7 +177,6 @@ def systemd_reload(
             logger_to_use,
             app_settings,
         )
-        # Consider if this should raise an error or just log, depending on criticality of systemd reload
 
 
 def get_debian_codename(
@@ -195,29 +188,29 @@ def get_debian_codename(
     Uses app_settings for logging symbols.
     """
     logger_to_use = current_logger if current_logger else module_logger
-    # Use default symbols if app_settings or app_settings.symbols is None
-    symbols = (
-        app_settings.symbols
-        if app_settings and app_settings.symbols
-        else SYMBOLS_DEFAULT
-    )
+    symbols_to_use = SYMBOLS_DEFAULT
+    if (
+        app_settings
+        and hasattr(app_settings, "symbols")
+        and app_settings.symbols
+    ):
+        symbols_to_use = app_settings.symbols
+
     try:
-        # run_command now takes app_settings
         result: subprocess.CompletedProcess = run_command(
             ["lsb_release", "-cs"],
-            app_settings,  # Can be None, run_command should handle this
+            app_settings,
             capture_output=True,
             check=True,
             current_logger=logger_to_use,
         )
-        # result.stdout is Optional[str] when text=True (default in run_command)
         stdout_val: Optional[str] = result.stdout
         if stdout_val is not None:
             return stdout_val.strip()
-        return None  # Should not be reached if check=True and command succeeds with output
-    except FileNotFoundError:  # lsb_release not found
+        return None
+    except FileNotFoundError:
         log_map_server(
-            f"{symbols.get('warning', '!')} lsb_release command not found. Cannot determine Debian codename.",
+            f"{symbols_to_use.get('warning', '!')} lsb_release command not found. Cannot determine Debian codename.",
             "warning",
             logger_to_use,
             app_settings,
@@ -231,7 +224,7 @@ def get_debian_codename(
         return None
     except Exception as e:  # Other errors
         log_map_server(
-            f"{symbols.get('warning', '!')} Unexpected error getting Debian codename: {e}",
+            f"{symbols_to_use.get('warning', '!')} Unexpected error getting Debian codename: {e}",
             "warning",
             logger_to_use,
             app_settings,
