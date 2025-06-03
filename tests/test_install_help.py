@@ -1,9 +1,9 @@
 # tests/test_install.py
+# -*- coding: utf-8 -*-
 import subprocess
 import sys
 from pathlib import Path
 
-# Assuming the tests directory is at the same level as the 'installer' and 'ot-osm-osrm-server' root
 PROJECT_ROOT = Path(__file__).parent.parent
 INSTALL_SCRIPT_PATH = PROJECT_ROOT / "install.py"
 
@@ -27,23 +27,25 @@ def test_install_script_help_output():
     )
 
     # Check stdout for key phrases from install.py's help
-    assert "Usage: install.py [--help] <action_flag>" in result.stdout, (
+    assert "Usage: install.py" in result.stdout, (
         "install.py usage string missing."
     )
     assert (
         "Ensures 'uv' (Python packager and virtual environment manager) is installed."
         in result.stdout
     ), "install.py 'uv' description missing."
-    assert "--continue-install" in result.stdout, (
-        "install.py '--continue-install' flag help missing."
+
+    # These assertions should be removed since the flags no longer exist
+    assert "--continue-install" not in result.stdout, (
+        "install.py should not have '--continue-install' flag anymore."
     )
-    assert "--exit-on-complete" in result.stdout, (
-        "install.py '--exit-on-complete' flag help missing."
+    assert "--exit-on-complete" not in result.stdout, (
+        "install.py should not have '--exit-on-complete' flag anymore."
     )
-    assert (
-        "Arguments for installer.main_installer (passed if --continue-install is used):"
-        in result.stdout
-    ), "install.py delegation message to main_installer help missing."
+
+    assert "Arguments for installer.main_installer" in result.stdout, (
+        "install.py delegation message to main_installer help missing."
+    )
 
     # Check stdout for key phrases indicating main_installer.py's help was called
     # These are based on the example output in your README.md
@@ -65,6 +67,11 @@ def test_install_script_help_output():
     )
     assert "--view-config" in result.stdout, (
         "Example main_installer.py argument '--view-config' missing."
+    )
+
+    # Check for --generate-preseed-yaml in main_installer.py help
+    assert "--generate-preseed-yaml" in result.stdout, (
+        "main_installer.py argument '--generate-preseed-yaml' missing."
     )
 
     # Check that the script exits successfully (return code 0) for --help
