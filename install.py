@@ -585,17 +585,11 @@ This script performs the following actions:
 5. Based on the <action_flag>, performs the specified action.
 
 Action Flags and Help (one is required if not -h/--help):
-  --continue-install          Proceed to run the main map server setup ('{MAP_SERVER_INSTALLER_NAME}')
-                                using the virtual environment's Python.
-                                Any additional arguments will be passed to it.
-  --exit-on-complete          Exit successfully after prerequisite and venv setup.
-  -h, --help                  Show this help message. If '--continue-install' is also
-                                part of the command line (e.g., for passing '--help'
-                                to the main installer), it will also attempt to display
+  -h, --help                  Show this help message, it will also attempt to display
                                 help from '{MAP_SERVER_INSTALLER_NAME}'.
 
-Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used):
-  (Displayed below if accessible when --help is used with --continue-install)
+Arguments for {MAP_SERVER_INSTALLER_NAME}:
+  (Displayed below if accessible when --help)
 """
 
     # --- Argument Parsing Setup ---
@@ -610,18 +604,6 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         "--help",
         action="store_true",
         help="Show this help message and combined help for the main installer, then exit.",
-    )
-    # Action flags in a mutually exclusive group. This group is NOT required if -h/--help is given.
-    action_group = parser.add_mutually_exclusive_group(required=False)
-    action_group.add_argument(
-        "--continue-install",
-        action="store_true",
-        help="After prerequisite and venv setup, proceed to run the main map server setup.",
-    )
-    action_group.add_argument(
-        "--exit-on-complete",
-        action="store_true",
-        help="Exit successfully after prerequisite and venv setup is complete.",
     )
 
     args, unknown_args = parser.parse_known_args()
@@ -663,14 +645,6 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
                 f"Could not display help from {MAP_SERVER_INSTALLER_NAME}. Its venv might need to be set up first (e.g. run with --exit-on-complete)."
             )
         return 0
-
-    # --- Ensure an action flag is chosen if not help ---
-    if not (args.continue_install or args.exit_on_complete):
-        parser.print_usage(sys.stderr)
-        prereq_script_logger.error(
-            "Error: You must specify an action flag (--continue-install, --exit-on-complete, or -h/--help."
-        )
-        return 1
 
     # --- Prerequisite installations ---
     if not install_uv_prereq(prereq_script_logger):  # pragma: no cover
@@ -760,69 +734,49 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         )
         return 1
 
-    if args.exit_on_complete:
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Prerequisite and venv setup complete. Exiting as requested.",
-            "info",
-            current_logger=prereq_script_logger,
-            app_settings=None,
-        )
-        return 0
-
-    if args.continue_install:
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('step', '->')} Proceeding to main map server setup using '{venv_python_executable}'...",
-            "info",
-            current_logger=prereq_script_logger,
-            app_settings=None,
-        )
-        cmd_to_run_main_installer = [
-            venv_python_executable,
-            "-m",
-            MAP_SERVER_INSTALLER_NAME,
-        ] + unknown_args
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('link', '>>')} Launching: {' '.join(cmd_to_run_main_installer)}",
-            "debug",
-            current_logger=prereq_script_logger,
-            app_settings=None,
-        )
-        try:
-            process_result = run_command(
-                cmd_to_run_main_installer,
-                app_settings=None,
-                check=False,
-                cwd=project_root,
-                current_logger=prereq_script_logger,
-            )
-            result_code = process_result.returncode
-            if result_code == 0:
-                log_map_server(
-                    f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Main map server setup ({MAP_SERVER_INSTALLER_NAME}) reported success!",
-                    "info",
-                    current_logger=prereq_script_logger,
-                    app_settings=None,
-                )
-            else:  # pragma: no cover
-                log_map_server(
-                    f"{SYMBOLS_OUTER.get('error', '!!')} Main map server setup ({MAP_SERVER_INSTALLER_NAME}) reported failure or no action (exit code {result_code}).",
-                    "error",
-                    current_logger=prereq_script_logger,
-                    app_settings=None,
-                )
-            return result_code
-        except Exception as e:  # pragma: no cover
-            log_map_server(
-                f"{SYMBOLS_OUTER.get('critical', '!!')} Unexpected error launching main map server setup: {e}",
-                "critical",
-                current_logger=prereq_script_logger,
-                app_settings=None,
-            )
-            return 1
-
-    return (
-        1  # Should be unreachable if action_group is required and help exits.
+    cmd_to_run_main_installer = [
+        venv_python_executable,
+        "-m",
+        MAP_SERVER_INSTALLER_NAME,
+    ] + unknown_args
+    log_map_server(
+        f"{SYMBOLS_OUTER.get('link', '>>')} Launching: {' '.join(cmd_to_run_main_installer)}",
+        "debug",
+        current_logger=prereq_script_logger,
+        app_settings=None,
     )
+    try:
+        process_result = run_command(
+            cmd_to_run_main_installer,
+            app_settings=None,
+            check=False,
+            cwd=project_root,
+            current_logger=prereq_script_logger,
+        )
+        result_code = process_result.returncode
+        if result_code == 0:
+            log_map_server(
+                f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Main map server setup ({MAP_SERVER_INSTALLER_NAME}) reported success!",
+                "info",
+                current_logger=prereq_script_logger,
+                app_settings=None,
+            )
+        else:  # pragma: no cover
+            log_map_server(
+                f"{SYMBOLS_OUTER.get('error', '!!')} Main map server setup ({MAP_SERVER_INSTALLER_NAME}) reported failure or no action (exit code {result_code}).",
+                "error",
+                current_logger=prereq_script_logger,
+                app_settings=None,
+            )
+        return result_code
+    except Exception as e:  # pragma: no cover
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('critical', '!!')} Unexpected error launching main map server setup: {e}",
+            "critical",
+            current_logger=prereq_script_logger,
+            app_settings=None,
+        )
+        return 1
 
 
 if __name__ == "__main__":  # pragma: no cover
