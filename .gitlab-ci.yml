@@ -146,16 +146,16 @@ Unit Testing:
   stage: test
   parallel: 4
   script:
-    - echo "Running Pytest unit tests..."
+    - echo "Running Pytest tests..."
     - |
       if [ $CI_NODE_INDEX -eq 1 ]; then
-        TEST_PATH="tests/unit/test_installer tests/unit/test_common"
+        TEST_PATH="tests/test_install_boot_verbosity.py"
       elif [ $CI_NODE_INDEX -eq 2 ]; then
-        TEST_PATH="tests/unit/test_configure tests/unit/test_dataproc"
+        TEST_PATH="tests/test_install_help.py"
       elif [ $CI_NODE_INDEX -eq 3 ]; then
-        TEST_PATH="tests/unit/test_processors tests/unit/test_setup"
+        TEST_PATH="tests/test_install_prereqs"
       else
-        TEST_PATH="tests/unit/test_actions tests/unit/test_install_help.py"
+        TEST_PATH="tests/*.py"
       fi
     - uv run pytest --cov --cov-report term --cov-report html:coverage-${CI_NODE_INDEX}.html --cov-report json:coverage-${CI_NODE_INDEX}.json $TEST_PATH
   coverage: "/TOTAL.*\\s+(\\d+%)$/"
