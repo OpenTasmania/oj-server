@@ -157,7 +157,7 @@ Unit Testing:
       else
         TEST_PATH="tests/*.py"
       fi
-    - uv run pytest --cov --cov-report term --cov-report html:coverage-${CI_NODE_INDEX}.html --cov-report json:coverage-${CI_NODE_INDEX}.json $TEST_PATH
+    - uv run pytest --cov --cov-report term --cov-report html:coverage-${CI_NODE_INDEX}.html --cov-report=xml:coverage-${CI_NODE_INDEX}.xml --cov-data-file=.coverage.${CI_NODE_INDEX} $TEST_PATH
   coverage: "/TOTAL.*\\s+(\\d+%)$/"
   artifacts:
     expire_in: 1 week
@@ -180,7 +180,7 @@ Combine Coverage:
   script:
     - echo "Combining coverage reports..."
     - uv pip install coverage
-    - coverage combine coverage-*.json
+    - coverage combine .coverage-*
     - coverage report
     - coverage xml -o coverage.xml
     - coverage html -d coverage-combined
