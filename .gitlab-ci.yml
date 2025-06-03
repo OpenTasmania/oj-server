@@ -153,7 +153,7 @@ Unit Testing:
       elif [ $CI_NODE_INDEX -eq 2 ]; then
         TEST_PATH="tests/test_install_help.py"
       elif [ $CI_NODE_INDEX -eq 3 ]; then
-        TEST_PATH="tests/test_install_prereqs"
+        TEST_PATH="tests/test_install_prereqs.py"
       else
         TEST_PATH="tests/*.py"
       fi
