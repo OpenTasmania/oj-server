@@ -362,3 +362,9 @@ webapp:
     </script>
     </body>
     </html>
+package_preseeding_values:
+  tzdata:
+    tzdata/Areas: select Australia
+    tzdata/Zones/Australia: select Hobart
+  unattended-upgrades:
+    unattended-upgrades/enable_auto_updates: true boolean
