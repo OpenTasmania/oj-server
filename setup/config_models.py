@@ -51,6 +51,24 @@ OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT: str = (
 APACHE_LISTEN_PORT_DEFAULT: int = 8080
 POSTGRES_VERSION_DEFAULT: str = "17"
 
+# --- Default Preseed Values ---
+DEFAULT_PACKAGE_PRESEEDING_VALUES: Dict[str, Dict[str, str]] = {
+    "tzdata": {
+        "tzdata/Areas": "select Australia",
+        "tzdata/Zones/Australia": "select Hobart",  # Default for Tasmania focus
+    },
+    "unattended-upgrades": {
+        "unattended-upgrades/enable_auto_updates": "true boolean",
+        # Add other unattended-upgrades preseed keys if needed
+        # e.g., "unattended-upgrades/origins_pattern": "string o=Debian,n=${distro_codename},l=Debian-Security; o=Debian,n=${distro_codename}-updates;",
+    },
+    # Add other packages and their preseed data here
+    # "some-other-package": {
+    #     "package/question1": "type value1",
+    #     "package/question2": "type value2",
+    # }
+}
+
 # --- Default Templates for Configuration Files ---
 PG_HBA_TEMPLATE_DEFAULT: str = """\
 # pg_hba.conf configured by script V{script_hash}
@@ -110,7 +128,7 @@ APACHE_TILE_SITE_TEMPLATE_DEFAULT: str = """\
     ServerName {server_name_apache}
     ServerAdmin {admin_email_apache}
 
-    AddTileConfig /{renderd_uri_path_segment}/ tile.openstreetmap.org 
+    AddTileConfig /{renderd_uri_path_segment}/ tile.openstreetmap.org
 
     ErrorLog ${{APACHE_LOG_DIR}}/tiles_error.log
     CustomLog ${{APACHE_LOG_DIR}}/tiles_access.log combined
@@ -130,7 +148,7 @@ server {{
     # listen [::]:443 ssl http2 default_server;
     # ssl_certificate /etc/letsencrypt/live/{server_name_nginx}/fullchain.pem;
     # ssl_certificate_key /etc/letsencrypt/live/{server_name_nginx}/privkey.pem;
-    # include /etc/letsencrypt/options-ssl-nginx.conf; 
+    # include /etc/letsencrypt/options-ssl-nginx.conf;
     # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
     server_name {server_name_nginx};
@@ -148,12 +166,12 @@ server {{
     proxy_buffering off;
 
     location {pg_tileserv_uri_prefix}/ {{ # Path prefix from PgTileservSettings
-        proxy_pass http://localhost:{pg_tileserv_port}/; 
+        proxy_pass http://localhost:{pg_tileserv_port}/;
     }}
     location /{renderd_uri_path_segment}/ {{ # Path prefix from RenderdSettings
         proxy_pass http://localhost:{apache_port}/{renderd_uri_path_segment}/;
     }}
-    location /route/v1/ {{ 
+    location /route/v1/ {{
         proxy_pass http://localhost:{osrm_port_car}/route/v1/;
     }}
     location / {{
@@ -599,6 +617,35 @@ class WebAppSettings(BaseSettings):
     )
 
 
+# New Model for Package Preseeding
+class PackagePreseedingSettings(BaseSettings):
+    """Holds preseed configurations for Debian packages.
+    Maps package names to their debconf key-value pairs.
+    Example: {"tzdata": {"tzdata/Areas": "select Australia"}}
+    """
+
+    model_config = SettingsConfigDict(
+        extra="ignore"
+    )  # Allows arbitrary package names as keys
+
+    # This field will effectively be Dict[str, Dict[str, str]]
+    # Pydantic handles this by allowing additional fields in the model if extra='allow'
+    # or by dynamically creating fields if we were to define them explicitly.
+    # For a truly dynamic Dict[str, Dict[str, str]] that still gets ENV var loading,
+    # a custom root model or a more complex setup might be needed.
+    # However, for loading from YAML, this structure is fine.
+    # The default_factory ensures it initializes as an empty dict if not in YAML/ENV.
+    # We will rely on the YAML loader to populate this correctly.
+    # For default values, we'll use the constant defined at the top of the file.
+
+    # This specific structure is a bit tricky for Pydantic's direct ENV mapping for nested dicts
+    # like PACKAGE_PRESEEDING_VALUES_TZDATA_AREAS='select Australia'.
+    # It's more straightforward if loaded from a YAML file or if individual packages
+    # had their own sub-model, e.g., tzdata_preseed: Optional[Dict[str,str]] = Field(...)
+    # For now, we'll initialize with a default dictionary.
+    # The _deep_update in config_loader.py will handle merging from YAML.
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore", case_sensitive=False)
 
@@ -629,6 +676,12 @@ class AppSettings(BaseSettings):
     renderd: RenderdSettings = Field(default_factory=RenderdSettings)
     certbot: CertbotSettings = Field(default_factory=CertbotSettings)
     webapp: WebAppSettings = Field(default_factory=WebAppSettings)
+
+    # Centralized package preseeding configurations
+    package_preseeding_values: Dict[str, Dict[str, str]] = Field(
+        default_factory=lambda: DEFAULT_PACKAGE_PRESEEDING_VALUES.copy(),
+        description="Debian package preseed configurations. Maps package names to debconf key-value pairs.",
+    )
 
     symbols: Dict[str, str] = Field(
         default_factory=lambda: SYMBOLS_DEFAULT.copy()

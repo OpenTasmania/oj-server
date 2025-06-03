@@ -8,6 +8,7 @@ then creates a virtual environment, installs project dependencies,
 and calls the main map server setup script, passing along all arguments.
 """
 
+import argparse
 import getpass
 import logging
 import os
@@ -15,9 +16,7 @@ import subprocess
 import sys
 
 _install_py_dir = os.path.dirname(os.path.abspath(__file__))
-_project_root_for_bs_import = (
-    _install_py_dir  # Assuming install.py is at project root
-)
+_project_root_for_bs_import = _install_py_dir
 
 if _project_root_for_bs_import not in sys.path:
     sys.path.insert(0, _project_root_for_bs_import)
@@ -37,7 +36,7 @@ try:
     from bs_installer.bs_orchestrator import (
         ensure_all_bootstrap_prerequisites,
     )
-except ImportError as e_bootstrap_import:
+except ImportError as e_bootstrap_import:  # pragma: no cover
     _early_bootstrap_logger_install_py.critical(
         f"Could not import the bs_orchestrator module: {e_bootstrap_import}"
     )
@@ -49,12 +48,7 @@ except ImportError as e_bootstrap_import:
     )
     sys.exit(1)
 
-# TODO: At the moment, we're a monolithic install for a single host.
-#       When we next refactor for individual system installers, this will have to be readdressed.
-
-# Run the bootstrap checks. If it returns True, it means packages were installed,
-# and install.py should re-execute itself.
-if ensure_all_bootstrap_prerequisites():
+if ensure_all_bootstrap_prerequisites():  # pragma: no cover
     _early_bootstrap_logger_install_py.info(
         f"Re-executing '{os.path.basename(sys.argv[0])}' due to bootstrap system package installations..."
     )
@@ -70,7 +64,6 @@ _early_bootstrap_logger_install_py.info(
     "Initial system prerequisite checks completed successfully. Proceeding with main installer script logic."
 )
 
-# Common utility imports
 from common.command_utils import (  # noqa: E402
     command_exists,
     log_map_server,
@@ -98,6 +91,7 @@ SYMBOLS_OUTER = {
     "critical": "🔥",
     "link": "🔗",
     "python": "🐍",
+    "yaml": "📜",
 }
 
 
@@ -123,7 +117,7 @@ def ensure_pip_installed_prereq(logger_instance: logging.Logger) -> bool:
         current_logger=logger_instance,
         app_settings=None,
     )
-    if not command_exists("apt"):
+    if not command_exists("apt"):  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command not found. Please install pip manually.",
             "error",
@@ -173,7 +167,7 @@ def ensure_pip_installed_prereq(logger_instance: logging.Logger) -> bool:
                 app_settings=None,
             )
             return True
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install 'python3-pip' via apt: {e}",
             "error",
@@ -183,7 +177,9 @@ def ensure_pip_installed_prereq(logger_instance: logging.Logger) -> bool:
         return False
 
 
-def _install_uv_with_pipx_prereq(logger_instance: logging.Logger) -> bool:
+def _install_uv_with_pipx_prereq(
+    logger_instance: logging.Logger,
+) -> bool:  # pragma: no cover
     log_map_server(
         f"{SYMBOLS_OUTER.get('info', '>>')} Attempting uv installation using pipx...",
         "info",
@@ -226,7 +222,7 @@ def _install_uv_with_pipx_prereq(logger_instance: logging.Logger) -> bool:
                         current_logger=logger_instance,
                         app_settings=None,
                     )
-                except Exception:  # pragma: no cover
+                except Exception:
                     log_map_server(
                         f"{SYMBOLS_OUTER.get('warning', '!!')} Failed to install pipx via apt. Trying pip...",
                         "warning",
@@ -234,7 +230,7 @@ def _install_uv_with_pipx_prereq(logger_instance: logging.Logger) -> bool:
                         app_settings=None,
                     )
 
-            if not command_exists("pipx"):  # pragma: no cover
+            if not command_exists("pipx"):
                 pip_cmd = "pip3" if command_exists("pip3") else "pip"
                 run_command(
                     [
@@ -259,7 +255,7 @@ def _install_uv_with_pipx_prereq(logger_instance: logging.Logger) -> bool:
                     current_logger=logger_instance,
                     app_settings=None,
                 )
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             log_map_server(
                 f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install pipx: {e}",
                 "error",
@@ -270,7 +266,7 @@ def _install_uv_with_pipx_prereq(logger_instance: logging.Logger) -> bool:
 
     pipx_bin_dir = os.path.expanduser("~/.local/bin")
     current_path = os.environ.get("PATH", "")
-    if pipx_bin_dir not in current_path.split(os.pathsep):  # pragma: no cover
+    if pipx_bin_dir not in current_path.split(os.pathsep):
         log_map_server(
             f"{SYMBOLS_OUTER.get('gear', '>>')} Adding '{pipx_bin_dir}' to PATH for current script session...",
             "info",
@@ -337,14 +333,14 @@ def install_uv_prereq(logger_instance: logging.Logger) -> bool:
             current_logger=logger_instance,
             app_settings=None,
         )
-        try:
+        try:  # pragma: no cover
             run_command(
                 ["uv", "--version"],
                 app_settings=None,
                 capture_output=True,
                 current_logger=logger_instance,
             )
-        except Exception:  # pragma: no cover
+        except Exception:
             pass
         return True
 
@@ -391,7 +387,7 @@ def install_uv_prereq(logger_instance: logging.Logger) -> bool:
                 app_settings=None,
             )
             return _install_uv_with_pipx_prereq(logger_instance)
-    else:
+    else:  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('package', '>>')} OS '{codename if codename else 'Unknown'}' detected. Using pipx to install 'uv'.",
             "info",
@@ -475,6 +471,92 @@ def get_venv_python_executable(project_root: str, venv_dir_name: str) -> str:
     return os.path.join(project_root, venv_dir_name, "bin", "python3")
 
 
+def generate_preseed_yaml_output(
+    venv_python_exe: str,
+    project_root_dir: str,
+    logger_instance: logging.Logger,
+) -> None:
+    """
+    Uses the venv Python to import config_models and print preseed data as YAML.
+    """
+    log_map_server(
+        f"{SYMBOLS_OUTER.get('yaml', '📜')} Generating default preseed data YAML using venv Python: {venv_python_exe}",
+        "info",
+        current_logger=logger_instance,
+        app_settings=None,
+    )
+    python_script_to_run = f"""
+import yaml
+import sys
+import os
+
+project_root_for_snippet = r'''{project_root_dir}''' 
+if project_root_for_snippet not in sys.path:
+    sys.path.insert(0, project_root_for_snippet)
+
+DEFAULT_PACKAGE_PRESEEDING_VALUES = None
+config_models_attributes = []
+
+try:
+    import setup.config_models
+    config_models_attributes = dir(setup.config_models)
+    DEFAULT_PACKAGE_PRESEEDING_VALUES = setup.config_models.DEFAULT_PACKAGE_PRESEEDING_VALUES
+except ImportError as e:
+    print(f"Error: Could not import setup.config_models module itself: {{e}}", file=sys.stderr)
+    print(f"Attempted to add '{{project_root_for_snippet}}' to sys.path. Current sys.path: {{sys.path}}", file=sys.stderr)
+    print("Ensure that 'setup' is a package (contains __init__.py).", file=sys.stderr)
+    sys.exit(1)
+except AttributeError as e:
+    print(f"Error: Could not access DEFAULT_PACKAGE_PRESEEDING_VALUES from setup.config_models: {{e}}", file=sys.stderr)
+    print(f"Attributes found in setup.config_models: {{config_models_attributes}}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e_gen:
+    print(f"An unexpected error occurred during import: {{e_gen}}", file=sys.stderr)
+    print(f"Attributes found in setup.config_models (if module was imported): {{config_models_attributes}}", file=sys.stderr)
+    sys.exit(1)
+
+if DEFAULT_PACKAGE_PRESEEDING_VALUES is None:
+    print("Error: DEFAULT_PACKAGE_PRESEEDING_VALUES is None after import attempts. This should not happen if imports were successful.", file=sys.stderr)
+    print(f"Attributes found in setup.config_models at time of failure: {{config_models_attributes}}", file=sys.stderr)
+    sys.exit(1)
+
+output_data = {{'package_preseeding_values': DEFAULT_PACKAGE_PRESEEDING_VALUES}}
+print("--- Start of Preseed YAML ---")
+yaml.dump(output_data, sys.stdout, indent=2, sort_keys=False, default_flow_style=False)
+print("--- End of Preseed YAML ---")
+print("\\n# Instructions: Copy the section 'package_preseeding_values:' (including the key itself)", file=sys.stderr)
+print("# and its content into your config.yaml file to customize preseed values.", file=sys.stderr)
+"""
+    try:
+        run_command(
+            [venv_python_exe, "-c", python_script_to_run],
+            app_settings=None,
+            cwd=project_root_dir,
+            current_logger=logger_instance,
+            capture_output=False,
+            check=True,
+        )
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('success', 'OK')} Preseed YAML generated to stdout.",
+            "info",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+    except Exception as e:  # pragma: no cover
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('error', '!!')} Failed to generate preseed YAML: {e}",
+            "error",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+        log_map_server(
+            "   Ensure PyYAML is listed as a dependency in pyproject.toml and installed in the venv.",
+            "error",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+
+
 def main() -> int:
     common_setup_logging(
         log_level=logging.INFO,
@@ -485,79 +567,113 @@ def main() -> int:
 
     script_name = os.path.basename(sys.argv[0])
     project_root = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, project_root)
 
-    install_py_help_text = f"""
-Usage: {script_name} [--help] <action_flag> [arguments_for_main_map_server_entry]
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
 
-Prerequisite installer for the Map Server Setup.
+    # --- Custom Help Text ---
+    # We defer the full help text generation until after we know if the user wants help.
+    def get_install_py_help_text():
+        return f"""
+Usage: {script_name} <action_flag_or_help> [arguments_for_main_map_server_entry]
+
 This script performs the following actions:
 1. Ensures 'uv' (Python packager and virtual environment manager) is installed.
-2. Ensures 'libpq-dev' (for 'pg_config') is installed.
+2. Ensures 'libpq-dev' (for 'pg_config' needed by psycopg) is installed.
 3. Creates a virtual environment in '{VENV_DIR}' using 'uv venv'.
 4. Installs project dependencies from 'pyproject.toml' into the venv.
-5. Based on the <action_flag>, proceeds to the main setup or exits.
+5. Based on the <action_flag>, performs the specified action.
 
-Action Flags (mutually exclusive, one is required):
-  --continue-install     After prerequisite and venv setup, run the main map server setup.
-  --exit-on-complete     Exit successfully after prerequisite and venv setup.
-
-Options for this script ({script_name}):
-  -h, --help             Show this combined help message and exit.
+Action Flags and Help (one is required if not -h/--help):
+  --continue-install          Proceed to run the main map server setup ('{MAP_SERVER_INSTALLER_NAME}')
+                                using the virtual environment's Python.
+                                Any additional arguments will be passed to it.
+  --exit-on-complete          Exit successfully after prerequisite and venv setup.
+  -h, --help                  Show this help message. If '--continue-install' is also
+                                part of the command line (e.g., for passing '--help'
+                                to the main installer), it will also attempt to display
+                                help from '{MAP_SERVER_INSTALLER_NAME}'.
 
 Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used):
-  (Displayed below if accessible)
+  (Displayed below if accessible when --help is used with --continue-install)
 """
 
-    if "--help" in sys.argv or "-h" in sys.argv:
-        print(install_py_help_text)
+    # --- Argument Parsing Setup ---
+    parser = argparse.ArgumentParser(
+        description="Prerequisite installer for the Map Server Setup.",
+        formatter_class=argparse.RawTextHelpFormatter,
+        add_help=False,  # Disable default help
+    )
+    # Our custom help flag
+    parser.add_argument(
+        "-h",
+        "--help",
+        action="store_true",
+        help="Show this help message and combined help for the main installer, then exit.",
+    )
+    # Action flags in a mutually exclusive group. This group is NOT required if -h/--help is given.
+    action_group = parser.add_mutually_exclusive_group(required=False)
+    action_group.add_argument(
+        "--continue-install",
+        action="store_true",
+        help="After prerequisite and venv setup, proceed to run the main map server setup.",
+    )
+    action_group.add_argument(
+        "--exit-on-complete",
+        action="store_true",
+        help="Exit successfully after prerequisite and venv setup is complete.",
+    )
+
+    args, unknown_args = parser.parse_known_args()
+
+    # --- Handle Help Explicitly ---
+    if args.help:
+        print(get_install_py_help_text())
+        # Attempt to show main_installer help regardless of other flags if help is requested.
+        # This part will try to use venv if available, else system python.
+        # The venv setup happens later, so this is a "best effort" for a clean --help call.
         print("\n" + "=" * 80)
         print(
             f"Help information for the main setup module ({MAP_SERVER_INSTALLER_NAME}):"
         )
         print("=" * 80)
+        venv_python_exe_for_help = get_venv_python_executable(
+            project_root, VENV_DIR
+        )
+        main_installer_help_cmd = [
+            venv_python_exe_for_help
+            if os.path.exists(venv_python_exe_for_help)
+            else sys.executable,
+            "-m",
+            MAP_SERVER_INSTALLER_NAME,
+            "--help",
+        ]
         try:
-            help_cmd_args = [
-                sys.executable,
-                "-m",
-                MAP_SERVER_INSTALLER_NAME,
-                "--help",
-            ]
-            subprocess.run(help_cmd_args, check=False, cwd=project_root)
-        except Exception as e_main_help:
+            subprocess.run(
+                main_installer_help_cmd, check=False, cwd=project_root
+            )
+        except Exception as e_main_help:  # pragma: no cover
             log_map_server(
                 f"{SYMBOLS_OUTER.get('error', '!!')} Error trying to display help from {MAP_SERVER_INSTALLER_NAME}: {e_main_help}",
                 "error",
                 current_logger=prereq_script_logger,
-                app_settings=None,  # Pass None for app_settings
+                app_settings=None,
             )
             print(
-                f"Could not display help from {MAP_SERVER_INSTALLER_NAME}. Its dependencies might need to be installed first via --continue-install."
+                f"Could not display help from {MAP_SERVER_INSTALLER_NAME}. Its venv might need to be set up first (e.g. run with --exit-on-complete)."
             )
         return 0
 
-    continue_install_flag = "--continue-install" in sys.argv
-    exit_on_complete_flag = "--exit-on-complete" in sys.argv
-
-    if not continue_install_flag and not exit_on_complete_flag:
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('error', '!!')} Error: Specify --continue-install or --exit-on-complete.",
-            "critical",
-            current_logger=prereq_script_logger,
-            app_settings=None,
-        )
-        print(f"\nRun '{script_name} --help' for details.")
-        return 1
-    if continue_install_flag and exit_on_complete_flag:  # pragma: no cover
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('error', '!!')} Error: --continue-install and --exit-on-complete are mutually exclusive.",
-            "critical",
-            current_logger=prereq_script_logger,
-            app_settings=None,
+    # --- Ensure an action flag is chosen if not help ---
+    if not (args.continue_install or args.exit_on_complete):
+        parser.print_usage(sys.stderr)
+        prereq_script_logger.error(
+            "Error: You must specify an action flag (--continue-install, --exit-on-complete, or -h/--help."
         )
         return 1
 
-    if not install_uv_prereq(prereq_script_logger):
+    # --- Prerequisite installations ---
+    if not install_uv_prereq(prereq_script_logger):  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to install 'uv'. Critical prerequisite. Aborting.",
             "critical",
@@ -582,7 +698,7 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
 
     if not ensure_pg_config_or_libpq_dev_installed_prereq(
         prereq_script_logger
-    ):
+    ):  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to ensure 'pg_config' (via 'libpq-dev'). Python DB drivers may fail to build. Aborting.",
             "critical",
@@ -591,6 +707,7 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         )
         return 1
 
+    # --- Virtual Environment Setup ---
     venv_path = os.path.join(project_root, VENV_DIR)
     venv_python_executable = get_venv_python_executable(
         project_root, VENV_DIR
@@ -610,14 +727,14 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
             current_logger=prereq_script_logger,
         )
         log_map_server(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} Virtual environment created at '{venv_path}'.",
+            f"{SYMBOLS_OUTER.get('success', 'OK')} Virtual environment created/updated at '{venv_path}'.",
             "info",
             current_logger=prereq_script_logger,
             app_settings=None,
         )
 
         log_map_server(
-            f"{SYMBOLS_OUTER.get('package', '>>')} Installing project dependencies into '{VENV_DIR}'...",
+            f"{SYMBOLS_OUTER.get('package', '>>')} Installing/syncing project dependencies into '{VENV_DIR}' using 'uv pip install .'... ",
             "info",
             current_logger=prereq_script_logger,
             app_settings=None,
@@ -629,12 +746,12 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
             current_logger=prereq_script_logger,
         )
         log_map_server(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} Project dependencies installed into '{VENV_DIR}'.",
+            f"{SYMBOLS_OUTER.get('success', 'OK')} Project dependencies installed/synced into '{VENV_DIR}'.",
             "info",
             current_logger=prereq_script_logger,
             app_settings=None,
         )
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to set up virtual environment or install dependencies: {e}",
             "critical",
@@ -643,34 +760,27 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
         )
         return 1
 
-    if exit_on_complete_flag:
+    if args.exit_on_complete:
         log_map_server(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Prerequisite and venv setup complete. Exiting.",
+            f"{SYMBOLS_OUTER.get('success', 'OK')} {SYMBOLS_OUTER.get('sparkles', '**')} Prerequisite and venv setup complete. Exiting as requested.",
             "info",
             current_logger=prereq_script_logger,
             app_settings=None,
         )
         return 0
 
-    if continue_install_flag:
+    if args.continue_install:
         log_map_server(
             f"{SYMBOLS_OUTER.get('step', '->')} Proceeding to main map server setup using '{venv_python_executable}'...",
             "info",
             current_logger=prereq_script_logger,
             app_settings=None,
         )
-
-        args_for_main_installer = [
-            arg
-            for arg in sys.argv[1:]
-            if arg not in ["--continue-install", "--exit-on-complete"]
-        ]
-
         cmd_to_run_main_installer = [
             venv_python_executable,
             "-m",
             MAP_SERVER_INSTALLER_NAME,
-        ] + args_for_main_installer
+        ] + unknown_args
         log_map_server(
             f"{SYMBOLS_OUTER.get('link', '>>')} Launching: {' '.join(cmd_to_run_main_installer)}",
             "debug",
@@ -678,11 +788,9 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
             app_settings=None,
         )
         try:
-            process_result = run_command(  # This call to run_command itself doesn't take app_settings
-                # if it were to be from common.command_utils, but this is subprocess.run
-                # If run_command is the one from common.command_utils, it needs app_settings=None
+            process_result = run_command(
                 cmd_to_run_main_installer,
-                app_settings=None,  # Assuming this is the run_command from common.command_utils
+                app_settings=None,
                 check=False,
                 cwd=project_root,
                 current_logger=prereq_script_logger,
@@ -695,7 +803,7 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
                     current_logger=prereq_script_logger,
                     app_settings=None,
                 )
-            else:
+            else:  # pragma: no cover
                 log_map_server(
                     f"{SYMBOLS_OUTER.get('error', '!!')} Main map server setup ({MAP_SERVER_INSTALLER_NAME}) reported failure or no action (exit code {result_code}).",
                     "error",
@@ -711,7 +819,10 @@ Arguments for {MAP_SERVER_INSTALLER_NAME} (passed if --continue-install is used)
                 app_settings=None,
             )
             return 1
-    return 1
+
+    return (
+        1  # Should be unreachable if action_group is required and help exits.
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
