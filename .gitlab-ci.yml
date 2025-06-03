@@ -14,7 +14,7 @@ workflow:
     - when: always # Default rule
 
 stages:
-  - build_images # New stage for building custom Docker images
+  - build_images
   - ".pre"
   - lint
   - type
@@ -28,6 +28,7 @@ variables:
   UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
   GIT_USER_EMAIL: "gitlab-ci@opentasmania.net"
   GIT_USER_NAME: "GitLab CI Bot"
+  # Add a cache version to allow controlled invalidation when needed
   CACHE_VERSION: "v1"
 
   # Define names for custom Docker images
@@ -49,8 +50,8 @@ variables:
   # USE_CUSTOM_CI_IMAGES: "false"
   USE_CUSTOM_CI_IMAGES: "true"
 
+# Global cache settings (inherited by all jobs unless overridden)
 cache:
-  # Global cache settings (inherited by all jobs unless overridden)
   key: ${CACHE_VERSION}-global-${CI_COMMIT_REF_SLUG}
   paths:
     - ".cache/pip"
@@ -101,7 +102,6 @@ cache:
         pipx --version
         echo "--- Installing uv using pipx ---"
         pipx install uv
-        # Ensure pipx-installed binaries are in PATH (typically $HOME/.local/bin for user, /root/.local/bin for root)
         if ! command -v uv &> /dev/null && [ -d "$HOME/.local/bin" ]; then # Check $HOME first
           export PATH="$HOME/.local/bin:$PATH"
         elif ! command -v uv &> /dev/null && [ -d "/root/.local/bin" ]; then # Fallback for root if $HOME isn't /root
@@ -111,13 +111,11 @@ cache:
         uv --version
       fi
     - echo "--- Creating virtual environment with uv ---"
-    - uv venv --python $(which python3) # .venv directory will be cached by GitLab CI cache
+    - uv venv --python $(which python3)
     - echo "--- Activating virtual environment (for context) ---"
     - source .venv/bin/activate
     - echo "--- Installing project dependencies with uv ---"
     - uv pip install .[dev]
-
-
 
 Linting:
   extends:
@@ -129,7 +127,7 @@ Linting:
     - uv run ruff check .
     - echo "Checking Ruff formatting (ruff format --check)..."
     - uv run ruff format --check .
-
+  interruptible: true
 Type checking:
   extends:
     - .uv_setup
@@ -138,27 +136,85 @@ Type checking:
   script:
     - echo "Running Mypy type checker..."
     - uv run mypy .
+  interruptible: true
 
-Testing:
-  rules:
-    - if: $CI_COMMIT_TAG
+# Unit tests - runs on all branches
+Unit Testing:
   extends:
     - .uv_setup
     - .python-cache
   stage: test
+  parallel: 4
   script:
-    - echo "Running Pytest tests..."
-    - uv run pytest --cov --cov-report term --cov-report html:coverage.html --cov-report json:coverage.json --cov-report xml:coverage.xml tests
+    - echo "Running Pytest unit tests..."
+    - |
+      if [ $CI_NODE_INDEX -eq 1 ]; then
+        TEST_PATH="tests/unit/test_installer tests/unit/test_common"
+      elif [ $CI_NODE_INDEX -eq 2 ]; then
+        TEST_PATH="tests/unit/test_configure tests/unit/test_dataproc"
+      elif [ $CI_NODE_INDEX -eq 3 ]; then
+        TEST_PATH="tests/unit/test_processors tests/unit/test_setup"
+      else
+        TEST_PATH="tests/unit/test_actions tests/unit/test_install_help.py"
+      fi
+    - uv run pytest --cov --cov-report term --cov-report html:coverage-${CI_NODE_INDEX}.html --cov-report json:coverage-${CI_NODE_INDEX}.json $TEST_PATH
   coverage: "/TOTAL.*\\s+(\\d+%)$/"
   artifacts:
     expire_in: 1 week
+    paths:
+      - coverage-*.html
+      - coverage-*.json
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-${CI_NODE_INDEX}.json
+  interruptible: true
+
+
+Combine Coverage:
+  extends: .uv_setup
+  stage: test
+  needs:
+    - job: "Unit Testing"
+      artifacts: true
+  script:
+    - echo "Combining coverage reports..."
+    - uv pip install coverage
+    - coverage combine coverage-*.json
+    - coverage report
+    - coverage xml -o coverage.xml
+    - coverage html -d coverage-combined
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - coverage-combined/
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
   interruptible: true
 
-# Job to build and push the custom Python builder image
+# Integration tests - separate job for longer-running tests
+Integration Testing:
+  extends:
+    - .uv_setup
+    - .python-cache
+  stage: test
+  script:
+    - echo "Running integration tests..."
+    - uv run pytest tests/integration --cov --cov-report term --cov-report html:integration-coverage.html
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH  # Run on main branch
+    - if: $CI_COMMIT_TAG                           # Run on tags
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"  # Run on MRs
+    - when: manual                                 # Allow manual runs for other branches
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - integration-coverage.html
+  interruptible: true
+  allow_failure: true  # Integration tests can be flaky, don't fail the pipeline
+
 build_python_builder_image:
   stage: build_images
   image: docker:latest
@@ -186,7 +242,6 @@ build_python_builder_image:
     - if: $USE_CUSTOM_CI_IMAGES == "true"
       when: manual
 
-# Job to build and push the custom docs builder image (now trixie-based)
 build_docs_builder_image:
   stage: build_images
   image: docker:latest
@@ -195,7 +250,7 @@ build_docs_builder_image:
   variables:
     TARGET_IMAGE: $DOCS_BUILDER_IMAGE_BASE
     DOCKERFILE_PATH: docker/ci-builders/docs-builder.Dockerfile
-    IMAGE_OS_TAG: trixie # Standardized to trixie
+    IMAGE_OS_TAG: trixie
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
