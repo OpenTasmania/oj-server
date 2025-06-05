@@ -28,7 +28,7 @@ via [OSRM](https://project-osrm.org/)). It adds [GTFS](https://gtfs.org/) data a
 be ingested and makes this data queryable through
 a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/) database.
 
-The entire stack is designed to run on a dedicated [Debian 12 "Bookworm"](http://debian.org/) system.
+The entire stack is designed to run on a dedicated [Debian 13 "Trixie"](http://debian.org/) system.
 
 ## 2. System Architecture
 
