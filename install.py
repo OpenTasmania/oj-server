@@ -33,7 +33,7 @@ if not _early_bootstrap_logger_install_py.handlers:
     _early_bootstrap_logger_install_py.setLevel(logging.INFO)
 
 try:
-    from bs_installer.bs_orchestrator import (
+    from bootstrap_installer.bs_orchestrator import (
         ensure_all_bootstrap_prerequisites,
     )
 except ImportError as e_bootstrap_import:  # pragma: no cover

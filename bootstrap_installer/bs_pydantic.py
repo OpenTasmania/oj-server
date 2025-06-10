@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from bs_installer.bs_utils import (
+from bootstrap_installer.bs_utils import (
     BS_SYMBOLS,
     apt_install_packages,
     check_python_module,

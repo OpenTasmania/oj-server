@@ -1,6 +1,6 @@
 # ot-osm-osrm-server/bs_installer/bs_lsb.py
 # -*- coding: utf-8 -*-
-from bs_installer.bs_utils import (
+from bootstrap_installer.bs_utils import (
     BS_SYMBOLS,
     apt_install_packages,
     bootstrap_cmd_exists,

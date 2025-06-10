@@ -1,9 +1,9 @@
 # ot-osm-osrm-server/bs_installer/bs_orchestrator.py
 # -*- coding: utf-8 -*-
-from bs_installer.bs_build_tools import ensure_build_tools
-from bs_installer.bs_lsb import ensure_lsb_release
-from bs_installer.bs_pydantic import ensure_pydantic_prerequisites
-from bs_installer.bs_utils import BS_SYMBOLS, get_bs_logger
+from bootstrap_installer.bs_build_tools import ensure_build_tools
+from bootstrap_installer.bs_lsb import ensure_lsb_release
+from bootstrap_installer.bs_pydantic import ensure_pydantic_prerequisites
+from bootstrap_installer.bs_utils import BS_SYMBOLS, get_bs_logger
 
 logger = get_bs_logger("Orchestrator")
 
