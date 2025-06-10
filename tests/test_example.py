@@ -16,9 +16,7 @@ def test_project_structure():
     assert (PROJECT_ROOT / "installer").exists(), (
         "Installer directory should exist"
     )
-    assert (PROJECT_ROOT / "services").exists(), (
-        "Services directory should exist"
-    )
+    assert (PROJECT_ROOT / "setup").exists(), "Setup directory should exist"
 
     # Check for essential files
     assert (PROJECT_ROOT / "install.py").exists(), "install.py should exist"
