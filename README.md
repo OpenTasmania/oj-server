@@ -250,7 +250,7 @@ intended to make use of Issues boards on a hosted git server, as well as continu
 
 ## 6. Future
 
-Theres a [Todo list](TODO.md), which is automatically generated from comments found in the code.
+Theres a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
 Planned [enhancements](https://gitlab.com/opentasmania/osm-osrm-server/-/issues/?label_name%5B%5D=Enhancement)
 can also be found on the Gitlab site.
 
@@ -262,4 +262,4 @@ as a Wiki.
 
 ## 8. Contributions
 
-Contributions welcome. Please see the [Contributions](CONTRIBUTING.md) file for more details.
+Contributions welcome. Please see the [Contributions](docs/CONTRIBUTING.md) file for more details.
