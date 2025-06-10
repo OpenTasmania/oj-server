@@ -23,9 +23,9 @@ pg:
   port: 5432
   database: "gis"
   user: "osmuser"
-  # password: "yourStrongPasswordHere" # IMPORTANT: It's highly recommended to set the PG_PASSWORD
-                                    # environment variable instead of hardcoding the password here.
-                                    # Pydantic will pick up PG_PASSWORD from the environment.
+    # password: "yourStrongPasswordHere" # IMPORTANT: It's highly recommended to set the PG_PASSWORD
+    # environment variable instead of hardcoding the password here.
+  # Pydantic will pick up PG_PASSWORD from the environment.
 
   # Template for pg_hba.conf content.
   # Placeholders like {pg_database}, {pg_user}, {admin_group_ip}, {script_hash}

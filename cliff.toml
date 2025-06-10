@@ -25,7 +25,7 @@ footer = ""
 conventional_commits = true
 filter_unconventional = false
 split_commits = false # Keep all commits under the latest tag
-commit_parsers = [ # Adjust to commit message conventions
+commit_parsers = [# Adjust to commit message conventions
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
     { message = "^docs", group = "Documentation" },

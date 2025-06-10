@@ -1,18 +1,18 @@
 # .pre-commit-config.yaml
 repos:
--   repo: https://github.com/astral-sh/ruff-pre-commit
+  - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: 'v0.11.12'
     hooks:
-    -   id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-    -   id: ruff-format
+      - id: ruff
+        args: [ --fix, --exit-non-zero-on-fix ]
+      - id: ruff-format
 
--   repo: https://github.com/pre-commit/mirrors-mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
     rev: 'v1.16.0'
     hooks:
-    -   id: mypy
-        args: [--ignore-missing-imports, --exclude, '(\.venv/|tests/)']
+      - id: mypy
+        args: [ --ignore-missing-imports, --exclude, '(\.venv/|tests/)' ]
         additional_dependencies: [
-            "types-requests",
-            "types-PyYAML"
+          "types-requests",
+          "types-PyYAML"
         ]

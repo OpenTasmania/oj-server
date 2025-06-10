@@ -44,14 +44,14 @@ def database_setup(conn, temp_schema, schema, metadata_table):
         cur.execute(
             sql.SQL(
                 """CREATE TABLE IF NOT EXISTS {schema}.{metadata_table}
-                               (
-                                   name
-                                   text
-                                   primary
-                                   key,
-                                   last_modified
-                                   text
-                               );"""
+                   (
+                       name
+                       text
+                       primary
+                       key,
+                       last_modified
+                       text
+                   );"""
             ).format(
                 schema=sql.Identifier(schema),
                 metadata_table=sql.Identifier(metadata_table),
@@ -87,8 +87,8 @@ class Table:
             cur.execute(
                 sql.SQL(
                     """SELECT last_modified
-                                   FROM {schema}.{metadata_table}
-                                   WHERE name = %s"""
+                       FROM {schema}.{metadata_table}
+                       WHERE name = %s"""
                 ).format(
                     schema=sql.Identifier(self._dst_schema),
                     metadata_table=sql.Identifier(self._metadata_table),
@@ -152,8 +152,8 @@ class Table:
             cur.execute(
                 sql.SQL(
                     """DELETE
-                                   FROM {temp_schema}.{name}
-                                   WHERE way IS NULL;"""
+                       FROM {temp_schema}.{name}
+                       WHERE way IS NULL;"""
                 ).format(
                     name=sql.Identifier(self._name),
                     temp_schema=sql.Identifier(self._temp_schema),
@@ -264,8 +264,8 @@ class Table:
             cur.execute(
                 sql.SQL(
                     """SELECT 1
-                                   FROM {schema}.{metadata_table}
-                                   WHERE name = %s"""
+                       FROM {schema}.{metadata_table}
+                       WHERE name = %s"""
                 ).format(
                     schema=sql.Identifier(self._dst_schema),
                     metadata_table=sql.Identifier(self._metadata_table),
@@ -277,8 +277,8 @@ class Table:
                 cur.execute(
                     sql.SQL(
                         """INSERT INTO {schema}.{metadata_table}
-                                           (name, last_modified)
-                                       VALUES (%s, %s)"""
+                               (name, last_modified)
+                           VALUES (%s, %s)"""
                     ).format(
                         schema=sql.Identifier(self._dst_schema),
                         metadata_table=sql.Identifier(self._metadata_table),
@@ -289,8 +289,8 @@ class Table:
                 cur.execute(
                     sql.SQL(
                         """UPDATE {schema}.{metadata_table}
-                                       SET last_modified = %s
-                                       WHERE name = %s"""
+                           SET last_modified = %s
+                           WHERE name = %s"""
                     ).format(
                         schema=sql.Identifier(self._dst_schema),
                         metadata_table=sql.Identifier(self._metadata_table),

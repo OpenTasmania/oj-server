@@ -16,7 +16,8 @@ Before you begin, ensure you have the following tools installed on your system:
 * **uv**: An extremely fast Python package and project manager. We use it to manage our virtual environments and
   dependencies.
 
-**NOTE:** This project is developed on x86_64 [Debian](https://www.debian.org/) [Trixie](https://www.debian.org/releases/trixie/). For
+**NOTE:** This project is developed on
+x86_64 [Debian](https://www.debian.org/) [Trixie](https://www.debian.org/releases/trixie/). For
 now, YMMV on other systems.
 
 ### **2. Fork and Clone**
