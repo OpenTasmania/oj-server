@@ -103,7 +103,7 @@ def run_command(
 
     log_map_server(
         f"{symbols.get('gear', '⚙️')} Executing: {command_to_log_str} {f'(in {cwd})' if cwd else ''}",
-        "debug",
+        "info",
         effective_logger,
         app_settings,
     )
@@ -117,13 +117,11 @@ def run_command(
             input=cmd_input,
             cwd=cwd,
         )
-        if (
-            capture_output
-        ):  # Log captured output only at debug level for brevity
+        if capture_output:
             if result.stdout and result.stdout.strip():
                 log_map_server(
                     f"   stdout: {result.stdout.strip()}",
-                    "debug",
+                    "info",
                     effective_logger,
                     app_settings,
                 )
@@ -131,10 +129,10 @@ def run_command(
                 result.stderr
                 and result.stderr.strip()
                 and (not check or result.returncode == 0)
-            ):  # Non-error stderr
+            ):
                 log_map_server(
                     f"   stderr: {result.stderr.strip()}",
-                    "debug",
+                    "info",
                     effective_logger,
                     app_settings,
                 )
