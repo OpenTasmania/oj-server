@@ -18,12 +18,6 @@ from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
 from common.pgpass_utils import setup_pgpass
 from common.system_utils import get_current_script_hash, systemd_reload
-from dataproc.data_processing import data_prep_group
-from dataproc.osrm_data_processor import (
-    build_osrm_graphs_for_region,
-    extract_regional_pbfs_with_osmium,
-)
-from dataproc.raster_processor import raster_tile_prerender
 from installer.apache_installer import ensure_apache_packages_installed
 from installer.carto_installer import (
     fetch_carto_external_data,
@@ -56,7 +50,15 @@ from installer.renderd_installer import (
     ensure_renderd_packages_installed,
 )
 from installer.ufw_installer import ensure_ufw_package_installed
-from processors.gtfs.orchestrator import process_and_setup_gtfs
+from processors.data_handling.data_processing import data_prep_group
+from processors.data_handling.osrm_data_processor import (
+    build_osrm_graphs_for_region,
+    extract_regional_pbfs_with_osmium,
+)
+from processors.data_handling.raster_processor import raster_tile_prerender
+from processors.plugins.importers.transit.gtfs.orchestrator import (
+    process_and_setup_gtfs,
+)
 from setup import config as static_config
 
 # Import all individual step functions

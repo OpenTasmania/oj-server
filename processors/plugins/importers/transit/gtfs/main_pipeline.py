@@ -20,8 +20,14 @@ from common.db_utils import get_db_connection
 from common.file_utils import (
     cleanup_directory,  # Updated cleanup_directory is used here
 )
-from processors.gtfs import download, load, transform
-from processors.gtfs import schema_definitions as schemas
+from processors.plugins.importers.transit.gtfs import (
+    download,
+    load,
+    transform,
+)
+from processors.plugins.importers.transit.gtfs import (
+    schema_definitions as schemas,
+)
 
 from .db_setup import (
     add_foreign_keys_from_schema,

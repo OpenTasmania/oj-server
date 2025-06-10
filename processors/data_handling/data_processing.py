@@ -13,8 +13,8 @@ from typing import (
 )  # Added Callable, List, Tuple
 
 from common.command_utils import log_map_server
-from dataproc.raster_processor import raster_tile_prerender
-from processors.gtfs.orchestrator import (
+from processors.data_handling.raster_processor import raster_tile_prerender
+from processors.plugins.importers.transit.gtfs.orchestrator import (
     process_and_setup_gtfs,
 )
 from setup import (
