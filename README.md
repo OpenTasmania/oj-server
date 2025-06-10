@@ -89,7 +89,7 @@ fi
     * Runs the main mapping installer ([main_map_server_entry](installer/main_installer.py))
 
 ```bash
-python3 install.py
+python3 install.py --full
 ```
 
 ### Installer help
@@ -97,8 +97,6 @@ python3 install.py
 To obtain install configuration options and associated help text, use this command (correct at 2025-05-28:
 
 ```bash
-python3 install.py --continue-install --help
-
 Usage: install.py <action_flag_or_help> [arguments_for_main_map_server_entry]
 
 This script performs the following actions:
@@ -119,16 +117,26 @@ Arguments for installer.main_installer:
 ================================================================================
 Help information for the main setup module (installer.main_installer):
 ================================================================================
-usage: main_installer.py [-h] [--generate-preseed-yaml [TASK_OR_GROUP ...]] [--full] [--view-config] [--view-state] [--clear-state] [--config-file CONFIG_FILE] [-a ADMIN_GROUP_IP] [-f GTFS_FEED_URL] [-v VM_IP_OR_DOMAIN] [-b PG_TILESERV_BINARY_LOCATION] [-l LOG_PREFIX] [--container-runtime-command CONTAINER_RUNTIME_COMMAND] [--osrm-image-tag OSRM_IMAGE_TAG]
-                         [--apache-listen-port APACHE_LISTEN_PORT] [-H PGHOST] [-P PGPORT] [-D PGDATABASE] [-U PGUSER] [-W PGPASSWORD] [--boot-verbosity] [--core-conflicts] [--docker-install] [--nodejs-install] [--ufw-pkg-check] [--ufw-rules] [--ufw-activate] [--ufw] [--postgres] [--carto] [--renderd] [--apache] [--nginx] [--certbot] [--pgtileserv] [--osrm] [--gtfs-prep]
-                         [--raster-prep] [--website-setup] [--task-systemd-reload] [--prereqs] [--services] [--data] [--systemd-reload] [--dev-override-unsafe-password]
+usage: main_installer.py [-h] [--generate-preseed-yaml [TASK_OR_GROUP ...]] [--full] [--view-config] [--view-state]
+                         [--clear-state] [--config-file CONFIG_FILE] [-a ADMIN_GROUP_IP] [-f GTFS_FEED_URL]
+                         [-v VM_IP_OR_DOMAIN] [-b PG_TILESERV_BINARY_LOCATION] [-l LOG_PREFIX]
+                         [--container-runtime-command CONTAINER_RUNTIME_COMMAND] [--osrm-image-tag OSRM_IMAGE_TAG]
+                         [--apache-listen-port APACHE_LISTEN_PORT] [-H PGHOST] [-P PGPORT] [-D PGDATABASE] [-U PGUSER]
+                         [-W PGPASSWORD] [--boot-verbosity] [--core-conflicts] [--docker-install] [--nodejs-install]
+                         [--ufw-pkg-check] [--ufw-rules] [--ufw-activate] [--ufw] [--postgres] [--carto] [--renderd]
+                         [--apache] [--nginx] [--certbot] [--pgtileserv] [--osrm] [--gtfs-prep] [--raster-prep]
+                         [--website-setup] [--task-systemd-reload] [--prereqs] [--services] [--data] [--systemd-reload]
+                         [--dev-override-unsafe-password]
 
 Map Server Installer Script
 
 options:
   -h, --help            Show this help message and exit.
   --generate-preseed-yaml [TASK_OR_GROUP ...]
-                        Generate package preseeding data as YAML and exit. Without arguments, shows all default preseed values. With specific task/group names (e.g., 'postgres', 'core_prereqs'), filters output to only show preseed data relevant to those tasks. Will include placeholder comments for packages without preseed data. (default: None)
+                        Generate package preseeding data as YAML and exit. Without arguments, shows all default preseed
+                        values. With specific task/group names (e.g., 'postgres', 'core_prereqs'), filters output to only
+                        show preseed data relevant to those tasks. Will include placeholder comments for packages without
+                        preseed data. (default: None)
   --full                Run full installation process. (default: False)
   --view-config         View current configuration settings and exit. (default: False)
   --view-state          View completed installation steps and exit. (default: False)
@@ -144,7 +152,8 @@ Configuration Overrides (CLI > YAML > ENV > Defaults):
   -v, --vm-ip-or-domain VM_IP_OR_DOMAIN
                         Public IP/FQDN. Default: example.com (default: None)
   -b, --pg-tileserv-binary-location PG_TILESERV_BINARY_LOCATION
-                        pg_tileserv URL. Default: https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip (default: None)
+                        pg_tileserv URL. Default: https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip (default:
+                        None)
   -l, --log-prefix LOG_PREFIX
                         Log prefix. Default: [MAP-SETUP] (default: None)
   --container-runtime-command CONTAINER_RUNTIME_COMMAND
@@ -179,17 +188,23 @@ Individual Task Flags:
   --nginx               Nginx full setup. (Orchestrates Group: 'Nginx Service') (default: False)
   --certbot             Certbot full setup. (Orchestrates Group: 'Certbot Service') (default: False)
   --pgtileserv          pg_tileserv full setup. (Orchestrates Group: 'pg_tileserv Service') (default: False)
-  --osrm                OSRM full setup & data processing. (Orchestrates Group: 'OSRM Service & Data Processing') (default: False)
+  --osrm                OSRM full setup & data processing. (Orchestrates Group: 'OSRM Service & Data Processing') (default:
+                        False)
   --gtfs-prep           Full GTFS Pipeline. (Part of Group: 'GTFS Data Pipeline', Sub-step: 1) (default: False)
-  --raster-prep         Raster tile pre-rendering. (Part of Group: 'Raster Tile Pre-rendering', Sub-step: 1) (default: False)
+  --raster-prep         Raster tile pre-rendering. (Part of Group: 'Raster Tile Pre-rendering', Sub-step: 1) (default:
+                        False)
   --website-setup       Deploy test website. (Part of Group: 'Application Content', Sub-step: 1) (default: False)
-  --task-systemd-reload
+  --task-systemd-reload 
                         Systemd reload task. (Part of Group: 'Systemd Reload', Sub-step: 1) (default: False)
 
 Group Task Flags:
-  --prereqs             Run 'Comprehensive Prerequisites' group. Includes: --boot-verbosity, --core-conflicts, --docker-install, --nodejs-install, and setup for essential utilities, Python, PostgreSQL, mapping & font packages, and unattended upgrades. (default: False)
-  --services            Run setup for ALL services. Includes: --ufw, --postgres, --pgtileserv, --carto, --renderd, --osrm, --apache, --nginx, --certbot, --website-setup, and a final systemd reload. (default: False)
-  --data                Run all data preparation tasks. Includes: --gtfs-prep (Full GTFS Pipeline) and --raster-prep (Raster tile pre-rendering). (default: False)
+  --prereqs             Run 'Comprehensive Prerequisites' group. Includes: --boot-verbosity, --core-conflicts, --docker-
+                        install, --nodejs-install, and setup for essential utilities, Python, PostgreSQL, mapping & font
+                        packages, and unattended upgrades. (default: False)
+  --services            Run setup for ALL services. Includes: --ufw, --postgres, --pgtileserv, --carto, --renderd, --osrm,
+                        --apache, --nginx, --certbot, --website-setup, and a final systemd reload. (default: False)
+  --data                Run all data preparation tasks. Includes: --gtfs-prep (Full GTFS Pipeline) and --raster-prep (Raster
+                        tile pre-rendering). (default: False)
   --systemd-reload      Run systemd reload task (as a group action). Same as --task-systemd-reload. (default: False)
 
 Developer Options:
