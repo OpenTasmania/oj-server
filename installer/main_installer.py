@@ -14,53 +14,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import yaml  # Added for YAML output
 
-# Import all individual step functions
-from actions.website_setup_actions import deploy_test_website_content
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
 from common.pgpass_utils import setup_pgpass
 from common.system_utils import get_current_script_hash, systemd_reload
-from configure.apache_configurator import (
-    activate_apache_service,
-    configure_apache_ports,
-    create_apache_tile_site_config,
-    create_mod_tile_config,
-    manage_apache_modules_and_sites,
-)
-from configure.carto_configurator import (
-    compile_osm_carto_stylesheet,
-    deploy_mapnik_stylesheet,
-    finalize_carto_directory_processing,
-    update_font_cache,
-)
-from configure.certbot_configurator import run_certbot_nginx
-from configure.nginx_configurator import (
-    activate_nginx_service,
-    create_nginx_proxy_site_config,
-    manage_nginx_sites,
-    test_nginx_configuration,
-)
-from configure.osrm_configurator import (
-    activate_osrm_routed_service,
-    create_osrm_routed_service_file,
-)
-from configure.pg_tileserv_configurator import (
-    activate_pg_tileserv_service,
-    create_pg_tileserv_config_file,
-)
-from configure.postgres_configurator import (
-    create_postgres_user_and_db,
-    customize_pg_hba_conf,
-    customize_postgresql_conf,
-    enable_postgres_extensions,
-    restart_and_enable_postgres_service,
-    set_postgres_permissions,
-)
-from configure.renderd_configurator import (
-    activate_renderd_service,
-    create_renderd_conf_file,
-)
-from configure.ufw_configurator import activate_ufw_service, apply_ufw_rules
 from dataproc.data_processing import data_prep_group
 from dataproc.osrm_data_processor import (
     build_osrm_graphs_for_region,
@@ -101,6 +58,9 @@ from installer.renderd_installer import (
 from installer.ufw_installer import ensure_ufw_package_installed
 from processors.gtfs.orchestrator import process_and_setup_gtfs
 from setup import config as static_config
+
+# Import all individual step functions
+from setup.actions import deploy_test_website_content
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.config_loader import load_app_settings
 from setup.config_models import (
@@ -118,6 +78,50 @@ from setup.config_models import (
     PGUSER_DEFAULT,
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
+)
+from setup.configure.apache_configurator import (
+    activate_apache_service,
+    configure_apache_ports,
+    create_apache_tile_site_config,
+    create_mod_tile_config,
+    manage_apache_modules_and_sites,
+)
+from setup.configure.carto_configurator import (
+    compile_osm_carto_stylesheet,
+    deploy_mapnik_stylesheet,
+    finalize_carto_directory_processing,
+    update_font_cache,
+)
+from setup.configure.certbot_configurator import run_certbot_nginx
+from setup.configure.nginx_configurator import (
+    activate_nginx_service,
+    create_nginx_proxy_site_config,
+    manage_nginx_sites,
+    test_nginx_configuration,
+)
+from setup.configure.osrm_configurator import (
+    activate_osrm_routed_service,
+    create_osrm_routed_service_file,
+)
+from setup.configure.pg_tileserv_configurator import (
+    activate_pg_tileserv_service,
+    create_pg_tileserv_config_file,
+)
+from setup.configure.postgres_configurator import (
+    create_postgres_user_and_db,
+    customize_pg_hba_conf,
+    customize_postgresql_conf,
+    enable_postgres_extensions,
+    restart_and_enable_postgres_service,
+    set_postgres_permissions,
+)
+from setup.configure.renderd_configurator import (
+    activate_renderd_service,
+    create_renderd_conf_file,
+)
+from setup.configure.ufw_configurator import (
+    activate_ufw_service,
+    apply_ufw_rules,
 )
 from setup.core_prerequisites import boot_verbosity as prereq_boot_verbosity
 from setup.core_prerequisites import (
