@@ -1285,6 +1285,11 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         help="View completed installation steps and exit.",
     )
     parser.add_argument(
+        "--status",
+        action="store_true",
+        help="View completed installation steps and exit.",
+    )
+    parser.add_argument(
         "--clear-state",
         action="store_true",
         help="Clear all progress state and exit.",
@@ -1544,7 +1549,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     if parsed_cli_args.view_config:
         view_configuration(APP_CONFIG, logger)
         return 0
-    if parsed_cli_args.view_state:
+    if parsed_cli_args.view_state or parsed_cli_args.status:
         completed = view_completed_steps(APP_CONFIG, logger)
         log_map_server(
             message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} Completed steps from {static_config.STATE_FILE_PATH}:",
