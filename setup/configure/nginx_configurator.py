@@ -10,7 +10,6 @@ import subprocess
 from typing import Optional
 
 from common.command_utils import (
-    elevated_command_exists,
     log_map_server,
     run_elevated_command,
 )
@@ -169,27 +168,35 @@ def manage_nginx_sites(
 
     default_nginx_symlink = os.path.join(NGINX_SITES_ENABLED_DIR, "default")
     try:
-        # Check if 'default' symlink exists in sites-enabled
-        # elevated_command_exists was refactored
-        if elevated_command_exists(
-            f"test -L {default_nginx_symlink}",
+        test_command = [
+            "test",
+            "-L",
+            default_nginx_symlink,
+            "-o",
+            "-f",
+            default_nginx_symlink,
+        ]
+        result = run_elevated_command(
+            test_command,
             app_settings,
+            check=False,
             current_logger=logger_to_use,
-        ):
+        )
+        if result:
             run_elevated_command(
                 ["rm", default_nginx_symlink],
                 app_settings,
                 current_logger=logger_to_use,
             )
             log_map_server(
-                f"{symbols.get('info', 'ℹ️')} Disabled default Nginx site.",
+                f"{symbols.get('info', 'ℹ️')} Disabled default Nginx site ({default_nginx_symlink}).",
                 "info",
                 logger_to_use,
                 app_settings,
             )
         else:
             log_map_server(
-                f"{symbols.get('info', 'ℹ️')} Default Nginx site not enabled or symlink not found. Skipping disable.",
+                f"{symbols.get('info', 'ℹ️')} Default Nginx site not enabled or symlink not found ({default_nginx_symlink}). Skipping disable.",
                 "info",
                 logger_to_use,
                 app_settings,
@@ -201,6 +208,7 @@ def manage_nginx_sites(
             logger_to_use,
             app_settings,
         )
+        raise
 
 
 def test_nginx_configuration(
