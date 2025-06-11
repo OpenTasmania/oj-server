@@ -23,43 +23,43 @@ pg:
   port: 5432
   database: "gis"
   user: "osmuser"
-    # password: "yourStrongPasswordHere" # IMPORTANT: It's highly recommended to set the PG_PASSWORD
-    # environment variable instead of hardcoding the password here.
+  # password: "yourStrongPasswordHere" # IMPORTANT: It's highly recommended to set the PG_PASSWORD
+  # environment variable instead of hardcoding the password here.
   # Pydantic will pick up PG_PASSWORD from the environment.
 
   # Template for pg_hba.conf content.
   # Placeholders like {pg_database}, {pg_user}, {admin_group_ip}, {script_hash}
   # will be formatted by the setup script using other configuration values.
   # Use YAML's literal block scalar style for multi-line strings.
-  hba_template: |
-    # pg_hba.conf configured by script V{script_hash}
-    # TYPE  DATABASE        USER            ADDRESS                 METHOD
-    local   all             postgres                                peer
-    local   all             all                                     peer
-    local   {pg_database}    {pg_user}                                scram-sha-256
-    host    all             all             127.0.0.1/32            scram-sha-256
-    host    {pg_database}    {pg_user}        127.0.0.1/32            scram-sha-256
-    host    {pg_database}    {pg_user}        {admin_group_ip}       scram-sha-256
-    host    all             all             ::1/128                 scram-sha-256
-    host    {pg_database}    {pg_user}        ::1/128                 scram-sha-256
-    # Template for additions to postgresql.conf.
-    # Supports placeholder {script_hash}.
-    postgresql_conf_additions_template: |
-      # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash} ---
-      listen_addresses = '*'
-      shared_buffers = 2GB
-      work_mem = 256MB
-      maintenance_work_mem = 2GB
-      checkpoint_timeout = 15min
-      max_wal_size = 4GB
-      min_wal_size = 2GB
-      checkpoint_completion_target = 0.9
-      effective_cache_size = 6GB
-      logging_collector = on
-      log_directory = 'log'
-      log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
-      log_min_duration_statement = 250ms
-      # --- END TRANSIT SERVER CUSTOMISATIONS ---
+hba_template: |
+  # pg_hba.conf configured by script V{script_hash}
+  # TYPE  DATABASE        USER            ADDRESS                 METHOD
+  local   all             postgres                                peer
+  local   all             all                                     peer
+  local   {pg_database}    {pg_user}                                scram-sha-256
+  host    all             all             127.0.0.1/32            scram-sha-256
+  host    {pg_database}    {pg_user}        127.0.0.1/32            scram-sha-256
+  host    {pg_database}    {pg_user}        {admin_group_ip}       scram-sha-256
+  host    all             all             ::1/128                 scram-sha-256
+  host    {pg_database}    {pg_user}        ::1/128                 scram-sha-256
+  # Template for additions to postgresql.conf.
+  # Supports placeholder {script_hash}.
+postgresql_conf_additions_template: |
+  # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash} ---
+  listen_addresses = '*'
+  shared_buffers = 2GB
+  work_mem = 256MB
+  maintenance_work_mem = 2GB
+  checkpoint_timeout = 15min
+  max_wal_size = 4GB
+  min_wal_size = 2GB
+  checkpoint_completion_target = 0.9
+  effective_cache_size = 6GB
+  logging_collector = on
+  log_directory = 'log'
+  log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+  log_min_duration_statement = 250ms
+  # --- END TRANSIT SERVER CUSTOMISATIONS ---
 
 # Apache Web Server Settings
 apache:
