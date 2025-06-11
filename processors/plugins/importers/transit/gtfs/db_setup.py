@@ -6,23 +6,16 @@ and foreign key management.
 """
 
 import logging
-from typing import List  # Added Tuple
+from typing import List
 
-import psycopg  # Keep psycopg for PgConnection
-from psycopg import Connection as PgConnection  # Keep specific import
+import psycopg
+from psycopg import Connection as PgConnection
 from psycopg import sql
 
-# Import definitions from other GTFS modules
-from . import schema_definitions as schemas  # For GTFS_FILE_SCHEMAS
+from . import schema_definitions as schemas
 from .pipeline_definitions import GTFS_FOREIGN_KEYS, GTFS_LOAD_ORDER
 
 module_logger = logging.getLogger(__name__)
-
-
-# REMOVE sanitize_identifier function as it will no longer be used.
-# def sanitize_identifier(name: str) -> str:
-#     """Sanitize SQL identifiers (table/column names) by quoting them."""
-#     return '"' + name.replace('"', '""').strip() + '"'
 
 
 def create_tables_from_schema(conn: PgConnection) -> None:
@@ -146,7 +139,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             cursor.execute(
                 sql.SQL(
                     """
-                    CREATE TABLE IF NOT EXISTS gtfs_shapes_lines # psycoph3 linter confusion
+                    CREATE TABLE IF NOT EXISTS gtfs_shapes_lines
                     (
                         shape_id
                         TEXT
