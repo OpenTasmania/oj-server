@@ -340,6 +340,22 @@ def build_osrm_graphs_for_region(
             app_settings,
         )
 
+    contract_cmd_args = [
+        "osrm-contract",
+        f"./{osrm_base_filename_in_container}.osrm",
+    ]
+    if not _run_osrm_container_command_internal(
+        contract_cmd_args,
+        app_settings,
+        region_processed_output_dir_host,
+        None,
+        None,
+        logger_to_use,
+        "osrm-contract",
+        region_name_key,
+    ):
+        return False
+
     partition_cmd_args = [
         "osrm-partition",
         f"./{osrm_base_filename_in_container}.osrm",
