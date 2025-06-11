@@ -6,9 +6,11 @@ Handles OSRM data processing: Osmium extraction and OSRM graph building using co
 
 import logging
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from common.command_utils import (
     log_map_server,
@@ -94,9 +96,7 @@ def _run_osrm_container_command_internal(
             app_settings,
         )
         return True
-    except (
-        subprocess.CalledProcessError
-    ):  # Error logged by run_elevated_command
+    except subprocess.CalledProcessError:
         log_map_server(
             f"{symbols.get('critical', '🔥')} {container_cmd} {step_name} for {region_name_log} FAILED. Check logs.",
             "critical",
@@ -176,13 +176,6 @@ def extract_regional_pbfs_with_osmium(
                     geojson_full_path.parent / output_pbf_filename
                 )
 
-                log_map_server(
-                    f"Processing Osmium for region key: {unique_region_key} from {geojson_filename}",
-                    "debug",
-                    logger_to_use,
-                    app_settings,
-                )
-
                 if output_pbf_full_path.is_file():
                     log_map_server(
                         f"{symbols.get('info', 'ℹ️')} Regional PBF {output_pbf_full_path} already exists. Skipping.",
@@ -223,16 +216,9 @@ def extract_regional_pbfs_with_osmium(
                     extracted_pbf_paths[unique_region_key] = str(
                         output_pbf_full_path
                     )
-                except subprocess.CalledProcessError as e:
+                except (subprocess.CalledProcessError, Exception) as e:
                     log_map_server(
                         f"{symbols.get('error', '❌')} Osmium extraction failed for {unique_region_key}: {e}",
-                        "error",
-                        logger_to_use,
-                        app_settings,
-                    )
-                except Exception as e:
-                    log_map_server(
-                        f"{symbols.get('error', '❌')} Unexpected Osmium error for {unique_region_key}: {e}",
                         "error",
                         logger_to_use,
                         app_settings,
@@ -275,191 +261,137 @@ def build_osrm_graphs_for_region(
         )
         return False
 
-    region_processed_output_dir_host = str(
-        Path(osrm_data_cfg.processed_dir) / region_name_key
-    )
+    final_output_dir = Path(osrm_data_cfg.processed_dir) / region_name_key
+    parent_dir = Path(osrm_data_cfg.processed_dir)
+    parent_dir.mkdir(exist_ok=True, parents=True)
 
-    docker_exec_uid = str(os.getuid())
-    docker_exec_gid = str(os.getgid())
-    try:
-        run_elevated_command(
-            ["mkdir", "-p", region_processed_output_dir_host],
-            app_settings,
-            current_logger=logger_to_use,
-            check=True,
-        )
-        run_elevated_command(
-            [
-                "chown",
-                "-R",
-                f"{docker_exec_uid}:{docker_exec_gid}",
-                region_processed_output_dir_host,
-            ],
-            app_settings,
-            current_logger=logger_to_use,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, Exception) as e:
+    with tempfile.TemporaryDirectory(
+        prefix=f"{region_name_key}_", dir=parent_dir
+    ) as tmp_dir_str:
+        tmp_dir_path = Path(tmp_dir_str)
         log_map_server(
-            f"{symbols.get('critical', '🔥')} Failed to create or set permissions for OSRM output directory {region_processed_output_dir_host}: {e}",
-            "critical",
+            f"Using temporary directory for processing: {tmp_dir_path}",
+            "debug",
             logger_to_use,
             app_settings,
         )
-        return False
 
-    pbf_filename_on_host = Path(regional_pbf_host_path).name
-    osrm_base_filename_in_container = region_name_key
+        docker_exec_uid = str(os.getuid())
+        docker_exec_gid = str(os.getgid())
+        try:
+            run_elevated_command(
+                [
+                    "chown",
+                    "-R",
+                    f"{docker_exec_uid}:{docker_exec_gid}",
+                    str(tmp_dir_path),
+                ],
+                app_settings,
+                current_logger=logger_to_use,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, Exception) as e:
+            log_map_server(
+                f"{symbols.get('critical', '🔥')} Failed to set permissions for temp directory {tmp_dir_path}: {e}",
+                "critical",
+                logger_to_use,
+                app_settings,
+            )
+            return False
 
-    pbf_readonly_path_in_container = (
-        f"/mnt_readonly_pbf/{pbf_filename_on_host}"
-    )
-    profile_path_in_container = str(osrm_data_cfg.profile_script_in_container)
-
-    shell_command_for_extract = (
-        # Fail immediately if any command fails
-        "set -e; "
-        # Copy PBF to the processing directory for modification
-        f'cp "{pbf_readonly_path_in_container}" "./{pbf_filename_on_host}"; '
-        # Run extraction
-        f'osrm-extract -p "{profile_path_in_container}" "./{pbf_filename_on_host}"; '
-        # Clean up the copied PBF
-        f'rm "./{pbf_filename_on_host}";'
-    )
-
-    extract_cmd_args = ["sh", "-c", shell_command_for_extract]
-
-    if not _run_osrm_container_command_internal(
-        extract_cmd_args,
-        app_settings,
-        region_processed_output_dir_host,
-        regional_pbf_host_path,
-        pbf_filename_on_host,
-        logger_to_use,
-        "osrm-extract",
-        region_name_key,
-    ):
-        return False
-
-    # Verify that the .osrm file was created
-    pbf_stem = Path(pbf_filename_on_host).stem.removesuffix(".osm")
-    extracted_osrm_file = (
-        Path(region_processed_output_dir_host) / f"{pbf_stem}.osrm"
-    )
-    if not extracted_osrm_file.is_file():
-        log_map_server(
-            f"{symbols.get('error', '❌')} osrm-extract failed to create the expected file: {extracted_osrm_file}",
-            "error",
-            logger_to_use,
-            app_settings,
+        pbf_filename_on_host = Path(regional_pbf_host_path).name
+        osrm_base_filename_in_container = region_name_key
+        pbf_readonly_path_in_container = (
+            f"/mnt_readonly_pbf/{pbf_filename_on_host}"
         )
-        return False
+        profile_path_in_container = str(
+            osrm_data_cfg.profile_script_in_container
+        )
 
-    # If the extracted file's base name doesn't match the region key, rename it
-    if pbf_stem != osrm_base_filename_in_container:
+        shell_command_for_extract = (
+            f'set -e; cp "{pbf_readonly_path_in_container}" "./{pbf_filename_on_host}"; '
+            f'osrm-extract -p "{profile_path_in_container}" "./{pbf_filename_on_host}"; '
+            f'rm "./{pbf_filename_on_host}";'
+        )
+
+        steps: List[Dict[str, Any]] = [
+            {
+                "name": "osrm-extract",
+                "args": ["sh", "-c", shell_command_for_extract],
+                "pbf_mount": True,
+            },
+            {
+                "name": "osrm-contract",
+                "args": [
+                    "osrm-contract",
+                    f"./{osrm_base_filename_in_container}.osrm",
+                ],
+            },
+            {
+                "name": "osrm-partition",
+                "args": [
+                    "osrm-partition",
+                    f"./{osrm_base_filename_in_container}.osrm",
+                ],
+            },
+            {
+                "name": "osrm-customize",
+                "args": [
+                    "osrm-customize",
+                    f"./{osrm_base_filename_in_container}.osrm",
+                ],
+            },
+        ]
+
+        for step in steps:
+            pbf_mount_path = (
+                regional_pbf_host_path if step.get("pbf_mount") else None
+            )
+            pbf_mount_name = (
+                pbf_filename_on_host if step.get("pbf_mount") else None
+            )
+
+            if not _run_osrm_container_command_internal(
+                step["args"],
+                app_settings,
+                str(tmp_dir_path),
+                pbf_mount_path,
+                pbf_mount_name,
+                logger_to_use,
+                step["name"],
+                region_name_key,
+            ):
+                log_map_server(
+                    f"Processing failed at step: {step['name']}. Aborting and cleaning up temp dir.",
+                    "error",
+                    logger_to_use,
+                    app_settings,
+                )
+                return False
+
         log_map_server(
-            f"OSRM output stem '{pbf_stem}' does not match desired base '{osrm_base_filename_in_container}'. Renaming files...",
+            f"All OSRM processing steps for {region_name_key} completed successfully.",
             "info",
             logger_to_use,
             app_settings,
         )
-        rename_script = (
-            "set -e; "
-            f"for f in {pbf_stem}.*; do "
-            f'  new_name="{osrm_base_filename_in_container}.${{f#*.}}"; '
-            f'  echo "Renaming $f to $new_name"; '
-            f'  mv -- "$f" "$new_name"; '
-            f"done"
-        )
-        rename_cmd_args = ["sh", "-c", rename_script]
-        if not _run_osrm_container_command_internal(
-            rename_cmd_args,
-            app_settings,
-            region_processed_output_dir_host,
-            None,
-            None,
-            logger_to_use,
-            "rename",
-            region_name_key,
-        ):
-            return False
 
-    contract_cmd_args = [
-        "osrm-contract",
-        f"./{osrm_base_filename_in_container}.osrm",
-    ]
-    if not _run_osrm_container_command_internal(
-        contract_cmd_args,
-        app_settings,
-        region_processed_output_dir_host,
-        None,
-        None,
-        logger_to_use,
-        "osrm-contract",
-        region_name_key,
-    ):
-        return False
+        if final_output_dir.exists():
+            log_map_server(
+                f"Removing existing directory to replace with new data: {final_output_dir}",
+                "info",
+                logger_to_use,
+                app_settings,
+            )
+            shutil.rmtree(final_output_dir)
 
-    # After osrm-contract, the .osrm file is updated. We proceed to partition.
-    partition_cmd_args = [
-        "osrm-partition",
-        f"./{osrm_base_filename_in_container}.osrm",
-    ]
-    if not _run_osrm_container_command_internal(
-        partition_cmd_args,
-        app_settings,
-        region_processed_output_dir_host,
-        None,
-        None,
-        logger_to_use,
-        "osrm-partition",
-        region_name_key,
-    ):
-        return False
-
-    # Verify partition file was created
-    partition_file = (
-        Path(region_processed_output_dir_host)
-        / f"{osrm_base_filename_in_container}.osrm.partition"
-    )
-    if not partition_file.is_file():
+        shutil.move(str(tmp_dir_path), final_output_dir)
         log_map_server(
-            f"{symbols.get('error', '❌')} osrm-partition failed to create the expected file: {partition_file}",
-            "error",
+            f"Committed processed data to final directory: {final_output_dir}",
+            "success",
             logger_to_use,
             app_settings,
         )
-        return False
-
-    customize_cmd_args = [
-        "osrm-customize",
-        f"./{osrm_base_filename_in_container}.osrm",
-    ]
-    if not _run_osrm_container_command_internal(
-        customize_cmd_args,
-        app_settings,
-        region_processed_output_dir_host,
-        None,
-        None,
-        logger_to_use,
-        "osrm-customize",
-        region_name_key,
-    ):
-        return False
-
-    # Verify customize file was created
-    customize_file = (
-        Path(region_processed_output_dir_host)
-        / f"{osrm_base_filename_in_container}.osrm.customize"
-    )
-    if not customize_file.is_file():
-        log_map_server(
-            f"{symbols.get('error', '❌')} osrm-customize failed to create the expected file: {customize_file}",
-            "error",
-            logger_to_use,
-            app_settings,
-        )
-        return False
 
     log_map_server(
         f"{symbols.get('success', '✅')} OSRM graphs built for region: {region_name_key}",
