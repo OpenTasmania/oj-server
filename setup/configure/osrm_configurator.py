@@ -17,6 +17,27 @@ from setup.config_models import AppSettings
 module_logger = logging.getLogger(__name__)
 
 
+def get_next_available_port(
+    app_settings: AppSettings, logger: logging.Logger
+) -> int:
+    """
+    Returns the next available port for OSRM services.
+    Tracks used ports to avoid conflicts.
+    """
+    osrm_service_cfg = app_settings.osrm_service
+    base_port = osrm_service_cfg.car_profile_default_host_port
+
+    # Get all explicitly configured ports
+    used_ports = set(osrm_service_cfg.region_port_map.values())
+
+    # Find the next available port
+    next_port = base_port
+    while next_port in used_ports:
+        next_port += 1
+
+    return next_port
+
+
 # OSRM_BASE_PROCESSED_DIR is now app_settings.osrm_data.processed_dir
 # OSRM_DOCKER_IMAGE is now app_settings.osrm_service.image_tag
 # CONTAINER_RUNTIME_COMMAND is app_settings.container_runtime_command
@@ -78,15 +99,35 @@ def create_osrm_routed_service_file(
             f"OSRM data file {expected_osrm_file_on_host} missing for service {service_name}"
         )
 
-    # Port mapping: Use a configured default host port for now.
-    # For multiple regions, a port management strategy is needed.
-    # This could involve a dictionary in AppSettings: osrm_service.region_port_map = {"region_key": port}
-    # Or incrementing from car_profile_default_host_port.
-    # For simplicity here, using the default car profile port.
-    host_port_for_this_region = osrm_service_cfg.car_profile_default_host_port
-    # A more robust way for multiple regions might be:
-    # host_port_for_this_region = osrm_service_cfg.car_profile_default_host_port + index_of_region (if regions are processed in a list)
-    # This needs to be coordinated with Nginx config if Nginx proxies to specific ports per region.
+    # Port mapping logic
+    if region_name_key in osrm_service_cfg.region_port_map:
+        # Use explicitly configured port for this region
+        host_port_for_this_region = osrm_service_cfg.region_port_map[
+            region_name_key
+        ]
+        log_map_server(
+            f"{symbols.get('info', 'ℹ️')} Using configured port {host_port_for_this_region} for region {region_name_key}",
+            "info",
+            logger_to_use,
+            app_settings,
+        )
+    else:
+        # Auto-assign port by incrementing from base port
+        # This requires tracking used ports to avoid conflicts
+        host_port_for_this_region = get_next_available_port(
+            app_settings, logger_to_use
+        )
+        log_map_server(
+            f"{symbols.get('info', 'ℹ️')} Auto-assigned port {host_port_for_this_region} for region {region_name_key}",
+            "info",
+            logger_to_use,
+            app_settings,
+        )
+
+    # Update the region_port_map to track this assignment
+    osrm_service_cfg.region_port_map[region_name_key] = (
+        host_port_for_this_region
+    )
 
     systemd_template_str = osrm_service_cfg.systemd_template
     format_vars = {

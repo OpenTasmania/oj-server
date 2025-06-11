@@ -517,6 +517,10 @@ class OsrmServiceSettings(BaseSettings):
         default=OSRM_SYSTEMD_TEMPLATE_DEFAULT,
         description="Template for OSRM systemd service files.",
     )
+    region_port_map: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Maps region keys to their assigned ports. If a region is not in this map, it will use an auto-assigned port.",
+    )
 
 
 class OsrmDataSettings(BaseSettings):
