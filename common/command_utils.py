@@ -8,7 +8,7 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 # Import AppSettings for type hinting and SYMBOLS_DEFAULT for fallback
 from setup.config_models import SYMBOLS_DEFAULT, AppSettings
@@ -65,6 +65,7 @@ def run_command(
     cmd_input: Optional[str] = None,
     current_logger: Optional[logging.Logger] = None,
     cwd: Optional[str] = None,
+    env: Optional[Dict[str, str]] = None,
 ) -> subprocess.CompletedProcess:
     effective_logger = current_logger if current_logger else module_logger
     symbols = (
@@ -116,6 +117,7 @@ def run_command(
             text=text,
             input=cmd_input,
             cwd=cwd,
+            env=env,
         )
         if capture_output:
             if result.stdout and result.stdout.strip():
@@ -202,6 +204,7 @@ def run_elevated_command(
     cmd_input: Optional[str] = None,
     current_logger: Optional[logging.Logger] = None,
     cwd: Optional[str] = None,
+    env: Optional[Dict[str, str]] = None,  # Added env parameter
 ) -> subprocess.CompletedProcess:
     prefix = _get_elevated_command_prefix()
     elevated_command_list = prefix + list(command)
@@ -215,6 +218,7 @@ def run_elevated_command(
         cmd_input=cmd_input,
         current_logger=current_logger,
         cwd=cwd,
+        env=env,
     )
 
 
