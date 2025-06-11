@@ -13,7 +13,7 @@ order of precedence:
 """
 
 import argparse
-import sys
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -22,6 +22,8 @@ import yaml  # PyYAML - ensure this is in dependencies
 # Assuming your Pydantic models are in setup.config_models
 # Adjust import if structure is different
 from .config_models import AppSettings
+
+module_logger = logging.getLogger(__name__)
 
 CONFIG_DIR = "config_files"
 
@@ -67,11 +69,14 @@ def _deep_merge_dicts(
 def load_app_settings(
     cli_args: Optional[argparse.Namespace] = None,
     config_file_path: str = "config.yaml",
+    current_logger: Optional[logging.Logger] = None,
 ) -> AppSettings:
     """
     Loads application settings with the following precedence:
     1. Pydantic Model Defaults.
     2. Values from YAML configuration file (overrides defaults).
+       - First looks for service-specific config files in /config_files
+       - Falls back to sections in the main config.yaml if not found
     3. Environment Variables (Pydantic BaseSettings loads these; values from YAML for the
        same fields will generally take precedence if both are specified, depending on how
        BaseSettings merges __init__ kwargs with ENV).
@@ -81,10 +86,12 @@ def load_app_settings(
     Args:
         cli_args: Parsed command-line arguments (from argparse).
         config_file_path: Path to the YAML configuration file.
+        current_logger: Optional logger to use instead of the module logger.
 
     Returns:
         An instance of AppSettings with the fully resolved configuration.
     """
+    logger_to_use = current_logger if current_logger else module_logger
 
     # 1. Start with Pydantic defaults.
     #    BaseSettings also loads from actual environment variables and .env files here.
@@ -94,8 +101,20 @@ def load_app_settings(
         exclude_defaults=False
     )
 
-    # 2. Override with values from YAML configuration file.
-    #    YAML values will override anything loaded from defaults or environment variables up to this point.
+    # Get the project root path
+    project_root = Path.cwd()
+    if not (project_root / CONFIG_DIR).exists():
+        # Try to find the project root by looking for the config_files directory
+        parent_dir = project_root.parent
+        while parent_dir != project_root:
+            if (parent_dir / CONFIG_DIR).exists():
+                project_root = parent_dir
+                break
+            project_root = parent_dir
+            parent_dir = parent_dir.parent
+
+    # 2. Override with values from YAML configuration files.
+    #    First, load the main config file to get the base configuration.
     yaml_config_path = Path(config_file_path)
     if yaml_config_path.exists() and yaml_config_path.is_file():
         try:
@@ -105,26 +124,63 @@ def load_app_settings(
                 current_values_dict = _deep_update(
                     current_values_dict, yaml_data
                 )
+                logger_to_use.info(
+                    f"Loaded main configuration from {yaml_config_path}"
+                )
             elif yaml_data is not None:
-                print(
-                    f"Warning: Config file '{yaml_config_path}' does not contain a valid YAML dictionary. Ignoring.",
-                    file=sys.stderr,
+                logger_to_use.warning(
+                    f"Config file '{yaml_config_path}' does not contain a valid YAML dictionary. Ignoring."
                 )
         except yaml.YAMLError as e:
-            print(
-                f"Warning: Could not parse YAML config file '{yaml_config_path}': {e}. Using defaults and environment variables.",
-                file=sys.stderr,
+            logger_to_use.warning(
+                f"Could not parse YAML config file '{yaml_config_path}': {e}. Using defaults and environment variables."
             )
         except IOError as e:
-            print(
-                f"Warning: Could not read config file '{yaml_config_path}': {e}. Using defaults and environment variables.",
-                file=sys.stderr,
+            logger_to_use.warning(
+                f"Could not read config file '{yaml_config_path}': {e}. Using defaults and environment variables."
             )
     else:
-        print(
-            f"Info: Configuration file '{yaml_config_path}' not found. Using defaults, environment variables, and CLI args.",
-            file=sys.stderr,
+        logger_to_use.info(
+            f"Configuration file '{yaml_config_path}' not found. Using defaults, environment variables, and CLI args."
         )
+
+    # Now, try to load service-specific config files for each service
+    # List of services to check for specific config files
+    services = [
+        "pg_tileserv",
+        "postgres",
+        "apache",
+        "nginx",
+        "osrm_service",
+        "osrm_data",
+        "renderd",
+        "certbot",
+        "webapp",
+    ]
+
+    for service in services:
+        # Load service-specific config if available
+        service_config = load_service_config(
+            service, project_root, config_file_path, logger_to_use
+        )
+
+        if service_config:
+            # If we have a service-specific config, update the current values
+            if service in current_values_dict:
+                # If the service key already exists in the main config, update it
+                if isinstance(
+                    current_values_dict[service], dict
+                ) and isinstance(service_config, dict):
+                    current_values_dict[service] = _deep_update(
+                        current_values_dict[service], service_config
+                    )
+                else:
+                    # If the service key exists but isn't a dict, or the service_config isn't a dict,
+                    # replace it entirely
+                    current_values_dict[service] = service_config
+            else:
+                # If the service key doesn't exist in the main config, add it
+                current_values_dict[service] = service_config
 
     # 3. Override with Command-Line Arguments (highest precedence).
     if cli_args:
@@ -193,13 +249,16 @@ def load_app_settings(
     try:
         final_settings = AppSettings(**current_values_dict)
     except Exception as e:  # Catch Pydantic validation errors etc.
-        print(f"Error: Configuration validation failed: {e}", file=sys.stderr)
+        logger_to_use.error(f"Configuration validation failed: {e}")
         # Potentially exit or raise a more specific configuration error
         raise SystemExit(f"Configuration error: {e}") from e
 
     # Optional: Log the final configuration source for sensitive fields like password
     # For example, log if password came from env, file, or default, without logging the password itself.
     # This can be complex to trace perfectly without more involved logic.
+    logger_to_use.info(
+        "Successfully loaded and validated application settings"
+    )
 
     return final_settings
 
@@ -237,7 +296,111 @@ def load_config_from_directory(project_root: Path) -> Dict[str, Any]:
                     )
             except yaml.YAMLError as e:
                 # Handle YAML parsing errors
-                print(f"Error parsing YAML file {file_path}: {e}")
+                module_logger.error(
+                    f"Error parsing YAML file {file_path}: {e}"
+                )
                 raise
 
     return merged_config
+
+
+def load_service_config(
+    service_name: str,
+    project_root: Path,
+    main_config_path: str = "config.yaml",
+    current_logger: Optional[logging.Logger] = None,
+) -> Dict[str, Any]:
+    """
+    Loads configuration for a specific service. First looks for a service-specific
+    config file in the config_files directory. If not found, falls back to the
+    section in the main config.yaml file.
+
+    Args:
+        service_name: The name of the service to load configuration for.
+        project_root: The root path of the project.
+        main_config_path: Path to the main configuration file (default: "config.yaml").
+        current_logger: Optional logger to use instead of the module logger.
+
+    Returns:
+        A dictionary containing the service configuration.
+    """
+    logger_to_use = current_logger if current_logger else module_logger
+
+    # First, try to load from service-specific config file
+    config_dir_path = project_root / CONFIG_DIR
+    service_config_path = config_dir_path / f"{service_name}.yaml"
+
+    service_config: Dict[str, Any] = {}
+
+    # Check if service-specific config file exists
+    if service_config_path.exists() and service_config_path.is_file():
+        try:
+            with open(service_config_path, "r", encoding="utf-8") as f:
+                yaml_data = yaml.safe_load(f)
+
+            if yaml_data and isinstance(yaml_data, dict):
+                service_config = yaml_data
+                logger_to_use.info(
+                    f"Loaded configuration for {service_name} from {service_config_path}"
+                )
+            else:
+                logger_to_use.warning(
+                    f"Service config file '{service_config_path}' does not contain a valid YAML dictionary. "
+                    f"Falling back to main config."
+                )
+        except yaml.YAMLError as e:
+            logger_to_use.warning(
+                f"Could not parse service config file '{service_config_path}': {e}. "
+                f"Falling back to main config."
+            )
+        except IOError as e:
+            logger_to_use.warning(
+                f"Could not read service config file '{service_config_path}': {e}. "
+                f"Falling back to main config."
+            )
+    else:
+        logger_to_use.info(
+            f"Service-specific config file for '{service_name}' not found at {service_config_path}. "
+            f"Falling back to main config."
+        )
+
+    # If service config is empty or not found, try to load from main config
+    if not service_config:
+        main_config_file_path = Path(main_config_path)
+        if main_config_file_path.exists() and main_config_file_path.is_file():
+            try:
+                with open(main_config_file_path, "r", encoding="utf-8") as f:
+                    yaml_data = yaml.safe_load(f)
+
+                if (
+                    yaml_data
+                    and isinstance(yaml_data, dict)
+                    and service_name in yaml_data
+                ):
+                    service_config = yaml_data[service_name]
+                    logger_to_use.info(
+                        f"Loaded configuration for {service_name} from section in {main_config_file_path}"
+                    )
+                else:
+                    logger_to_use.warning(
+                        f"No configuration section for '{service_name}' found in {main_config_file_path}."
+                    )
+            except yaml.YAMLError as e:
+                logger_to_use.error(
+                    f"Could not parse main config file '{main_config_file_path}': {e}."
+                )
+                raise
+            except IOError as e:
+                logger_to_use.error(
+                    f"Could not read main config file '{main_config_file_path}': {e}."
+                )
+                raise
+        else:
+            logger_to_use.error(
+                f"Main configuration file '{main_config_file_path}' not found."
+            )
+            raise FileNotFoundError(
+                f"Configuration file '{main_config_file_path}' not found."
+            )
+
+    return service_config
