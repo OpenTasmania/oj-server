@@ -37,7 +37,6 @@ from installer.osrm_installer import (
 )
 from installer.pg_tileserv_installer import (
     create_pg_tileserv_system_user,
-    create_pg_tileserv_systemd_service_file,
     download_and_install_pg_tileserv_binary,
     setup_pg_tileserv_binary_permissions,
 )
@@ -108,6 +107,7 @@ from setup.configure.osrm_configurator import (
 from setup.configure.pg_tileserv_configurator import (
     activate_pg_tileserv_service,
     create_pg_tileserv_config_file,
+    create_pg_tileserv_systemd_service_file,
 )
 from setup.configure.postgres_configurator import (
     create_postgres_user_and_db,

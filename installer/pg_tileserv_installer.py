@@ -19,8 +19,6 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-from common.system_utils import get_current_script_hash
-from setup import config as static_config
 from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
@@ -253,76 +251,3 @@ def setup_pg_tileserv_binary_permissions(
         logger_to_use,
         app_settings,
     )
-
-
-def create_pg_tileserv_systemd_service_file(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
-) -> None:
-    """Creates the systemd service file for pg_tileserv using template from app_settings."""
-    logger_to_use = current_logger if current_logger else module_logger
-    symbols = app_settings.symbols
-    script_hash = (
-        get_current_script_hash(
-            project_root_dir=static_config.OSM_PROJECT_ROOT,
-            app_settings=app_settings,
-            logger_instance=logger_to_use,
-        )
-        or "UNKNOWN_HASH"
-    )
-
-    pgts_settings = app_settings.pg_tileserv
-    service_file_path = (
-        "/etc/systemd/system/pg_tileserv.service"  # Standard system path
-    )
-    config_file_full_path = str(
-        Path(pgts_settings.config_dir) / pgts_settings.config_filename
-    )
-
-    log_map_server(
-        f"{symbols.get('step', '➡️')} Creating pg_tileserv systemd service file at {service_file_path} from template...",
-        "info",
-        logger_to_use,
-        app_settings,
-    )
-
-    systemd_template = pgts_settings.systemd_template
-    format_vars = {
-        "script_hash": script_hash,
-        "pg_tileserv_system_user": pgts_settings.system_user,
-        "pg_tileserv_system_group": pgts_settings.system_user,  # Assumes group is same as user
-        "pg_tileserv_binary_path": str(pgts_settings.binary_install_path),
-        "pg_tileserv_config_file_path_systemd": config_file_full_path,
-    }
-
-    try:
-        pg_tileserv_service_content_final = systemd_template.format(
-            **format_vars
-        )
-        run_elevated_command(
-            ["tee", service_file_path],
-            app_settings,
-            cmd_input=pg_tileserv_service_content_final,
-            current_logger=logger_to_use,
-        )
-        log_map_server(
-            f"{symbols.get('success', '✅')} Created/Updated {service_file_path}",
-            "success",
-            logger_to_use,
-            app_settings,
-        )
-    except KeyError as e_key:
-        log_map_server(
-            f"{symbols.get('error', '❌')} Missing placeholder key '{e_key}' for pg_tileserv systemd template. Check config.yaml/models.",
-            "error",
-            logger_to_use,
-            app_settings,
-        )
-        raise
-    except Exception as e:
-        log_map_server(
-            f"{symbols.get('error', '❌')} Failed to write pg_tileserv systemd service file: {e}",
-            "error",
-            logger_to_use,
-            app_settings,
-        )
-        raise
