@@ -18,14 +18,11 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
+from common.json_utils import JsonFileType, check_json_file
 from setup import config as static_config  # For OSM_PROJECT_ROOT
 from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
-
-
-# Constants like OSRM_DOCKER_IMAGE are now in app_settings.osrm_service.image_tag
-# Paths are from app_settings.osrm_data
 
 
 def ensure_osrm_dependencies(
@@ -111,10 +108,7 @@ def setup_osrm_data_directories(
     )
 
     osm_data_base_dir = str(osrm_data_cfg.base_dir)
-    # regions_subdir is implicitly part of how GeoJSONs are structured under base_dir/regions
-    osm_data_regions_dir = str(
-        Path(osm_data_base_dir) / "regions"
-    )  # Standardized sub-path
+    osm_data_regions_dir = str(Path(osm_data_base_dir) / "regions")
     osrm_base_processed_dir = str(osrm_data_cfg.processed_dir)
 
     current_uid_str = str(os.getuid())
@@ -127,7 +121,6 @@ def setup_osrm_data_directories(
     ]
     for dir_path_str in dirs_to_create:
         dir_path = Path(dir_path_str)
-        # Use elevated command for mkdir, chown, chmod as these are system dirs
         if not dir_path.exists():
             run_elevated_command(
                 ["mkdir", "-p", str(dir_path)],
@@ -141,8 +134,6 @@ def setup_osrm_data_directories(
                 app_settings,
             )
 
-        # Ensure current user can write, as osmium and PBF download might run as current user
-        # while Docker commands might map this user's UID/GID.
         run_elevated_command(
             ["chown", f"{current_uid_str}:{current_gid_str}", str(dir_path)],
             app_settings,
@@ -187,11 +178,10 @@ def download_base_pbf(
             logger_to_use,
             app_settings,
         )
-        # Ensure base_dir is writable by current user (should be handled by setup_osrm_data_directories)
         run_command(
             ["wget", pbf_download_url, "-O", pbf_full_path],
             app_settings,
-            cwd=str(osrm_data_cfg.base_dir),  # wget -O specifies full path
+            cwd=str(osrm_data_cfg.base_dir),
             current_logger=logger_to_use,
         )
         log_map_server(
@@ -208,7 +198,7 @@ def download_base_pbf(
             app_settings,
         )
 
-    if not os.path.isfile(pbf_full_path):  # Verify after attempt
+    if not os.path.isfile(pbf_full_path):
         raise FileNotFoundError(
             f"Base PBF file {pbf_full_path} not found after download attempt."
         )
@@ -230,11 +220,9 @@ def prepare_region_boundaries(
         app_settings,
     )
 
-    # OSM_PROJECT_ROOT comes from static_config
     assets_source_regions_dir = (
         static_config.OSM_PROJECT_ROOT / "assets" / "regions"
     )
-    # Target is base_dir / "regions" (standardized sub-path)
     target_osm_data_regions_dir = Path(osrm_data_cfg.base_dir) / "regions"
 
     if not assets_source_regions_dir.is_dir():
@@ -244,42 +232,48 @@ def prepare_region_boundaries(
             logger_to_use,
             app_settings,
         )
-        return  # Or raise if critical
+        return
 
-    # Ensure target base directory exists (setup_osrm_data_directories should have done this)
     target_osm_data_regions_dir.mkdir(parents=True, exist_ok=True)
-    # Permissions on target_osm_data_regions_dir already set by setup_osrm_data_directories
 
     copied_files_count = 0
+    malformed_files = []
+    current_uid_str = str(os.getuid())
+    current_gid_str = str(os.getgid())
+
     for root, _, files in os.walk(assets_source_regions_dir):
         source_root_path = Path(root)
-        # Determine relative path from the *assets* regions dir to maintain structure
-        relative_path_from_assets = source_root_path.relative_to(
+        relative_path = source_root_path.relative_to(
             assets_source_regions_dir
         )
-        target_current_dir = (
-            target_osm_data_regions_dir / relative_path_from_assets
-        )
+        target_current_dir = target_osm_data_regions_dir / relative_path
 
-        if (
-            not target_current_dir.exists()
-        ):  # Create subdirectories in target if they don't exist
+        if not target_current_dir.exists():
             target_current_dir.mkdir(parents=True, exist_ok=True)
-            # Ownership should be fine due to parent dir permissions.
 
         for file_name in files:
-            if file_name.endswith(
-                ".json"
-            ):  # Assuming GeoJSON files end with .json
-                source_file = source_root_path / file_name
+            source_file = source_root_path / file_name
+            json_status = check_json_file(source_file)
+
+            if json_status == JsonFileType.VALID_JSON:
                 target_file = target_current_dir / file_name
                 try:
-                    shutil.copy2(
-                        source_file, target_file
-                    )  # copy2 preserves metadata
-                    # Ensure copied files are also owned/writable by current user for osmium
-                    # This might require sudo if target_osm_data_regions_dir was created by root earlier
-                    # and current user is different. setup_osrm_data_directories chowns to current user.
+                    shutil.copy2(source_file, target_file)
+                    run_elevated_command(
+                        [
+                            "chown",
+                            f"{current_uid_str}:{current_gid_str}",
+                            str(target_file),
+                        ],
+                        app_settings,
+                        current_logger=logger_to_use,
+                    )
+                    run_elevated_command(
+                        ["chmod", "644", str(target_file)],  # rw-r--r--
+                        app_settings,
+                        current_logger=logger_to_use,
+                    )
+
                     log_map_server(
                         f"Copied boundary file: {target_file}",
                         "debug",
@@ -294,6 +288,18 @@ def prepare_region_boundaries(
                         logger_to_use,
                         app_settings,
                     )
+            elif json_status == JsonFileType.MALFORMED_JSON:
+                malformed_files.append(source_file)
+
+    if malformed_files:
+        log_map_server(
+            f"{symbols.get('warning', '!')} {len(malformed_files)} malformed JSON file(s) detected and skipped:",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+        for f in malformed_files:
+            log_map_server(f"  - {f}", "warning", logger_to_use, app_settings)
 
     if copied_files_count > 0:
         log_map_server(
@@ -304,7 +310,7 @@ def prepare_region_boundaries(
         )
     else:
         log_map_server(
-            f"{symbols.get('warning', '!')} No boundary files were copied. Check assets directory.",
+            f"{symbols.get('warning', '!')} No valid boundary files were copied. Check assets directory.",
             "warning",
             logger_to_use,
             app_settings,
