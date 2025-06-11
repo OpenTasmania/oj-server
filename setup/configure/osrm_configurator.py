@@ -27,20 +27,13 @@ def get_next_available_port(
     osrm_service_cfg = app_settings.osrm_service
     base_port = osrm_service_cfg.car_profile_default_host_port
 
-    # Get all explicitly configured ports
     used_ports = set(osrm_service_cfg.region_port_map.values())
 
-    # Find the next available port
     next_port = base_port
     while next_port in used_ports:
         next_port += 1
 
     return next_port
-
-
-# OSRM_BASE_PROCESSED_DIR is now app_settings.osrm_data.processed_dir
-# OSRM_DOCKER_IMAGE is now app_settings.osrm_service.image_tag
-# CONTAINER_RUNTIME_COMMAND is app_settings.container_runtime_command
 
 
 def create_osrm_routed_service_file(
@@ -66,12 +59,9 @@ def create_osrm_routed_service_file(
     service_name = f"osrm-routed-{region_name_key}.service"
     service_file_path = f"/etc/systemd/system/{service_name}"
 
-    # Path to the directory on host containing this region's .osrm files (e.g., /opt/osrm_processed_data/Australia_Tasmania_Hobart/)
     host_osrm_data_dir_for_this_region = (
         Path(osrm_data_cfg.processed_dir) / region_name_key
     )
-    # The OSRM filename inside the container (relative to its /data_processing mount)
-    # OSRM tools use region_name_key as the base, e.g., Australia_Tasmania_Hobart.osrm
     osrm_filename_stem_in_container = region_name_key
 
     log_map_server(
@@ -81,9 +71,6 @@ def create_osrm_routed_service_file(
         app_settings,
     )
 
-    # Check if the main .osrm data file exists on host to ensure data processing was successful for this region
-    # The actual file might be region_name_key.osrm, region_name_key.hsgr etc.
-    # Checking for the base .osrm file is a good indicator.
     expected_osrm_file_on_host = (
         host_osrm_data_dir_for_this_region
         / f"{osrm_filename_stem_in_container}.osrm"
@@ -99,9 +86,7 @@ def create_osrm_routed_service_file(
             f"OSRM data file {expected_osrm_file_on_host} missing for service {service_name}"
         )
 
-    # Port mapping logic
     if region_name_key in osrm_service_cfg.region_port_map:
-        # Use explicitly configured port for this region
         host_port_for_this_region = osrm_service_cfg.region_port_map[
             region_name_key
         ]
@@ -112,8 +97,6 @@ def create_osrm_routed_service_file(
             app_settings,
         )
     else:
-        # Auto-assign port by incrementing from base port
-        # This requires tracking used ports to avoid conflicts
         host_port_for_this_region = get_next_available_port(
             app_settings, logger_to_use
         )
@@ -124,7 +107,6 @@ def create_osrm_routed_service_file(
             app_settings,
         )
 
-    # Update the region_port_map to track this assignment
     osrm_service_cfg.region_port_map[region_name_key] = (
         host_port_for_this_region
     )
@@ -141,7 +123,6 @@ def create_osrm_routed_service_file(
         ),
         "osrm_image_tag": osrm_service_cfg.image_tag,
         "osrm_filename_in_container": f"{osrm_filename_stem_in_container}.osrm",
-        # osrm-routed expects the .osrm extension
         "max_table_size_routed": osrm_data_cfg.max_table_size_routed,
         "extra_osrm_routed_args": osrm_service_cfg.extra_routed_args,
     }
@@ -180,7 +161,7 @@ def create_osrm_routed_service_file(
 
 
 def activate_osrm_routed_service(
-    region_name_key: str,  # Unique key for the region
+    region_name_key: str,
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
@@ -218,10 +199,104 @@ def activate_osrm_routed_service(
         app_settings,
         current_logger=logger_to_use,
         check=False,
-    )  # Allow status to show failure
+    )
     log_map_server(
         f"{symbols.get('success', '✅')} {service_name} activation process completed (check status above).",
         "success",
         logger_to_use,
         app_settings,
     )
+
+
+def configure_osrm_services(
+    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> bool:
+    """
+    Finds all processed OSRM regions and creates and activates systemd services for them.
+
+    This function orchestrates the configuration of all OSRM services based on the
+    processed data found in the specified directory.
+    """
+    logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
+    processed_dir = Path(app_settings.osrm_data.processed_dir)
+
+    log_map_server(
+        f"{symbols.get('step', '➡️')} Starting OSRM service configuration...",
+        "info",
+        logger_to_use,
+        app_settings,
+    )
+
+    if not processed_dir.is_dir():
+        log_map_server(
+            f"{symbols.get('warning', '!')} Processed OSRM data directory not found at {processed_dir}. Nothing to configure.",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+        return True
+
+    processed_regions = [
+        d.name for d in processed_dir.iterdir() if d.is_dir()
+    ]
+
+    if not processed_regions:
+        log_map_server(
+            f"{symbols.get('warning', '!')} No processed OSRM regions found in {processed_dir}. No services to create.",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+        return True
+
+    all_successful = True
+    for region_name_key in processed_regions:
+        try:
+            log_map_server(
+                f"--- Configuring OSRM service for region: {region_name_key} ---",
+                "info",
+                logger_to_use,
+                app_settings,
+            )
+            create_osrm_routed_service_file(
+                region_name_key, app_settings, logger_to_use
+            )
+            activate_osrm_routed_service(
+                region_name_key, app_settings, logger_to_use
+            )
+        except FileNotFoundError as e:
+            log_map_server(
+                f"{symbols.get('error', '❌')} Skipping configuration for {region_name_key}: {e}",
+                "error",
+                logger_to_use,
+                app_settings,
+            )
+            all_successful = False
+            continue
+        except Exception as e:
+            log_map_server(
+                f"{symbols.get('critical', '🔥')} Unexpected error configuring {region_name_key}: {e}",
+                "critical",
+                logger_to_use,
+                app_settings,
+                exc_info=True,
+            )
+            all_successful = False
+
+    if all_successful:
+        log_map_server(
+            f"{symbols.get('success', '✅')} All OSRM services configured successfully.",
+            "success",
+            logger_to_use,
+            app_settings,
+        )
+    else:
+        log_map_server(
+            f"{symbols.get('error', '❌')} Some OSRM services failed to configure. Please check the logs.",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+
+    return all_successful
