@@ -54,7 +54,6 @@ def _run_osrm_container_command_internal(
             f"{pbf_host_path_for_mount}:/mnt_readonly_pbf/{pbf_filename_in_container_mount}:ro",
         ])
 
-    Path(region_osrm_data_dir_host).mkdir(parents=True, exist_ok=True)
     volume_mounts.extend([
         "-v",
         f"{region_osrm_data_dir_host}:/data_processing",
@@ -270,18 +269,56 @@ def build_osrm_graphs_for_region(
     region_processed_output_dir_host = str(
         Path(osrm_data_cfg.processed_dir) / region_name_key
     )
+
+    docker_exec_uid = str(os.getuid())
+    docker_exec_gid = str(os.getgid())
+    try:
+        run_elevated_command(
+            ["mkdir", "-p", region_processed_output_dir_host],
+            app_settings,
+            current_logger=logger_to_use,
+            check=True,
+        )
+        run_elevated_command(
+            [
+                "chown",
+                "-R",
+                f"{docker_exec_uid}:{docker_exec_gid}",
+                region_processed_output_dir_host,
+            ],
+            app_settings,
+            current_logger=logger_to_use,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, Exception) as e:
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} Failed to create or set permissions for OSRM output directory {region_processed_output_dir_host}: {e}",
+            "critical",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+
     pbf_filename_on_host = Path(regional_pbf_host_path).name
     osrm_base_filename_in_container = region_name_key
-    pbf_path_for_extract_in_container = (
+
+    pbf_readonly_path_in_container = (
         f"/mnt_readonly_pbf/{pbf_filename_on_host}"
+    )
+    profile_path_in_container = str(osrm_data_cfg.profile_script_in_container)
+
+    shell_command_for_extract = (
+        f'cp "{pbf_readonly_path_in_container}" . && '
+        f'osrm-extract -p "{profile_path_in_container}" "./{pbf_filename_on_host}" && '
+        f'rm "./{pbf_filename_on_host}"'
     )
 
     extract_cmd_args = [
-        "osrm-extract",
-        "-p",
-        str(osrm_data_cfg.profile_script_in_container),
-        pbf_path_for_extract_in_container,
+        "sh",
+        "-c",
+        shell_command_for_extract,
     ]
+
     if not _run_osrm_container_command_internal(
         extract_cmd_args,
         app_settings,
@@ -294,17 +331,14 @@ def build_osrm_graphs_for_region(
     ):
         return False
 
-    # Ensure output of osrm-extract (e.g., pbf_filename_on_host_stem.osrm) is renamed to region_name_key.osrm if different
-    # OSRM typically uses the input PBF stem for its output files.
-    # If pbf_filename_on_host's stem is not already region_name_key, a rename is needed inside the container or on host.
-    # For simplicity, current logic assumes the stem of pbf_filename_on_host matches region_name_key or that
-    # osrm-extract output is correctly named region_name_key.osrm (e.g. input was region_name_key.osm.pbf)
-    # This might need a robust rename step if input PBF names are arbitrary.
-    # Example rename logic (if needed, inside the container or via another docker exec):
-    # pbf_stem = Path(pbf_filename_on_host).stem.removesuffix('.osm') # Common pattern
-    # if pbf_stem != region_name_key:
-    #     rename_cmd = ["mv", f"./{pbf_stem}.osrm", f"./{region_name_key}.osrm"] # Plus all other extensions
-    #     _run_osrm_container_command_internal(rename_cmd, ...)
+    pbf_stem = Path(pbf_filename_on_host).stem.removesuffix(".osm")
+    if pbf_stem != osrm_base_filename_in_container:
+        log_map_server(
+            f"OSRM output stem '{pbf_stem}' does not match desired base '{osrm_base_filename_in_container}'. Renaming files...",
+            "info",
+            logger_to_use,
+            app_settings,
+        )
 
     partition_cmd_args = [
         "osrm-partition",
