@@ -266,6 +266,15 @@ def build_osrm_graphs_for_region(
         app_settings,
     )
 
+    if not Path(regional_pbf_host_path).is_file():
+        log_map_server(
+            f"{symbols.get('error', '❌')} Regional PBF file not found: {regional_pbf_host_path}",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+
     region_processed_output_dir_host = str(
         Path(osrm_data_cfg.processed_dir) / region_name_key
     )
@@ -308,16 +317,17 @@ def build_osrm_graphs_for_region(
     profile_path_in_container = str(osrm_data_cfg.profile_script_in_container)
 
     shell_command_for_extract = (
-        f'cp "{pbf_readonly_path_in_container}" . && '
-        f'osrm-extract -p "{profile_path_in_container}" "./{pbf_filename_on_host}" && '
-        f'rm "./{pbf_filename_on_host}"'
+        # Fail immediately if any command fails
+        "set -e; "
+        # Copy PBF to the processing directory for modification
+        f'cp "{pbf_readonly_path_in_container}" "./{pbf_filename_on_host}"; '
+        # Run extraction
+        f'osrm-extract -p "{profile_path_in_container}" "./{pbf_filename_on_host}"; '
+        # Clean up the copied PBF
+        f'rm "./{pbf_filename_on_host}";'
     )
 
-    extract_cmd_args = [
-        "sh",
-        "-c",
-        shell_command_for_extract,
-    ]
+    extract_cmd_args = ["sh", "-c", shell_command_for_extract]
 
     if not _run_osrm_container_command_internal(
         extract_cmd_args,
@@ -331,7 +341,21 @@ def build_osrm_graphs_for_region(
     ):
         return False
 
+    # Verify that the .osrm file was created
     pbf_stem = Path(pbf_filename_on_host).stem.removesuffix(".osm")
+    extracted_osrm_file = (
+        Path(region_processed_output_dir_host) / f"{pbf_stem}.osrm"
+    )
+    if not extracted_osrm_file.is_file():
+        log_map_server(
+            f"{symbols.get('error', '❌')} osrm-extract failed to create the expected file: {extracted_osrm_file}",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+
+    # If the extracted file's base name doesn't match the region key, rename it
     if pbf_stem != osrm_base_filename_in_container:
         log_map_server(
             f"OSRM output stem '{pbf_stem}' does not match desired base '{osrm_base_filename_in_container}'. Renaming files...",
@@ -339,6 +363,26 @@ def build_osrm_graphs_for_region(
             logger_to_use,
             app_settings,
         )
+        rename_script = (
+            "set -e; "
+            f"for f in {pbf_stem}.*; do "
+            f'  new_name="{osrm_base_filename_in_container}.${{f#*.}}"; '
+            f'  echo "Renaming $f to $new_name"; '
+            f'  mv -- "$f" "$new_name"; '
+            f"done"
+        )
+        rename_cmd_args = ["sh", "-c", rename_script]
+        if not _run_osrm_container_command_internal(
+            rename_cmd_args,
+            app_settings,
+            region_processed_output_dir_host,
+            None,
+            None,
+            logger_to_use,
+            "rename",
+            region_name_key,
+        ):
+            return False
 
     contract_cmd_args = [
         "osrm-contract",
@@ -356,6 +400,7 @@ def build_osrm_graphs_for_region(
     ):
         return False
 
+    # After osrm-contract, the .osrm file is updated. We proceed to partition.
     partition_cmd_args = [
         "osrm-partition",
         f"./{osrm_base_filename_in_container}.osrm",
@@ -372,6 +417,20 @@ def build_osrm_graphs_for_region(
     ):
         return False
 
+    # Verify partition file was created
+    partition_file = (
+        Path(region_processed_output_dir_host)
+        / f"{osrm_base_filename_in_container}.osrm.partition"
+    )
+    if not partition_file.is_file():
+        log_map_server(
+            f"{symbols.get('error', '❌')} osrm-partition failed to create the expected file: {partition_file}",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+
     customize_cmd_args = [
         "osrm-customize",
         f"./{osrm_base_filename_in_container}.osrm",
@@ -386,6 +445,20 @@ def build_osrm_graphs_for_region(
         "osrm-customize",
         region_name_key,
     ):
+        return False
+
+    # Verify customize file was created
+    customize_file = (
+        Path(region_processed_output_dir_host)
+        / f"{osrm_base_filename_in_container}.osrm.customize"
+    )
+    if not customize_file.is_file():
+        log_map_server(
+            f"{symbols.get('error', '❌')} osrm-customize failed to create the expected file: {customize_file}",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
         return False
 
     log_map_server(
