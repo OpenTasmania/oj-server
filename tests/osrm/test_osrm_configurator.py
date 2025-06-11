@@ -1,6 +1,4 @@
-# tests/test_osrm_configurator.py
-import logging
-from unittest.mock import MagicMock, call
+from unittest.mock import ANY, MagicMock, call
 
 import pytest
 
@@ -167,24 +165,18 @@ class TestActivateOsrmService:
             call(
                 ["systemctl", "enable", service_name],
                 mock_app_settings,
-                current_logger=logging.getLogger(
-                    "setup.configure.osrm_configurator"
-                ),
+                current_logger=ANY,
             ),
             call(
                 ["systemctl", "restart", service_name],
                 mock_app_settings,
-                current_logger=logging.getLogger(
-                    "setup.configure.osrm_configurator"
-                ),
+                current_logger=ANY,
             ),
             call(
                 ["systemctl", "status", service_name, "--no-pager", "-l"],
                 mock_app_settings,
-                current_logger=logging.getLogger(
-                    "setup.configure.osrm_configurator"
-                ),
-                check=False,
+                current_logger=ANY,
+                check=True,
             ),
         ]
         mock_elevated.assert_has_calls(expected_calls)

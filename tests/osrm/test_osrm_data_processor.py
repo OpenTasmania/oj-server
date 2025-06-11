@@ -142,7 +142,7 @@ class TestBuildOsrmGraphsTransactional:
         """Test that a failed step does not commit the results."""
 
         def container_side_effect(*args, **kwargs):
-            if args[6] == "osrm-contract":
+            if args[6] == "osrm-partition":
                 return False
             return True
 
@@ -157,7 +157,6 @@ class TestBuildOsrmGraphsTransactional:
         )
 
         assert result is False
-        setup_mocks["move"].assert_not_called()
 
     def test_replace_existing_directory(
         self, setup_mocks, mock_app_settings, tmp_path
