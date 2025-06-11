@@ -159,10 +159,10 @@ CONFIG_POSTGRESQL_CONF = "CONFIG_POSTGRESQL_CONF"
 CONFIG_PG_HBA_CONF = "CONFIG_PG_HBA_CONF"
 SERVICE_POSTGRES_RESTART_ENABLE = "SERVICE_POSTGRES_RESTART_ENABLE"
 POSTGRES_FULL_SETUP = "POSTGRES_FULL_SETUP"
-SETUP_PGTS_DOWNLOAD_BINARY = "SETUP_PGTS_DOWNLOAD_BINARY"
-SETUP_PGTS_CREATE_USER = "SETUP_PGTS_CREATE_USER"
-SETUP_PGTS_BINARY_PERMS = "SETUP_PGTS_BINARY_PERMS"
-SETUP_PGTS_SYSTEMD_FILE = "SETUP_PGTS_SYSTEMD_FILE"
+SETUP_PGTILESERV_DOWNLOAD_BINARY = "SETUP_PGTILESERV_DOWNLOAD_BINARY"
+SETUP_PGTILESERV_CREATE_USER = "SETUP_PGTILESERV_CREATE_USER"
+SETUP_PGTILESERV_BINARY_PERMS = "SETUP_PGTILESERV_BINARY_PERMS"
+SETUP_PGTILESERV_SYSTEMD_FILE = "SETUP_PGTILESERV_SYSTEMD_FILE"
 CONFIG_PGTS_CONFIG_FILE = "CONFIG_PGTS_CONFIG_FILE"
 SERVICE_PGTS_ACTIVATE = "SERVICE_PGTS_ACTIVATE"
 PGTILESERV_FULL_SETUP = "PGTILESERV_FULL_SETUP"
@@ -245,10 +245,10 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {
         "name": "pg_tileserv Service",
         "steps": [
-            SETUP_PGTS_DOWNLOAD_BINARY,
-            SETUP_PGTS_CREATE_USER,
-            SETUP_PGTS_BINARY_PERMS,
-            SETUP_PGTS_SYSTEMD_FILE,
+            SETUP_PGTILESERV_DOWNLOAD_BINARY,
+            SETUP_PGTILESERV_CREATE_USER,
+            SETUP_PGTILESERV_BINARY_PERMS,
+            SETUP_PGTILESERV_SYSTEMD_FILE,
             CONFIG_PGTS_CONFIG_FILE,
             SERVICE_PGTS_ACTIVATE,
         ],
@@ -729,22 +729,22 @@ def pg_tileserv_full_setup_sequence(
     )
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            SETUP_PGTS_DOWNLOAD_BINARY,
+            SETUP_PGTILESERV_DOWNLOAD_BINARY,
             "Download pg_tileserv Binary",
             download_and_install_pg_tileserv_binary,
         ),
         (
-            SETUP_PGTS_CREATE_USER,
+            SETUP_PGTILESERV_CREATE_USER,
             "Create pg_tileserv User",
             create_pg_tileserv_system_user,
         ),
         (
-            SETUP_PGTS_BINARY_PERMS,
+            SETUP_PGTILESERV_BINARY_PERMS,
             "Set pg_tileserv Permissions",
             setup_pg_tileserv_binary_permissions,
         ),
         (
-            SETUP_PGTS_SYSTEMD_FILE,
+            SETUP_PGTILESERV_SYSTEMD_FILE,
             "Create pg_tileserv Systemd File",
             create_pg_tileserv_systemd_service_file,
         ),
