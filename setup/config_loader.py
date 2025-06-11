@@ -23,6 +23,8 @@ import yaml  # PyYAML - ensure this is in dependencies
 # Adjust import if structure is different
 from .config_models import AppSettings
 
+CONFIG_DIR = "config_files"
+
 
 def _deep_update(
     source: Dict[str, Any], overrides: Dict[str, Any]
@@ -48,6 +50,18 @@ def _deep_update(
         ):  # If key is new and value is None, add it
             source[key] = value
     return source
+
+
+def _deep_merge_dicts(
+    d1: Dict[str, Any], d2: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Recursively merges d2 into d1."""
+    for k, v in d2.items():
+        if k in d1 and isinstance(d1[k], dict) and isinstance(v, dict):
+            d1[k] = _deep_merge_dicts(d1[k], v)
+        else:
+            d1[k] = v
+    return d1
 
 
 def load_app_settings(
@@ -188,3 +202,42 @@ def load_app_settings(
     # This can be complex to trace perfectly without more involved logic.
 
     return final_settings
+
+
+def load_config_from_directory(project_root: Path) -> Dict[str, Any]:
+    """
+    Loads and merges all YAML configuration files from the config_files directory.
+
+    Args:
+        project_root: The root path of the project.
+
+    Returns:
+        A single dictionary containing the merged configuration.
+    """
+    config_path = project_root / CONFIG_DIR
+    merged_config: Dict[str, Any] = {}
+
+    if not config_path.is_dir():
+        # Handle error: configuration directory not found
+        raise FileNotFoundError(
+            f"Configuration directory not found at: {config_path}"
+        )
+
+    # Sort files alphabetically to ensure a predictable merge order
+    config_files = sorted(config_path.glob("*.yaml"))
+
+    for file_path in config_files:
+        with open(file_path, "r") as f:
+            try:
+                single_config = yaml.safe_load(f)
+                if single_config and isinstance(single_config, dict):
+                    # Use a deep merge to handle nested dictionaries correctly
+                    merged_config = _deep_merge_dicts(
+                        merged_config, single_config
+                    )
+            except yaml.YAMLError as e:
+                # Handle YAML parsing errors
+                print(f"Error parsing YAML file {file_path}: {e}")
+                raise
+
+    return merged_config
