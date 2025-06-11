@@ -201,14 +201,6 @@ pg_tileserv:
     WantedBy=multi-user.target
     # File created by script V{script_hash}
 
-
-# OSRM upstream port(s) for Nginx proxying
-osrm:
-  car_profile_port: 5000
-  # bicycle_profile_port: 5001 # Example if you had another
-
-
-
 renderd:
   num_threads_multiplier: 2.0 # Multiplier for CPU cores. 0 for auto (cpu_count * 2).
   tile_cache_dir: "/var/lib/mod_tile"
@@ -237,7 +229,10 @@ renderd:
     HOST={renderd_host}
     TILESIZE=256
 
-
+# OSRM upstream port(s) for Nginx proxying
+osrm:
+  car_profile_port: 5000
+  # bicycle_profile_port: 5001 # Example if you had another
 
 osrm_service:
   car_profile_default_host_port: 5000 # Host port Nginx will proxy to for car profile
@@ -273,7 +268,6 @@ osrm_data:
   base_pbf_url: "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
   base_pbf_filename: "australia-latest.osm.pbf"
   profile_script_in_container: "/opt/car.lua" # Standard OSRM car profile
-  max_table_size_routed: 8000 # Default for systemd template if not overridden
 
 certbot:
   # admin_email: null # Example: "your-email@example.com" (If null or not provided, an email will be derived from vm_ip_or_domain)
