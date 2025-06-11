@@ -22,6 +22,19 @@ from setup.config_models import (  # For type hinting and default comparison
 # PGTILESERV_SYSTEM_USER is also from app_settings.pg_tileserv
 
 
+def get_pg_tileserv_settings(app_settings: AppSettings):
+    """
+    Common function to retrieve pg_tileserv settings from app_settings.
+
+    Args:
+        app_settings: The application settings object
+
+    Returns:
+        The pg_tileserv settings from app_settings
+    """
+    return app_settings.pg_tileserv
+
+
 def create_pg_tileserv_config_file(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
@@ -37,9 +50,9 @@ def create_pg_tileserv_config_file(
         or "UNKNOWN_HASH"
     )
 
-    pgts_settings = app_settings.pg_tileserv
-    config_dir = Path(pgts_settings.config_dir)
-    config_file_path = config_dir / pgts_settings.config_filename
+    pg_tileserv_settings = get_pg_tileserv_settings(app_settings)
+    config_dir = Path(pg_tileserv_settings.config_dir)
+    config_file_path = config_dir / pg_tileserv_settings.config_filename
 
     log_map_server(
         f"{symbols.get('step', '➡️')} Creating pg_tileserv configuration file at {config_file_path} from template...",
@@ -71,26 +84,25 @@ def create_pg_tileserv_config_file(
             logger_to_use,
             app_settings,
         )
-        # Replace with placeholder if using default password without override for safety in written config
         db_url_for_config = (
-            f"postgresql://{app_settings.pg.user}:YOUR_PASSWORD_HERE@"  # Placeholder
+            f"postgresql://{app_settings.pg.user}:{app_settings.pg.password}@"
             f"{app_settings.pg.host}:{app_settings.pg.port}/{app_settings.pg.database}"
         )
 
-    config_template_str = pgts_settings.config_template
+    config_template_str = pg_tileserv_settings.config_template
     format_vars = {
         "script_hash": script_hash,
-        "pg_tileserv_http_host": pgts_settings.http_host,
-        "pg_tileserv_http_port": pgts_settings.http_port,
+        "pg_tileserv_http_host": pg_tileserv_settings.http_host,
+        "pg_tileserv_http_port": pg_tileserv_settings.http_port,
         "db_url_for_pg_tileserv": db_url_for_config,
-        "pg_tileserv_default_max_features": pgts_settings.default_max_features,
-        "pg_tileserv_publish_schemas": pgts_settings.publish_schemas,
-        "pg_tileserv_uri_prefix": pgts_settings.uri_prefix,
+        "pg_tileserv_default_max_features": pg_tileserv_settings.default_max_features,
+        "pg_tileserv_publish_schemas": pg_tileserv_settings.publish_schemas,
+        "pg_tileserv_uri_prefix": pg_tileserv_settings.uri_prefix,
         "pg_tileserv_development_mode_bool": str(
-            pgts_settings.development_mode
+            pg_tileserv_settings.development_mode
         ).lower(),  # bool to "true"/"false"
         "pg_tileserv_allow_function_sources_bool": str(
-            pgts_settings.allow_function_sources
+            pg_tileserv_settings.allow_function_sources
         ).lower(),
         # bool to "true"/"false"
     }
@@ -113,7 +125,7 @@ def create_pg_tileserv_config_file(
         )
 
         # Set ownership and permissions for config file
-        system_user = pgts_settings.system_user
+        system_user = pg_tileserv_settings.system_user
         run_elevated_command(
             ["chown", f"{system_user}:{system_user}", str(config_file_path)],
             app_settings,
@@ -209,12 +221,13 @@ def create_pg_tileserv_systemd_service_file(
         or "UNKNOWN_HASH"
     )
 
-    pgts_settings = app_settings.pg_tileserv
+    pg_tileserv_settings = get_pg_tileserv_settings(app_settings)
     service_file_path = (
         "/etc/systemd/system/pg_tileserv.service"  # Standard system path
     )
     config_file_full_path = str(
-        Path(pgts_settings.config_dir) / pgts_settings.config_filename
+        Path(pg_tileserv_settings.config_dir)
+        / pg_tileserv_settings.config_filename
     )
 
     log_map_server(
@@ -223,16 +236,20 @@ def create_pg_tileserv_systemd_service_file(
         logger_to_use,
         app_settings,
     )
-
-    systemd_template = pgts_settings.systemd_template
+    systemd_template = pg_tileserv_settings.systemd_template
+    db_url_for_config = (
+        f"postgresql://{app_settings.pg.user}:{app_settings.pg.password}@"
+        f"{app_settings.pg.host}:{app_settings.pg.port}/{app_settings.pg.database}"
+    )
     format_vars = {
         "script_hash": script_hash,
-        "pg_tileserv_system_user": pgts_settings.system_user,
-        "pg_tileserv_system_group": pgts_settings.system_user,  # Assumes group is same as user
-        "pg_tileserv_binary_path": str(pgts_settings.binary_install_path),
+        "pg_tileserv_system_user": pg_tileserv_settings.system_user,
+        "pg_tileserv_system_group": pg_tileserv_settings.system_user,  # Assumes group is same as user
+        "pg_tileserv_binary_path": str(
+            pg_tileserv_settings.binary_install_path
+        ),
         "pg_tileserv_config_file_path_systemd": config_file_full_path,
-        # Environment="DATABASE_URL=postgresql://osmuser:yourStrongPasswordHere@127.0.0.1:5432/gis"
-        "pg_tileserv_systemd_environment": f'Environment="DATABASE-URL=postgresql://{app_settings.pg.user}:{app_settings.pg.password}@{app_settings.pg.host}:{app_settings.pg.port}/{app_settings.pg.database}"',
+        "pg_tileserv_systemd_environment": db_url_for_config,
     }
 
     try:

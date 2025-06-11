@@ -33,7 +33,7 @@ systemd_template: |
   User={pg_tileserv_system_user}
   # Assumes group is same as user, or define separately
   Group={pg_tileserv_system_group}
-  Environment="DATABASE_URL={db_url_for_pg_tileserv}"
+  Environment="DATABASE_URL={pg_tileserv_systemd_environment}"
   ExecStart={pg_tileserv_binary_path} --config {pg_tileserv_config_file_path_systemd}
   Restart=on-failure
   RestartSec=5s
