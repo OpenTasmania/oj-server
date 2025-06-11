@@ -115,7 +115,7 @@ def load_app_settings(
 
     # 2. Override with values from YAML configuration files.
     #    First, load the main config file to get the base configuration.
-    yaml_config_path = Path(config_file_path)
+    yaml_config_path = project_root / config_file_path
     if yaml_config_path.exists() and yaml_config_path.is_file():
         try:
             with open(yaml_config_path, "r", encoding="utf-8") as f:
@@ -263,47 +263,6 @@ def load_app_settings(
     return final_settings
 
 
-def load_config_from_directory(project_root: Path) -> Dict[str, Any]:
-    """
-    Loads and merges all YAML configuration files from the config_files directory.
-
-    Args:
-        project_root: The root path of the project.
-
-    Returns:
-        A single dictionary containing the merged configuration.
-    """
-    config_path = project_root / CONFIG_DIR
-    merged_config: Dict[str, Any] = {}
-
-    if not config_path.is_dir():
-        # Handle error: configuration directory not found
-        raise FileNotFoundError(
-            f"Configuration directory not found at: {config_path}"
-        )
-
-    # Sort files alphabetically to ensure a predictable merge order
-    config_files = sorted(config_path.glob("*.yaml"))
-
-    for file_path in config_files:
-        with open(file_path, "r") as f:
-            try:
-                single_config = yaml.safe_load(f)
-                if single_config and isinstance(single_config, dict):
-                    # Use a deep merge to handle nested dictionaries correctly
-                    merged_config = _deep_merge_dicts(
-                        merged_config, single_config
-                    )
-            except yaml.YAMLError as e:
-                # Handle YAML parsing errors
-                module_logger.error(
-                    f"Error parsing YAML file {file_path}: {e}"
-                )
-                raise
-
-    return merged_config
-
-
 def load_service_config(
     service_name: str,
     project_root: Path,
@@ -366,7 +325,7 @@ def load_service_config(
 
     # If service config is empty or not found, try to load from main config
     if not service_config:
-        main_config_file_path = Path(main_config_path)
+        main_config_file_path = project_root / main_config_path
         if main_config_file_path.exists() and main_config_file_path.is_file():
             try:
                 with open(main_config_file_path, "r", encoding="utf-8") as f:
@@ -396,11 +355,49 @@ def load_service_config(
                 )
                 raise
         else:
-            logger_to_use.error(
+            logger_to_use.warning(  # Changed to warning as it might not be a fatal error if config is optional
                 f"Main configuration file '{main_config_file_path}' not found."
-            )
-            raise FileNotFoundError(
-                f"Configuration file '{main_config_file_path}' not found."
             )
 
     return service_config
+
+
+def load_config_from_directory(project_root: Path) -> Dict[str, Any]:
+    """
+    Loads and merges all YAML configuration files from the config_files directory.
+
+    Args:
+        project_root: The root path of the project.
+
+    Returns:
+        A single dictionary containing the merged configuration.
+    """
+    config_path = project_root / CONFIG_DIR
+    merged_config: Dict[str, Any] = {}
+
+    if not config_path.is_dir():
+        # Handle error: configuration directory not found
+        raise FileNotFoundError(
+            f"Configuration directory not found at: {config_path}"
+        )
+
+    # Sort files alphabetically to ensure a predictable merge order
+    config_files = sorted(config_path.glob("*.yaml"))
+
+    for file_path in config_files:
+        with open(file_path, "r") as f:
+            try:
+                single_config = yaml.safe_load(f)
+                if single_config and isinstance(single_config, dict):
+                    # Use a deep merge to handle nested dictionaries correctly
+                    merged_config = _deep_merge_dicts(
+                        merged_config, single_config
+                    )
+            except yaml.YAMLError as e:
+                # Handle YAML parsing errors
+                module_logger.error(
+                    f"Error parsing YAML file {file_path}: {e}"
+                )
+                raise
+
+    return merged_config
