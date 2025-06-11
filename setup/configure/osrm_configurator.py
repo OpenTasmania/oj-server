@@ -6,7 +6,10 @@ systemd services for osrm-routed for processed regions.
 """
 
 import logging
+from datetime import datetime
+from os import cpu_count, environ
 from pathlib import Path
+from subprocess import CalledProcessError
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
@@ -160,6 +163,149 @@ def create_osrm_routed_service_file(
         raise
 
 
+def import_pbf_to_postgis_with_osm2pgsql(
+    pbf_full_path: str,
+    app_settings: AppSettings,
+    current_logger: Optional[logging.Logger] = None,
+) -> bool:
+    """Imports a PBF file into PostGIS using osm2pgsql."""
+    logger_to_use = current_logger if current_logger else module_logger
+    symbols = app_settings.symbols
+
+    try:
+        postgis_cfg = app_settings.pg
+        osm_data_cfg = app_settings.osrm_data
+    except AttributeError as e:
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} Missing required PostGIS or OSRM data configuration in app_settings: {e}",
+            "critical",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+
+    log_map_server(
+        f"{symbols.get('step', '➡️')} Starting osm2pgsql import for {Path(pbf_full_path).name}...",
+        "info",
+        logger_to_use,
+        app_settings,
+    )
+
+    if not Path(pbf_full_path).is_file():
+        log_map_server(
+            f"{symbols.get('error', '❌')} PBF file not found for osm2pgsql import: {pbf_full_path}",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+
+    osm_carto_dir = (
+        static_config.OSM_PROJECT_ROOT / "external" / "openstreetmap-carto"
+    )
+    osm_carto_lua_candidates = [
+        osm_carto_dir / "openstreetmap-carto-flex.lua",
+        osm_carto_dir / "openstreetmap-carto.lua",
+    ]
+    osm_carto_lua_found = None
+    for lua_candidate in osm_carto_lua_candidates:
+        if lua_candidate.is_file():
+            osm_carto_lua_found = str(lua_candidate)
+            break
+
+    if osm_carto_lua_found is None:
+        log_map_server(
+            f"{symbols.get('error', '❌')} OSM-Carto Lua script not found at expected location ({osm_carto_dir}). Cannot proceed with osm2pgsql.",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+    log_map_server(
+        f"{symbols.get('info', 'ℹ️')} Found OSM-Carto Lua script: {osm_carto_lua_found}",
+        "info",
+        logger_to_use,
+        app_settings,
+    )
+
+    env_vars = environ.copy()
+    if postgis_cfg.password:
+        env_vars["PGPASSWORD"] = postgis_cfg.password
+    else:
+        log_map_server(
+            f"{symbols.get('warning', '!')} PostgreSQL password not configured in app_settings.postgis_db. osm2pgsql may fail without PGPASSWORD or a ~/.pgpass entry.",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+
+    osm2pgsql_cmd = [
+        "osm2pgsql",
+        "--verbose",
+        "--create",
+        "--database",
+        str(postgis_cfg.database),
+        "--username",
+        str(postgis_cfg.user),
+        "--host",
+        str(postgis_cfg.host),
+        "--port",
+        str(postgis_cfg.port),
+        "--slim",
+        "--hstore",
+        "--multi-geometry",
+        "--tag-transform-script",
+        osm_carto_lua_found,
+        "--style",
+        osm_carto_lua_found,
+        "--output=flex",
+        "-C",
+        str(getattr(osm_data_cfg, "osm2pgsql_cache_mb", 20000)),
+        "--number-processes",
+        str(cpu_count()),
+        "--flat-nodes",
+        str(
+            Path(osm_data_cfg.base_dir)
+            / f"flat-nodes-{datetime.now().strftime('%Y-%m-%d')}.bin"
+        ),
+        pbf_full_path,
+    ]
+
+    try:
+        run_elevated_command(
+            osm2pgsql_cmd,
+            app_settings,
+            current_logger=logger_to_use,
+            capture_output=True,
+            check=True,
+            env=env_vars,
+        )
+        log_map_server(
+            f"{symbols.get('success', '✅')} osm2pgsql import for {Path(pbf_full_path).name} completed successfully.",
+            "success",
+            logger_to_use,
+            app_settings,
+        )
+        return True
+    except CalledProcessError as e:
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} osm2pgsql import for {Path(pbf_full_path).name} FAILED with exit code {e.returncode}. Output: {e.stderr.decode()}",
+            "critical",
+            logger_to_use,
+            app_settings,
+        )
+        return False
+    except Exception as e:
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} Unexpected error during osm2pgsql import for {Path(pbf_full_path).name}: {e}",
+            "critical",
+            logger_to_use,
+            app_settings,
+            exc_info=True,
+        )
+        return False
+
+
 def activate_osrm_routed_service(
     region_name_key: str,
     app_settings: AppSettings,
@@ -188,20 +334,45 @@ def activate_osrm_routed_service(
         current_logger=logger_to_use,
     )
 
+    try:
+        log_map_server(
+            f"{symbols.get('info', 'ℹ️')} Checking status of {service_name}...",
+            "info",
+            logger_to_use,
+            app_settings,
+        )
+        run_elevated_command(
+            ["systemctl", "status", service_name, "--no-pager", "-l"],
+            app_settings,
+            current_logger=logger_to_use,
+            check=True,
+        )
+        log_map_server(
+            f"{symbols.get('success', '✅')} {service_name} is active.",
+            "success",
+            logger_to_use,
+            app_settings,
+        )
+    except CalledProcessError:
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} {service_name} FAILED to start. Aborting OSRM configuration.",
+            "critical",
+            logger_to_use,
+            app_settings,
+        )
+        raise
+    except Exception as e:
+        log_map_server(
+            f"{symbols.get('critical', '🔥')} Unexpected error while checking {service_name} status: {e}",
+            "critical",
+            logger_to_use,
+            app_settings,
+            exc_info=True,
+        )
+        raise
+
     log_map_server(
-        f"{symbols.get('info', 'ℹ️')} {service_name} status:",
-        "info",
-        logger_to_use,
-        app_settings,
-    )
-    run_elevated_command(
-        ["systemctl", "status", service_name, "--no-pager", "-l"],
-        app_settings,
-        current_logger=logger_to_use,
-        check=False,
-    )
-    log_map_server(
-        f"{symbols.get('success', '✅')} {service_name} activation process completed (check status above).",
+        f"{symbols.get('success', '✅')} {service_name} activation process completed.",
         "success",
         logger_to_use,
         app_settings,
