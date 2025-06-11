@@ -238,7 +238,7 @@ osrm_service:
   car_profile_default_host_port: 5000 # Host port Nginx will proxy to for car profile
   container_osrm_port: 5000         # OSRM's internal port in the container
   image_tag: "osrm/osrm-backend:latest"
-  extra_routed_args: "--max-matching-size 2000" # Example extra args
+  extra_routed_args: "--algorithm MLD --max-matching-size 2000" # Example extra args
   systemd_template: |
     [Unit]
     Description=OSRM Routed service for region: {region_name}

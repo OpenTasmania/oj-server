@@ -321,13 +321,6 @@ def build_osrm_graphs_for_region(
                 "pbf_mount": True,
             },
             {
-                "name": "osrm-contract",
-                "args": [
-                    "osrm-contract",
-                    f"./{osrm_base_filename_in_container}.osrm",
-                ],
-            },
-            {
                 "name": "osrm-partition",
                 "args": [
                     "osrm-partition",
