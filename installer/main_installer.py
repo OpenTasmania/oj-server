@@ -1476,42 +1476,56 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     parsed_cli_args = parser.parse_args(
         cli_args_list if cli_args_list is not None else sys.argv[1:]
     )
+    is_non_install_action = (
+        parsed_cli_args.view_config
+        or parsed_cli_args.view_state
+        or parsed_cli_args.status
+        or parsed_cli_args.clear_state
+        or parsed_cli_args.generate_preseed_yaml is not None
+    )
     try:
         APP_CONFIG = load_app_settings(
             parsed_cli_args, parsed_cli_args.config_file
         )
-
-        if APP_CONFIG.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT:
-            if not APP_CONFIG.dev_override_unsafe_password:
+        if (
+            APP_CONFIG.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT
+            and not APP_CONFIG.dev_override_unsafe_password
+            and not is_non_install_action  #
+        ):
+            log_map_server(
+                f"{APP_CONFIG.symbols.get('error', '❌')} vm_ip_or_domain is set to '{VM_IP_OR_DOMAIN_DEFAULT}'. "
+                f"This is unsafe for production use. Please set a proper domain or IP address. \n"
+                f"    To run an installation with this default, use the --dev-override-all-settings flag. \n"
+                f"    This check is bypassed for non-install actions like --view-config or --status.",
+                "critical",
+                current_logger=logger,
+                app_settings=APP_CONFIG,
+            )
+            return 1
+        elif (
+            APP_CONFIG.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT
+            and APP_CONFIG.dev_override_unsafe_password
+            and not is_non_install_action
+        ):
+            primary_ip = get_primary_ip_address(APP_CONFIG, logger)
+            if primary_ip:
+                APP_CONFIG.vm_ip_or_domain = primary_ip
                 log_map_server(
-                    f"{APP_CONFIG.symbols.get('error', '❌')} vm_ip_or_domain is set to '{VM_IP_OR_DOMAIN_DEFAULT}'. "
-                    f"This is unsafe for production use. Please set a proper domain or IP address, "
-                    f"or use --dev-override-all-settings for development environments.",
+                    f"{APP_CONFIG.symbols.get('info', 'ℹ️')} vm_ip_or_domain was '{VM_IP_OR_DOMAIN_DEFAULT}' but --dev-override-all-settings "
+                    f"was specified. Using primary IP address: {primary_ip}",
+                    "info",
+                    current_logger=logger,
+                    app_settings=APP_CONFIG,
+                )
+            else:
+                log_map_server(
+                    f"{APP_CONFIG.symbols.get('error', '❌')} Could not determine primary IP address to replace '{VM_IP_OR_DOMAIN_DEFAULT}'. "
+                    f"Please set vm_ip_or_domain manually.",
                     "critical",
                     current_logger=logger,
                     app_settings=APP_CONFIG,
                 )
                 return 1
-            else:
-                primary_ip = get_primary_ip_address(APP_CONFIG, logger)
-                if primary_ip:
-                    APP_CONFIG.vm_ip_or_domain = primary_ip
-                    log_map_server(
-                        f"{APP_CONFIG.symbols.get('info', 'ℹ️')} vm_ip_or_domain was '{VM_IP_OR_DOMAIN_DEFAULT}' but --dev-override-all-settings "
-                        f"was specified. Using primary IP address: {primary_ip}",
-                        "info",
-                        current_logger=logger,
-                        app_settings=APP_CONFIG,
-                    )
-                else:
-                    log_map_server(
-                        f"{APP_CONFIG.symbols.get('error', '❌')} Could not determine primary IP address to replace '{VM_IP_OR_DOMAIN_DEFAULT}'. "
-                        f"Please set vm_ip_or_domain manually.",
-                        "critical",
-                        current_logger=logger,
-                        app_settings=APP_CONFIG,
-                    )
-                    return 1
     except SystemExit as e:  # pragma: no cover
         print(
             f"CRITICAL: Failed to load or validate application configuration: {e}",
