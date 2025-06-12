@@ -63,8 +63,6 @@ from processors.plugins.importers.transit.gtfs.orchestrator import (
     process_and_setup_gtfs,
 )
 from setup import config as static_config
-
-# Import all individual step functions
 from setup.actions import deploy_test_website_content
 from setup.cli_handler import cli_prompt_for_rerun, view_configuration
 from setup.config_loader import load_app_settings
@@ -107,6 +105,7 @@ from setup.configure.nginx_configurator import (
 from setup.configure.osrm_configurator import (
     activate_osrm_routed_service,
     create_osrm_routed_service_file,
+    import_pbf_to_postgis_with_osm2pgsql,
 )
 from setup.configure.pg_tileserv_configurator import (
     activate_pg_tileserv_service,
@@ -220,6 +219,8 @@ GTFS_PROCESS_AND_SETUP_TAG = "GTFS_PROCESS_AND_SETUP"
 RASTER_PREP_TAG = "RASTER_PREP"
 WEBSITE_CONTENT_DEPLOY_TAG = "WEBSITE_CONTENT_DEPLOY"
 SYSTEMD_RELOAD_TASK_TAG = "SYSTEMD_RELOAD_TASK"
+OSM_PBF_DOWNLOAD_TAG = "OSM_PBF_DOWNLOAD"
+DATAPROC_OSM2PGSQL_IMPORT_TAG = "DATAPROC_OSM2PGSQL_IMPORT"
 
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {
@@ -345,6 +346,25 @@ group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
     for index, group_info in enumerate(INSTALLATION_GROUPS_ORDER)
 }
+pbf_path_holder: Dict[str, Optional[str]] = {"path": None}
+
+
+def _download_pbf_wrapper(
+    ac: AppSettings, cl: Optional[logging.Logger]
+) -> None:
+    """Wrapper to download PBF and store its path."""
+    pbf_path_holder["path"] = download_base_pbf(ac, cl)
+
+
+def _import_pbf_to_postgis_wrapper(
+    ac: AppSettings, cl: Optional[logging.Logger]
+) -> None:
+    """Wrapper to import the downloaded PBF into PostGIS."""
+    pbf_path = pbf_path_holder["path"]
+    if not pbf_path:
+        raise RuntimeError("PBF file path not available for import step.")
+    if not import_pbf_to_postgis_with_osm2pgsql(pbf_path, ac, cl):
+        raise RuntimeError("PostGIS import step failed.")
 
 
 def get_dynamic_help(base_help: str, task_tag: str) -> str:
@@ -791,7 +811,18 @@ def osrm_full_setup_sequence(
     def _download_pbf_step(
         ac: AppSettings, cl: Optional[logging.Logger]
     ) -> None:
-        base_pbf_path_holder["path"] = download_base_pbf(ac, cl)
+        # Check if the PBF path is already set in the module-level pbf_path_holder
+        if pbf_path_holder["path"]:
+            log_map_server(
+                f"Using existing PBF file from previous download: {pbf_path_holder['path']}",
+                level="info",
+                current_logger=cl,
+                app_settings=ac,
+            )
+            base_pbf_path_holder["path"] = pbf_path_holder["path"]
+        else:
+            # Fall back to downloading if not already available
+            base_pbf_path_holder["path"] = download_base_pbf(ac, cl)
 
     regional_pbf_map_holder: Dict[str, Dict[str, str]] = {"map": {}}
 
@@ -1768,6 +1799,16 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 POSTGRES_FULL_SETUP,
                 "PostgreSQL Full Setup",
                 postgres_full_setup_sequence,
+            ),
+            (
+                OSM_PBF_DOWNLOAD_TAG,
+                "Download Base OpenStreetMap PBF Data",
+                _download_pbf_wrapper,
+            ),
+            (
+                DATAPROC_OSM2PGSQL_IMPORT_TAG,
+                "Import OSM Data into PostGIS (for Rendering)",
+                _import_pbf_to_postgis_wrapper,
             ),
             (
                 PGTILESERV_FULL_SETUP,

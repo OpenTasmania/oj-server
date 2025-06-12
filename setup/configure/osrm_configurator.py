@@ -6,13 +6,16 @@ systemd services for osrm-routed for processed regions.
 """
 
 import logging
-from datetime import datetime
 from os import cpu_count, environ
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import Optional
 
-from common.command_utils import log_map_server, run_elevated_command
+from common.command_utils import (
+    log_map_server,
+    run_command,
+    run_elevated_command,
+)
 from common.system_utils import get_current_script_hash, systemd_reload
 from setup import config as static_config
 from setup.config_models import AppSettings
@@ -27,6 +30,7 @@ def get_next_available_port(
     Returns the next available port for OSRM services.
     Tracks used ports to avoid conflicts.
     """
+    # TODO: Use logger
     osrm_service_cfg = app_settings.osrm_service
     base_port = osrm_service_cfg.car_profile_default_host_port
 
@@ -171,18 +175,8 @@ def import_pbf_to_postgis_with_osm2pgsql(
     """Imports a PBF file into PostGIS using osm2pgsql."""
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
-
-    try:
-        postgis_cfg = app_settings.pg
-        osm_data_cfg = app_settings.osrm_data
-    except AttributeError as e:
-        log_map_server(
-            f"{symbols.get('critical', '🔥')} Missing required PostGIS or OSRM data configuration in app_settings: {e}",
-            "critical",
-            logger_to_use,
-            app_settings,
-        )
-        return False
+    postgis_cfg = app_settings.pg
+    osm_data_cfg = app_settings.osrm_data
 
     log_map_server(
         f"{symbols.get('step', '➡️')} Starting osm2pgsql import for {Path(pbf_full_path).name}...",
@@ -200,48 +194,37 @@ def import_pbf_to_postgis_with_osm2pgsql(
         )
         return False
 
+    # Define paths for Carto style and lua files
     osm_carto_dir = (
         static_config.OSM_PROJECT_ROOT / "external" / "openstreetmap-carto"
     )
-    osm_carto_lua_candidates = [
-        osm_carto_dir / "openstreetmap-carto-flex.lua",
-        osm_carto_dir / "openstreetmap-carto.lua",
-    ]
-    osm_carto_lua_found = None
-    for lua_candidate in osm_carto_lua_candidates:
-        if lua_candidate.is_file():
-            osm_carto_lua_found = str(lua_candidate)
-            break
+    osm_carto_style_file = osm_carto_dir / "openstreetmap-carto.style"
+    osm_carto_lua_script = osm_carto_dir / "openstreetmap-carto.lua"
 
-    if osm_carto_lua_found is None:
+    if not osm_carto_style_file.is_file():
         log_map_server(
-            f"{symbols.get('error', '❌')} OSM-Carto Lua script not found at expected location ({osm_carto_dir}). Cannot proceed with osm2pgsql.",
+            f"{symbols.get('error', '❌')} OSM-Carto style file not found at {osm_carto_style_file}. Cannot proceed.",
             "error",
             logger_to_use,
             app_settings,
         )
         return False
-    log_map_server(
-        f"{symbols.get('info', 'ℹ️')} Found OSM-Carto Lua script: {osm_carto_lua_found}",
-        "info",
-        logger_to_use,
-        app_settings,
-    )
 
-    env_vars = environ.copy()
-    if postgis_cfg.password:
-        env_vars["PGPASSWORD"] = postgis_cfg.password
-    else:
+    if not osm_carto_lua_script.is_file():
         log_map_server(
-            f"{symbols.get('warning', '!')} PostgreSQL password not configured in app_settings.postgis_db. osm2pgsql may fail without PGPASSWORD or a ~/.pgpass entry.",
-            "warning",
+            f"{symbols.get('error', '❌')} OSM-Carto LUA script not found at {osm_carto_lua_script}. Cannot proceed.",
+            "error",
             logger_to_use,
             app_settings,
         )
+        return False
 
+    env_vars = environ.copy()
+    env_vars["PGPASSWORD"] = postgis_cfg.password
+
+    # Command using flex output, as recommended by modern CartoCSS
     osm2pgsql_cmd = [
         "osm2pgsql",
-        "--verbose",
         "--create",
         "--database",
         str(postgis_cfg.database),
@@ -254,29 +237,28 @@ def import_pbf_to_postgis_with_osm2pgsql(
         "--slim",
         "--hstore",
         "--multi-geometry",
-        "--tag-transform-script",
-        osm_carto_lua_found,
-        "--style",
-        osm_carto_lua_found,
+        f"--tag-transform-script={osm_carto_lua_script}",
+        f"--style={osm_carto_style_file}",
         "--output=flex",
         "-C",
-        str(getattr(osm_data_cfg, "osm2pgsql_cache_mb", 20000)),
-        "--number-processes",
-        str(cpu_count()),
-        "--flat-nodes",
-        str(
-            Path(osm_data_cfg.base_dir)
-            / f"flat-nodes-{datetime.now().strftime('%Y-%m-%d')}.bin"
-        ),
+        str(osm_data_cfg.osm2pgsql_cache_mb),
+        f"--number-processes={str(cpu_count() or 1)}",
         pbf_full_path,
     ]
 
+    log_map_server(
+        f"osm2pgsql command: {' '.join(osm2pgsql_cmd)}",
+        "debug",
+        logger_to_use,
+        app_settings,
+    )
+
     try:
-        run_elevated_command(
+        # Using run_command as osm2pgsql should not require root if permissions are correct.
+        run_command(
             osm2pgsql_cmd,
             app_settings,
             current_logger=logger_to_use,
-            capture_output=True,
             check=True,
             env=env_vars,
         )
@@ -289,7 +271,7 @@ def import_pbf_to_postgis_with_osm2pgsql(
         return True
     except CalledProcessError as e:
         log_map_server(
-            f"{symbols.get('critical', '🔥')} osm2pgsql import for {Path(pbf_full_path).name} FAILED with exit code {e.returncode}. Output: {e.stderr.decode()}",
+            f"{symbols.get('critical', '🔥')} osm2pgsql import FAILED with exit code {e.returncode}. Output: {e.stderr or e.stdout}",
             "critical",
             logger_to_use,
             app_settings,
@@ -297,7 +279,7 @@ def import_pbf_to_postgis_with_osm2pgsql(
         return False
     except Exception as e:
         log_map_server(
-            f"{symbols.get('critical', '🔥')} Unexpected error during osm2pgsql import for {Path(pbf_full_path).name}: {e}",
+            f"{symbols.get('critical', '🔥')} Unexpected error during osm2pgsql import: {e}",
             "critical",
             logger_to_use,
             app_settings,

@@ -549,6 +549,8 @@ class OsrmDataSettings(BaseSettings):
         default=OSRM_MAX_TABLE_SIZE_ROUTED_DEFAULT,
         description="--max-table-size parameter for osrm-routed instances (used in systemd template).",
     )
+    # TODO: Remove this hardcode
+    osm2pgsql_cache_mb: int = 20000
 
 
 class RenderdSettings(BaseSettings):
