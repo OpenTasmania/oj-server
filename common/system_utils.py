@@ -10,6 +10,7 @@ determining the Debian codename, and calculating a project hash.
 import hashlib
 import logging
 import subprocess
+from os import cpu_count
 from pathlib import Path
 from typing import List, Optional
 
@@ -225,6 +226,99 @@ def get_debian_codename(
     except Exception as e:  # Other errors
         log_map_server(
             f"{symbols_to_use.get('warning', '!')} Unexpected error getting Debian codename: {e}",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+        return None
+
+
+def calculate_threads(
+    app_settings: Optional[AppSettings],
+    current_logger: Optional[logging.Logger] = None,
+) -> Optional[str]:
+    logger_to_use = current_logger if current_logger else module_logger
+    symbols_to_use = SYMBOLS_DEFAULT
+    num_threads_str = "0"
+    # Ensure app_settings and renderd are accessible
+    if (
+        app_settings
+        and hasattr(app_settings, "symbols")
+        and app_settings.symbols
+    ):
+        symbols_to_use = app_settings.symbols
+
+    if (
+        not app_settings
+        or not hasattr(app_settings, "renderd")
+        or not app_settings.renderd
+    ):
+        log_map_server(
+            f"{symbols_to_use.get('error', '❌')} App settings or renderd configuration not found. Cannot calculate threads.",
+            "error",
+            logger_to_use,
+            app_settings,
+        )
+        return None
+
+    renderd_cfg = app_settings.renderd
+
+    try:
+        # Call lscpu once using run_command
+        result: subprocess.CompletedProcess = run_command(
+            ["lscpu", "-p=Core,Socket"],
+            app_settings,
+            capture_output=True,
+            check=True,
+            current_logger=logger_to_use,
+        )
+        stdout_val: Optional[str] = result.stdout
+
+        if stdout_val is not None:
+            if float(renderd_cfg.num_threads_multiplier) > 0:
+                physical_core_count = None
+                try:
+                    # Use stdout_val from the run_command call
+                    physical_cores = {
+                        line
+                        for line in stdout_val.strip().split("\n")
+                        if not line.startswith("#")
+                    }
+                    if physical_cores:
+                        physical_core_count = len(physical_cores)
+                except Exception as e:  # Catch any parsing errors
+                    log_map_server(
+                        f"{symbols_to_use.get('warning', '!')} Error parsing lscpu output for physical cores: {e}",
+                        "warning",
+                        logger_to_use,
+                        app_settings,
+                    )
+                    physical_core_count = None
+
+                cpu_c: Optional[int] = cpu_count()
+                cpu_count_to_use = physical_core_count or cpu_c
+
+                calculated_threads = int(
+                    (cpu_count_to_use or 1)
+                    * float(renderd_cfg.num_threads_multiplier)
+                )
+                num_threads_str = str(max(1, calculated_threads))
+            return num_threads_str
+        return None  # If stdout_val is None after run_command
+    except FileNotFoundError:
+        log_map_server(
+            f"{symbols_to_use.get('warning', '!')} lscpu command not found. Cannot determine cpu count.",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+        return None
+    except subprocess.CalledProcessError:
+        # run_command with check=True already logs the error, just return None
+        return None
+    except Exception as e:  # Other errors
+        log_map_server(
+            f"{symbols_to_use.get('warning', '!')} Unexpected error calculating threads: {e}",
             "warning",
             logger_to_use,
             app_settings,

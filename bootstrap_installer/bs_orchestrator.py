@@ -3,6 +3,7 @@
 from bootstrap_installer.bs_build_tools import ensure_build_tools
 from bootstrap_installer.bs_lsb import ensure_lsb_release
 from bootstrap_installer.bs_pydantic import ensure_pydantic_prerequisites
+from bootstrap_installer.bs_util_linux import ensure_util_linux
 from bootstrap_installer.bs_utils import BS_SYMBOLS, get_bs_logger
 
 logger = get_bs_logger("Orchestrator")
@@ -44,8 +45,16 @@ def ensure_all_bootstrap_prerequisites() -> bool:
     if install_attempted_lsb:
         any_install_attempted_overall = True
 
+    # util-linux
+    logger.info("--- Stage 3: util-linux Release Prerequisite ---")
+    install_attempted_util_linux, apt_updated_this_orchestration_run = (
+        ensure_util_linux(apt_updated_this_orchestration_run)
+    )
+    if install_attempted_lsb:
+        any_install_attempted_overall = True
+
     # Build Tools (build-essential, python3-dev)
-    logger.info("--- Stage 3: Build Tools Prerequisites ---")
+    logger.info("--- Stage 4: Build Tools Prerequisites ---")
     install_attempted_build_tools, apt_updated_this_orchestration_run = (
         ensure_build_tools(apt_updated_this_orchestration_run)
     )
