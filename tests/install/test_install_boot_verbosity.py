@@ -28,7 +28,8 @@ def mock_default_app_settings():
     # Create a basic AppSettings instance. If specific fields are accessed by
     # the parts of main_installer.py that run before the step execution,
     # ensure they have sensible defaults or are mocked appropriately.
-    return AppSettings()
+    # Set dev_override_unsafe_password to True to bypass the vm_ip_or_domain check
+    return AppSettings(dev_override_unsafe_password=True)
 
 
 def test_boot_verbosity_switch_runs_correct_commands(
