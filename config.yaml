@@ -202,7 +202,7 @@ pg_tileserv:
     # File created by script V{script_hash}
 
 renderd:
-  num_threads_multiplier: 2.0 # Multiplier for CPU cores. 0 for auto (cpu_count * 2).
+  num_threads_multiplier: 1
   tile_cache_dir: "/var/lib/mod_tile"
   run_dir: "/var/run/renderd" # For socket and stats file
   socket_path: "/var/run/renderd/renderd.sock"

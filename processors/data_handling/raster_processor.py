@@ -79,7 +79,8 @@ def raster_tile_prerender(
     render_list_base_cmd = [
         "render_list",
         "--all",
-        f"--num-threads {num_threads_str} --socket={renderd_cfg.socket_path}",
+        f"--num-threads={num_threads_str}",
+        f"--socket={renderd_cfg.socket_path}",
     ]
 
     zoom_ranges: List[ZoomRangeTyped] = [
@@ -94,13 +95,13 @@ def raster_tile_prerender(
             logger_to_use,
             app_settings,
         )
-        cmd_zoom_range = render_list_base_cmd + [
+        render_list_cmd = render_list_base_cmd + [
             f"--min-zoom={z_range['min']}",
             f"--max-zoom={z_range['max']}",
         ]
         try:
             run_elevated_command(
-                cmd_zoom_range, app_settings, current_logger=logger_to_use
+                render_list_cmd, app_settings, current_logger=logger_to_use
             )
             log_map_server(
                 f"{symbols.get('success', '✅')} Successfully queued {z_range['desc']} tiles.",
