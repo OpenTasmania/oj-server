@@ -85,7 +85,8 @@ def raster_tile_prerender(
 
     zoom_ranges: List[ZoomRangeTyped] = [
         {"min": 0, "max": 5, "desc": "low-resolution (Zoom 0-5)"},
-        {"min": 6, "max": 12, "desc": "mid-resolution (Zoom 6-12)"},
+        # TODO: Make renderd pre-rendered tiles configurable
+        # {"min": 6, "max": 12, "desc": "mid-resolution (Zoom 6-12)"},
     ]
 
     for z_range in zoom_ranges:
