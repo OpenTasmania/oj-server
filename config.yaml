@@ -139,7 +139,7 @@ nginx:
         proxy_buffering off;
 
         location /vector/ {{
-            proxy_pass http://localhost:{pg_tileserv_port}/; 
+            proxy_pass http://localhost:{pg_tileserv_port}; 
         }}
         location /raster/hot/ {{
             proxy_pass http://localhost:{apache_port}/hot/;
@@ -324,7 +324,7 @@ webapp:
         // --- Raster Map (Leaflet) ---
         try {{
             var rasterMap = L.map('map-raster').setView([-42.8826, 147.3257], 13);
-            L.tileLayer('{scheme}://{vm_ip_or_domain}:{nginx_port}/{renderd_uri_path_segment}/{{z}}/{{x}}/{{y}}.png', {{
+            L.tileLayer('{scheme}://{vm_ip_or_domain}:{nginx_port}/raster/{renderd_uri_path_segment}/{{z}}/{{x}}/{{y}}.png', {{
                 maxZoom: 19,
                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles by Local Server'
             }}).addTo(rasterMap);
