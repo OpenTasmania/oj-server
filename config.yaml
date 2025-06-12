@@ -6,12 +6,14 @@
 # General Application Settings
 admin_group_ip: "192.168.128.0/22"
 gtfs_feed_url: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
-vm_ip_or_domain: "example.com" # IMPORTANT: Change this to your server's actual FQDN or IP
+# IMPORTANT: Change this to your server's actual FQDN or IP.
+# If left as "example.com", the installer will error unless --dev-override-all-settings is specified, in which case it will use the primary IP address.
+vm_ip_or_domain: "example.com"
 pg_tileserv_binary_location: "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
 log_prefix: "[MAP-SETUP]" # Log prefix for the main installer script
 
 # Developer Flags
-dev_override_unsafe_password: false # Set to true only for development if using default DB password
+dev_override_unsafe_password: false # Set to true only for development to override safety checks, including allowing default DB password
 
 # Containerization Settings
 container_runtime_command: "docker" # e.g., "docker" or "podman"

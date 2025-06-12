@@ -660,7 +660,10 @@ class AppSettings(BaseSettings):
         default=PG_TILESERV_BINARY_LOCATION_DEFAULT
     )
     log_prefix: str = Field(default=LOG_PREFIX_DEFAULT)
-    dev_override_unsafe_password: bool = Field(default=False)
+    dev_override_unsafe_password: bool = Field(
+        default=False,
+        description="Override safety checks for development environments",
+    )
 
     container_runtime_command: str = Field(
         default=CONTAINER_RUNTIME_COMMAND_DEFAULT

@@ -17,7 +17,11 @@ import yaml  # Added for YAML output
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
 from common.pgpass_utils import setup_pgpass
-from common.system_utils import get_current_script_hash, systemd_reload
+from common.system_utils import (
+    get_current_script_hash,
+    get_primary_ip_address,
+    systemd_reload,
+)
 from installer.apache_installer import ensure_apache_packages_installed
 from installer.carto_installer import (
     fetch_carto_external_data,
@@ -1463,9 +1467,10 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     )
     dev_grp = parser.add_argument_group("Developer Options")
     dev_grp.add_argument(
-        "--dev-override-unsafe-password",
+        "--dev-override-all-settings",
         action="store_true",
         dest="dev_override_unsafe_password",
+        help="Override safety checks for development environments. Allows use of default/unsafe passwords and automatically sets vm_ip_or_domain to the primary IP address if it's set to 'example.com'.",
     )
 
     parsed_cli_args = parser.parse_args(
@@ -1475,6 +1480,38 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         APP_CONFIG = load_app_settings(
             parsed_cli_args, parsed_cli_args.config_file
         )
+
+        if APP_CONFIG.vm_ip_or_domain == VM_IP_OR_DOMAIN_DEFAULT:
+            if not APP_CONFIG.dev_override_unsafe_password:
+                log_map_server(
+                    f"{APP_CONFIG.symbols.get('error', '❌')} vm_ip_or_domain is set to '{VM_IP_OR_DOMAIN_DEFAULT}'. "
+                    f"This is unsafe for production use. Please set a proper domain or IP address, "
+                    f"or use --dev-override-all-settings for development environments.",
+                    "critical",
+                    current_logger=logger,
+                    app_settings=APP_CONFIG,
+                )
+                return 1
+            else:
+                primary_ip = get_primary_ip_address(APP_CONFIG, logger)
+                if primary_ip:
+                    APP_CONFIG.vm_ip_or_domain = primary_ip
+                    log_map_server(
+                        f"{APP_CONFIG.symbols.get('info', 'ℹ️')} vm_ip_or_domain was '{VM_IP_OR_DOMAIN_DEFAULT}' but --dev-override-all-settings "
+                        f"was specified. Using primary IP address: {primary_ip}",
+                        "info",
+                        current_logger=logger,
+                        app_settings=APP_CONFIG,
+                    )
+                else:
+                    log_map_server(
+                        f"{APP_CONFIG.symbols.get('error', '❌')} Could not determine primary IP address to replace '{VM_IP_OR_DOMAIN_DEFAULT}'. "
+                        f"Please set vm_ip_or_domain manually.",
+                        "critical",
+                        current_logger=logger,
+                        app_settings=APP_CONFIG,
+                    )
+                    return 1
     except SystemExit as e:  # pragma: no cover
         print(
             f"CRITICAL: Failed to load or validate application configuration: {e}",

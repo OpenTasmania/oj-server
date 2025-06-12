@@ -126,7 +126,7 @@ usage: main_installer.py [-h] [--generate-preseed-yaml [TASK_OR_GROUP ...]] [--f
                          [--ufw-pkg-check] [--ufw-rules] [--ufw-activate] [--ufw] [--postgres] [--carto] [--renderd]
                          [--apache] [--nginx] [--certbot] [--pgtileserv] [--osrm] [--gtfs-prep] [--raster-prep]
                          [--website-setup] [--task-systemd-reload] [--prereqs] [--services] [--data] [--systemd-reload]
-                         [--dev-override-unsafe-password]
+                         [--dev-override-all-settings]
 
 Map Server Installer Script
 
@@ -208,7 +208,8 @@ Group Task Flags:
   --systemd-reload      Run systemd reload task (as a group action). Same as --task-systemd-reload. (default: False)
 
 Developer Options:
-  --dev-override-unsafe-password
+  --dev-override-all-settings
+                        Override safety checks for development environments. Allows use of default/unsafe passwords and automatically sets vm_ip_or_domain to the primary IP address if it's set to 'example.com'.
 
 Example: python3 ./installer/main_installer.py --full -v mymap.example.com
 ```

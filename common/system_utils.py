@@ -9,6 +9,7 @@ determining the Debian codename, and calculating a project hash.
 
 import hashlib
 import logging
+import socket
 import subprocess
 from os import cpu_count
 from pathlib import Path
@@ -27,6 +28,48 @@ from setup.config_models import (
 module_logger = logging.getLogger(__name__)
 
 CACHED_SCRIPT_HASH: Optional[str] = None
+
+
+def get_primary_ip_address(
+    app_settings: Optional[AppSettings] = None,
+    current_logger: Optional[logging.Logger] = None,
+) -> Optional[str]:
+    """
+    Get the primary IP address of the machine.
+
+    This function attempts to determine the primary IP address by creating a socket
+    connection to an external host (doesn't actually connect).
+
+    Args:
+        app_settings: Optional application settings for logging symbols.
+        current_logger: Optional logger instance.
+
+    Returns:
+        The primary IP address as a string, or None if it cannot be determined.
+    """
+    logger_to_use = current_logger if current_logger else module_logger
+    symbols_to_use = SYMBOLS_DEFAULT
+    if (
+        app_settings
+        and hasattr(app_settings, "symbols")
+        and app_settings.symbols
+    ):
+        symbols_to_use = app_settings.symbols
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip_address = s.getsockname()[0]
+        s.close()
+        return str(ip_address)
+    except Exception as e:
+        log_map_server(
+            f"{symbols_to_use.get('warning', '!')} Could not determine primary IP address: {e}",
+            "warning",
+            logger_to_use,
+            app_settings,
+        )
+        return None
 
 
 def calculate_project_hash(
@@ -264,7 +307,6 @@ def calculate_threads(
     renderd_cfg = app_settings.renderd
 
     try:
-        # Call lscpu once using run_command
         result: subprocess.CompletedProcess = run_command(
             ["lscpu", "-p=Core,Socket"],
             app_settings,
@@ -286,7 +328,7 @@ def calculate_threads(
                     }
                     if physical_cores:
                         physical_core_count = len(physical_cores)
-                except Exception as e:  # Catch any parsing errors
+                except Exception as e:
                     log_map_server(
                         f"{symbols_to_use.get('warning', '!')} Error parsing lscpu output for physical cores: {e}",
                         "warning",
