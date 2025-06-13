@@ -13,24 +13,24 @@ Some implicit assumptions are
 - Usage patterns will be similar to typical map rendering
 """
 
+# Psycopg(3) version
+# NOTE: The orginal version of this script is:
+# https://raw.githubusercontent.com/gravitystorm/openstreetmap-carto/refs/heads/master/scripts/get-external-data.py
+
 import argparse
 import io
 import logging
 import os
 import re
 import shutil
-
-# modules for converting and postgres loading
 import subprocess
-
-# modules for getting data
 import zipfile
 from urllib.parse import urlparse
 
-import psycopg  # Changed from psycopg2
+import psycopg
 import requests
 import yaml
-from psycopg import sql  # Added for safe SQL identifier formatting
+from psycopg import sql
 
 
 def database_setup(conn, temp_schema, schema, metadata_table):
@@ -170,7 +170,7 @@ class Table:
             self._conn.commit()
             return None
 
-    def grant_access(self, user_role):  # parameter renamed for clarity
+    def grant_access(self, user_role):
         """
         Grants SELECT permissions on a specified database schema and table to a user role.
         This method executes a SQL statement to provide access to the table, defined
@@ -489,7 +489,7 @@ class Downloader:
                 if (
                     str(int(os.path.getmtime(filename)))
                     == headers["If-Modified-Since"]
-                ):  # Basic comparison
+                ):
                     return DownloadResult(
                         status_code=requests.codes.not_modified
                     )
@@ -498,7 +498,7 @@ class Downloader:
                     status_code=200,
                     content=fp.read(),
                     last_modified=str(os.fstat(fp.fileno()).st_mtime),
-                )  # Ensure string
+                )
         response = self.session.get(url, headers=headers)
         response.raise_for_status()
         return DownloadResult(
@@ -779,9 +779,7 @@ def main():
 
                 for name, source in config["sources"].items():
                     logging.info("Checking table {}".format(name))
-                    if not re.match(
-                        r"""^[a-zA-Z0-9_]+$""", name
-                    ):  # r'' for raw string
+                    if not re.match(r"""^[a-zA-Z0-9_]+$""", name):
                         raise RuntimeError(
                             "Only ASCII alphanumeric table are names supported"
                         )
