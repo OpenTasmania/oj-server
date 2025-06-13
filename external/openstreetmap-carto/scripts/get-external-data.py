@@ -882,7 +882,8 @@ def main():
                     ogr_target_table = (
                         f"{config['settings']['temp_schema']}.{name}"
                     )
-
+                    # TODO: Address ogr2ogr warnings.
+                    # The superuser privilege warning for ogr_system_tables_event_trigger_for_metadata needs to be considered.
                     ogrcommand = [
                         "ogr2ogr",
                         "-f",
@@ -892,8 +893,7 @@ def main():
                         "-lco",
                         "GEOMETRY_NAME=way",
                         "-lco",
-                        "SPATIAL_INDEX=FALSE",
-                        # '-lco', 'EXTRACT_SCHEMA_FROM_LAYER_NAME=YES',
+                        "SPATIAL_INDEX=NONE",
                         "-nln",
                         ogr_target_table,
                         "-overwrite",
