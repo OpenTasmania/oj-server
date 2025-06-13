@@ -10,11 +10,8 @@ from typing import Optional
 
 from common.command_utils import log_map_server
 from common.system_utils import get_current_script_hash
-
-# get_current_script_hash is now in common.system_utils, state_manager imports it
-# Import static_config for OSM_PROJECT_ROOT, STATE_FILE_PATH, SCRIPT_VERSION
 from setup import config as static_config
-from setup.config_models import (  # For type hinting and default comparison
+from setup.config_models import (
     PGPASSWORD_DEFAULT,
     AppSettings,
 )
@@ -27,6 +24,24 @@ def cli_prompt_for_rerun(
     app_settings: AppSettings,
     current_logger_instance: Optional[logging.Logger] = None,
 ) -> bool:
+    """
+    Prompt the user in the CLI to confirm or reject rerun action using a specific prompt
+    message. It optionally logs the interaction and defaults to "No" upon receiving
+    end-of-file (EOF) from the user.
+
+    Parameters:
+    prompt_message : str
+        The message to display in the CLI when prompting the user.
+    app_settings : AppSettings
+        The application settings object providing necessary configuration, such as symbols.
+    current_logger_instance : Optional[logging.Logger]
+        The logger instance to use for logging. If not provided, a default module-level
+        logger is used.
+
+    Returns:
+    bool
+        True if the user inputs "y" or "Y" after the prompt, otherwise False.
+    """
     logger_to_use = (
         current_logger_instance if current_logger_instance else module_logger
     )
@@ -38,7 +53,7 @@ def cli_prompt_for_rerun(
             .lower()
         )
         return user_input == "y"
-    except EOFError:  # Handle non-interactive environments
+    except EOFError:
         log_map_server(
             f"{symbols.get('warning', '!')} No user input (EOF), defaulting to 'N' for prompt: '{prompt_message}'",
             "warning",
@@ -51,6 +66,22 @@ def cli_prompt_for_rerun(
 def view_configuration(
     app_config: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Displays the current effective configuration values for the application,
+    including details sourced from CLI, YAML configuration, environment variables,
+    or default settings in the model. This provides a comprehensive view of all
+    necessary settings, such as PostgreSQL settings, runtime paths, container
+    details, and static configurations.
+
+    Parameters:
+        app_config (AppSettings): Application's configuration object that contains
+            all settings and their respective values.
+        current_logger (Optional[logging.Logger]): A logger instance to use for
+            logging output. If not provided, the module's default logger is used.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_config.symbols
 
@@ -85,14 +116,14 @@ def view_configuration(
     if (
         app_config.pg.password == PGPASSWORD_DEFAULT
         and not app_config.dev_override_unsafe_password
-    ):  # PGPASSWORD_DEFAULT from config_models
+    ):
         pg_password_display = "[DEFAULT - Potentially Insecure! Override via ENV, YAML, or CLI -W]"
     elif (
         app_config.pg.password == PGPASSWORD_DEFAULT
         and app_config.dev_override_unsafe_password
     ):
         pg_password_display = "[DEFAULT - Dev override active]"
-    elif not app_config.pg.password:  # Should be rare with Pydantic defaults
+    elif not app_config.pg.password:
         pg_password_display = "[NOT SET or EMPTY - Check Configuration]"
     config_text += (
         f"    Password:                    {pg_password_display}\n\n"
