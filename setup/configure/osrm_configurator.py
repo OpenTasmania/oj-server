@@ -27,8 +27,20 @@ def get_next_available_port(
     app_settings: AppSettings, logger: logging.Logger
 ) -> int:
     """
-    Returns the next available port for OSRM services.
-    Tracks used ports to avoid conflicts.
+    Determine the next available port not currently in use within the region port map.
+
+    This function iterates over the pre-configured region port map to identify the next
+    free port. It starts at a default base port and increments until an available port
+    not conflicting with existing ports is found.
+
+    Parameters:
+        app_settings (AppSettings): The application settings containing OSRM service
+            configuration, including the default host port and the mapping of regions
+            to their respective ports.
+        logger (logging.Logger): A logger for capturing diagnostic and debug information.
+
+    Returns:
+        int: The next available port number starting from the default host port.
     """
     # TODO: Use logger
     osrm_service_cfg = app_settings.osrm_service
@@ -48,7 +60,29 @@ def create_osrm_routed_service_file(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
-    """Creates a systemd service file for osrm-routed for a specific region using template from app_settings."""
+    """
+    Creates or updates a systemd service file for an OSRM routed service for a particular region.
+
+    This function generates and writes a systemd service file for running the OSRM routed
+    server for a specified region. The service file is created using a provided template
+    and fills in placeholders related to the region, OSRM configuration, and system
+    settings. If necessary, it also assigns a port for the service, either from preconfigured
+    values or by determining the next available port.
+
+    Parameters:
+        region_name_key (str): Unique key for the region, such as "Australia_Tasmania_Hobart".
+        app_settings (AppSettings): Application settings instance containing configuration
+                                     details for OSRM and system settings.
+        current_logger (Optional[logging.Logger]): Logger instance for logging activities.
+                                                   If None, a predefined module-level logger
+                                                   is used.
+
+    Raises:
+        FileNotFoundError: If the required OSRM data file for the specified region is not
+                           found.
+        KeyError: If a required placeholder key is missing in the systemd service template.
+        Exception: For any other errors occurring while generating or writing the service file.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
@@ -172,7 +206,39 @@ def import_pbf_to_postgis_with_osm2pgsql(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> bool:
-    """Imports a PBF file into PostGIS using osm2pgsql."""
+    """
+    Imports a PBF (Protocolbuffer Binary Format) file into a PostGIS database using the
+    osm2pgsql tool. The function validates the existence of the required PBF file and
+    OSM-Carto Lua script, constructs the osm2pgsql command, and executes it. Logs are
+    generated at each step to track the progress and results of the import operation.
+
+    The function also allows specifying a logger to use for logging messages. If no
+    logger is provided, a default module-level logger is used. Additionally, it
+    utilizes environment variables to securely pass the database password to osm2pgsql.
+
+    Parameters:
+    pbf_full_path: str
+        Full path to the PBF file to be imported.
+
+    app_settings: AppSettings
+        Settings configuration containing PostGIS connection details, OSRM (Open
+        Source Routing Machine) data settings, and symbols for logging.
+
+    current_logger: Optional[logging.Logger]
+        Logger instance to be used for logging messages related to the import process.
+        If None, a default logger is used.
+
+    Returns:
+    bool
+        True if the import is successful, False otherwise.
+
+    Raises:
+    CalledProcessError
+        Raised when the osm2pgsql command returns a non-zero exit status.
+
+    Exception
+        Raised for any other unexpected errors encountered during the import process.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     postgis_cfg = app_settings.pg
@@ -194,21 +260,10 @@ def import_pbf_to_postgis_with_osm2pgsql(
         )
         return False
 
-    # Define paths for Carto style and lua files
     osm_carto_dir = (
         static_config.OSM_PROJECT_ROOT / "external" / "openstreetmap-carto"
     )
-    osm_carto_style_file = osm_carto_dir / "openstreetmap-carto.style"
     osm_carto_lua_script = osm_carto_dir / "openstreetmap-carto.lua"
-
-    if not osm_carto_style_file.is_file():
-        log_map_server(
-            f"{symbols.get('error', '❌')} OSM-Carto style file not found at {osm_carto_style_file}. Cannot proceed.",
-            "error",
-            logger_to_use,
-            app_settings,
-        )
-        return False
 
     if not osm_carto_lua_script.is_file():
         log_map_server(
@@ -222,7 +277,6 @@ def import_pbf_to_postgis_with_osm2pgsql(
     env_vars = environ.copy()
     env_vars["PGPASSWORD"] = postgis_cfg.password
 
-    # Command using flex output, as recommended by modern CartoCSS
     osm2pgsql_cmd = [
         "osm2pgsql",
         "--create",
@@ -238,7 +292,7 @@ def import_pbf_to_postgis_with_osm2pgsql(
         "--hstore",
         "--multi-geometry",
         f"--tag-transform-script={osm_carto_lua_script}",
-        f"--style={osm_carto_style_file}",
+        f"--style={osm_carto_lua_script}",
         "--output=flex",
         "-C",
         str(osm_data_cfg.osm2pgsql_cache_mb),
@@ -254,7 +308,6 @@ def import_pbf_to_postgis_with_osm2pgsql(
     )
 
     try:
-        # Using run_command as osm2pgsql should not require root if permissions are correct.
         run_command(
             osm2pgsql_cmd,
             app_settings,
@@ -293,7 +346,31 @@ def activate_osrm_routed_service(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
-    """Reloads systemd, enables and restarts the osrm-routed service for a region."""
+    """
+    Activates and ensures the proper startup and status of an OSRM (Open Source Routing
+    Machine) routed service corresponding to a specific region. This involves enabling,
+    restarting, and verifying the service using system commands, with appropriate logging
+    throughout the process.
+
+    Parameters
+    ----------
+    region_name_key : str
+        The key corresponding to the region-specific service name.
+    app_settings : AppSettings
+        An instance of `AppSettings` containing configuration and symbols needed during the
+        process.
+    current_logger : Optional[logging.Logger], optional
+        A custom logger to use for logging. If not provided, the module's default logger
+        will be used.
+
+    Raises
+    ------
+    CalledProcessError
+        Raised if the systemctl command indicates the service has failed to start.
+    Exception
+        Raised for unexpected errors during service status verification, logging the issue
+        with traceback information when available.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     service_name = f"osrm-routed-{region_name_key}.service"
@@ -365,10 +442,22 @@ def configure_osrm_services(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:
     """
-    Finds all processed OSRM regions and creates and activates systemd services for them.
+    Configures the OSRM services based on the specified application settings and
+    logged information. The function handles configuration for all processed
+    regions listed in the OSRM data directory, logging progress, warnings, and
+    errors encountered during the process. It verifies the presence of required
+    directories and files, then activates corresponding OSRM routed services.
 
-    This function orchestrates the configuration of all OSRM services based on the
-    processed data found in the specified directory.
+    Arguments:
+        app_settings (AppSettings): Application settings containing information
+            about OSRM service configuration, including paths and symbols used
+            for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for
+            logging. If not provided, a default logger (`module_logger`) is used.
+
+    Returns:
+        bool: True if all OSRM services are successfully configured, otherwise
+            False in case of any errors during the process.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

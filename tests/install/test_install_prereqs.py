@@ -51,7 +51,8 @@ from setup.core_prerequisites import (
 @pytest.fixture
 def mock_default_app_settings():
     """Provides a default AppSettings instance for tests."""
-    return AppSettings()
+    # Set dev_override_unsafe_password to True to bypass the vm_ip_or_domain check
+    return AppSettings(dev_override_unsafe_password=True)
 
 
 def test_prereqs_switch_orchestrates_core_prerequisites(
