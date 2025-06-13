@@ -37,15 +37,7 @@ from .pipeline_definitions import GTFS_LOAD_ORDER
 
 module_logger = logging.getLogger(__name__)
 
-# Default GTFS feed URL if not provided by environment variable
-# The attempt to import from setup.config has been removed as GTFS_FEED_URL is a runtime configuration.
 DEFAULT_GTFS_FEED_URL_CONFIG = "https://example.com/default_gtfs_feed.zip"
-
-# This module-level variable is primarily for understanding the source if needed,
-# but the run_full_gtfs_etl_pipeline function will fetch the current value from ENV.
-# GTFS_FEED_URL_MODULE_LEVEL_VAR = os.environ.get( # This variable is not strictly necessary anymore
-#     "GTFS_FEED_URL", DEFAULT_GTFS_FEED_URL_CONFIG
-# )
 
 DB_PARAMS: dict[str, str] = {
     "dbname": os.environ.get("PG_GIS_DB", "gis"),
@@ -64,16 +56,40 @@ TEMP_DOWNLOAD_PATH = TEMP_DOWNLOAD_DIR / TEMP_ZIP_FILENAME
 TEMP_EXTRACT_PATH = TEMP_DOWNLOAD_DIR / TEMP_EXTRACT_DIR_NAME
 
 
-def run_full_gtfs_etl_pipeline() -> (
-    bool
-):  # This function does not take AppSettings
+def run_full_gtfs_etl_pipeline() -> bool:
+    """
+    Runs the complete GTFS ETL (Extract, Transform, Load) pipeline using the GTFS kit. This
+    function handles downloading, extracting, validating, transforming, and loading GTFS
+    data into a database.
+
+    In the first step, the latest GTFS feed is downloaded from the specified URL and
+    extracted. The second step loads the GTFS feed into memory using the gtfs-kit library,
+    while assuming the input GTFS data has already been validated. The function then
+    ensures that the required database schema (tables and primary keys) exists.
+
+    Next, it iterates through the predefined GTFS file load order to transform and load
+    each table into a database. Table-specific transformation logic is applied (e.g.,
+    geometrizing stops or shapes using gtfs-kit). Optionally processed geometry data is
+    also handled for specific tables such as `shapes`. Any failures to download data,
+    extract files, validate schema, connect to the database, or process data result in the
+    pipeline halting.
+
+    Finally, the function records statistics on the pipeline's execution, such as the
+    total number of records processed, loaded successfully, and sent to a dead-letter
+    queue (DLQ). Temporary directories created for file downloads and extraction are
+    cleaned up during this operation.
+
+    Arguments:
+        None
+
+    Returns:
+        bool: True if the pipeline succeeded, otherwise False.
+    """
     start_time = datetime.now()
     module_logger.info(
         f"===== GTFS ETL Pipeline (gtfs-kit) Started at {start_time.isoformat()} ====="
     )
-    # Get the GTFS_FEED_URL from environment variable, with a fallback to the default.
-    # This environment variable is expected to be set by the calling script (e.g., runner.py)
-    # which gets the value from AppSettings.
+
     current_gtfs_feed_url = os.environ.get(
         "GTFS_FEED_URL", DEFAULT_GTFS_FEED_URL_CONFIG
     )
@@ -237,9 +253,7 @@ def run_full_gtfs_etl_pipeline() -> (
                                 module_logger.error(
                                     "Schema for 'gtfs_shapes_lines.txt' not found. Cannot load shape lines."
                                 )
-                                df_transformed = (
-                                    df_for_processing.copy()
-                                )  # Fallback to original points if lines fail
+                                df_transformed = df_for_processing.copy()
                             else:
                                 final_shapes_lines_df = (
                                     transform.transform_dataframe(
@@ -255,27 +269,20 @@ def run_full_gtfs_etl_pipeline() -> (
                                 )
                                 total_records_loaded_successfully += loaded_sl
                                 total_records_sent_to_dlq += dlq_sl
-                                # After processing lines, df_transformed should be the original points for shapes.txt
                                 df_transformed = df_for_processing.copy()
                         else:
                             module_logger.info(
                                 "No shape geometries computed or result is empty for 'gtfs_shapes_lines'."
                             )
-                            df_transformed = (
-                                df_for_processing.copy()
-                            )  # Process original points
+                            df_transformed = df_for_processing.copy()
                     else:
                         module_logger.info(
                             "No shapes data in feed. Skipping line geometrization. Original shapes.txt points will be processed if they exist."
                         )
-                        # If feed.shapes was None or empty, df_for_processing (a copy of original feed.shapes)
-                        # will also be None or empty. transform_dataframe and load_dataframe_to_db handle empty DataFrames.
                         df_transformed = df_for_processing.copy()
                 else:
                     df_transformed = df_for_processing.copy()
 
-                # This check was specific to shapes.txt points after attempting line geometrization.
-                # If df_transformed (original shapes.txt points) is empty, it should be skipped.
                 if (
                     df_transformed.empty
                     and table_base_name == "shapes"
@@ -342,12 +349,11 @@ def run_full_gtfs_etl_pipeline() -> (
             module_logger.info("Database connection closed.")
         download.cleanup_temp_file(TEMP_DOWNLOAD_PATH)
         if TEMP_EXTRACT_PATH.exists():
-            # Corrected call to cleanup_directory:
             cleanup_directory(
                 TEMP_EXTRACT_PATH,
-                app_settings=None,  # Pass None as AppSettings is not available here
+                app_settings=None,
                 ensure_dir_exists_after=True,
-                current_logger=module_logger,  # Pass this module's logger
+                current_logger=module_logger,
             )
         end_time = datetime.now()
         duration = end_time - start_time
@@ -365,8 +371,6 @@ if __name__ == "__main__":
             log_prefix="[GTFS-PIPELINE-DIRECT]",
         )
 
-    # When run directly, GTFS_FEED_URL should be set in the environment,
-    # otherwise it uses the hardcoded DEFAULT_GTFS_FEED_URL_CONFIG.
     _feed_url_check = os.environ.get(
         "GTFS_FEED_URL", DEFAULT_GTFS_FEED_URL_CONFIG
     )

@@ -230,7 +230,7 @@ def log_to_dlq(
     dlq_table_name: str,
     failed_record_data: Dict,
     error_reason: str,
-    source_info: str,  # Renamed from 'notes' to be more descriptive of its use
+    source_info: str,
 ) -> None:
     """
     Log a failed record or batch failure information to a Dead-Letter Queue (DLQ) table.
@@ -243,32 +243,23 @@ def log_to_dlq(
         error_reason: String describing the reason for failure.
         source_info: String providing context about the data's origin or process step.
     """
-    # Construct DLQ table name ensuring it's a valid identifier if not already
-    # This assumes dlq_table_name might not be sanitized yet.
-    # If dlq_table_name is always from a trusted source, this might be overkill.
-
-    # The original main_pipeline was creating dlq tables like dlq_gtfs_stops,
-    # but the generic gtfs_dlq was also created by update_gtfs.
+    # TODO: Don't assume this table exists.
     # For now, this function assumes dlq_table_name is the correct, existing table name.
     # A check for table existence or dynamic creation of DLQ tables might be needed.
 
     dlq_insert_stmt = sql.SQL(
         "INSERT INTO {} (original_row_data, error_reason, notes, error_timestamp) "  # type: ignore[misc] # psycoph3 linter confusion
         "VALUES (%s, %s, %s, %s);"
-    ).format(
-        sql.Identifier(dlq_table_name)
-    )  # Assuming notes field exists in per-table DLQ.
+    ).format(sql.Identifier(dlq_table_name))
 
     try:
         record_json = json.dumps(failed_record_data, default=str)
         timestamp_now = datetime.now()
-
-        # DLQ logging should ideally happen in its own transaction or with autocommit.
+        # TODO: DLQ logging to happen in its own transaction or with autocommit.
         # Here, we use the passed connection; its transaction state depends on the caller.
         # If the main transaction was rolled back, this conn might be in an aborted state
         # unless the caller specifically handles that (e.g. by using a new cursor or conn.rollback()).
 
-        # To ensure DLQ write happens even if main transaction failed:
         is_main_transaction_active = (
             conn.info.transaction_status
             == psycopg.pq.TransactionStatus.INTRANS
@@ -281,7 +272,7 @@ def log_to_dlq(
                 != psycopg.pq.TransactionStatus.IDLE
             ):
                 try:
-                    conn.rollback()  # Attempt to clear failed transaction state if any
+                    conn.rollback()
                     module_logger.debug(
                         f"Rolled back connection for DLQ insert to {dlq_table_name}"
                     )
@@ -289,18 +280,15 @@ def log_to_dlq(
                     module_logger.error(
                         f"Error rolling back for DLQ insert: {rb_err}"
                     )
-                    # Proceeding, but insert might fail if connection is broken
 
             cursor.execute(
                 dlq_insert_stmt,
                 (record_json, error_reason, source_info, timestamp_now),
             )
-            # If not in a main transaction, this cursor's operation will typically autocommit
-            # or commit if conn.autocommit = True. If conn.autocommit = False and not in a tx,
-            # an explicit conn.commit() would be needed for this write.
+            # TODO: Don't simp
             # For simplicity, assuming default Psycopg 3 behavior or caller manages commits.
             if not is_main_transaction_active and not conn.autocommit:
-                conn.commit()  # Explicit commit for DLQ if not in main transaction and no autocommit
+                conn.commit()
 
         module_logger.debug(
             f"Record/Info logged to DLQ table '{dlq_table_name}' for source: {source_info}"

@@ -29,15 +29,10 @@ DB_PARAMS: Dict[str, str] = {
     "port": os.environ.get("PG_PORT", "5432"),
 }
 
-LOG_FILE = (
-    "/var/log/update_gtfs_cli.log"  # Specific log file for this CLI tool
-)
+LOG_FILE = "/var/log/update_gtfs_cli.log"
 
-# Default GTFS feed URL if not provided by environment variable or CLI argument.
-# The attempt to import from setup.config has been removed.
 DEFAULT_GTFS_URL_CONFIG = "https://example.com/default_gtfs_feed.zip"
 
-# Effective default URL considering environment override first, then the above config, then hardcoded.
 DEFAULT_GTFS_URL = os.environ.get("GTFS_FEED_URL", DEFAULT_GTFS_URL_CONFIG)
 
 
@@ -45,17 +40,24 @@ def run_gtfs_etl_via_core_pipeline(
     feed_url_override: Optional[str] = None,
 ) -> bool:
     """
-    Sets GTFS_FEED_URL and DB environment variables then runs the main ETL pipeline.
+    Runs the GTFS ETL process using the core pipeline.
+
+    Summary:
+    This function executes the GTFS (General Transit Feed Specification) ETL
+    (Extract, Transform, Load) process utilizing the core pipeline module. It
+    configures necessary environment variables, including the GTFS feed URL and
+    database connection parameters, to ensure proper execution of the pipeline.
 
     Args:
-        feed_url_override: Optional URL to override the default GTFS feed URL.
+        feed_url_override (Optional[str]): Overrides the default GTFS feed URL
+            if specified. Defaults to None.
+
     Returns:
-        True if the pipeline completed successfully, False otherwise.
+        bool: Indicates whether the GTFS ETL process completed successfully.
     """
     effective_feed_url = feed_url_override or DEFAULT_GTFS_URL
 
     os.environ["GTFS_FEED_URL"] = effective_feed_url
-    # This logger will use the configuration set by setup_update_gtfs_logging
     module_logger.info(
         f"GTFS_FEED_URL set for core pipeline: {effective_feed_url}"
     )
@@ -69,6 +71,7 @@ def run_gtfs_etl_via_core_pipeline(
     if hasattr(
         core_gtfs_pipeline, "GTFS_FEED_URL_MODULE_LEVEL_VAR"
     ):  # pragma: no cover
+        # Todo: Be better
         # This line attempts to modify a variable in the imported main_pipeline module.
         # While it might work, it's generally better for main_pipeline to solely rely on
         # os.environ.get("GTFS_FEED_URL") for its configuration if it's meant to be
@@ -87,23 +90,42 @@ def setup_update_gtfs_logging(
     ] = LOG_FILE,  # Use the module's LOG_FILE constant
     log_to_console: bool = True,
 ) -> None:
-    """Set up logging configuration for the update_gtfs CLI script."""
+    """
+    Configures logging for the GTFS update process.
+
+    This function sets up logging for the GTFS update command-line interface (CLI),
+    allowing logs to be written to a file, output to the console, and tagged with
+    a distinct prefix for easier identification. The logging level and target log
+    file can be customized using parameters, while invalid logging levels default
+    to INFO.
+
+    Parameters:
+        log_level_str: str
+            The logging level as a string, e.g., 'DEBUG', 'INFO', 'WARNING', etc.
+            Defaults to 'INFO'.
+        log_file_path: Optional[str]
+            Path to the log file where logs will be written. If None, uses the default
+            value defined by the module's LOG_FILE constant.
+        log_to_console: bool
+            Whether to also output logs to the console. Defaults to True.
+
+    Returns:
+        None
+    """
     log_level_val = getattr(logging, log_level_str.upper(), logging.INFO)
     if not isinstance(log_level_val, int):  # Ensure it's a valid level
         print(
             f"Warning: Invalid log_level_str '{log_level_str}'. Defaulting to INFO.",
             file=sys.stderr,
-        )  # To stderr
+        )
         log_level_val = logging.INFO
 
-    # Call the enhanced common_setup_logging function
     common_setup_logging(
         log_level=log_level_val,
-        log_file=log_file_path,  # Pass the specific log file for this tool
+        log_file=log_file_path,
         log_to_console=log_to_console,
-        log_prefix="[GTFS-UPDATE-CLI]",  # Optional: Add a distinct prefix for this tool's logs
+        log_prefix="[GTFS-UPDATE-CLI]",
     )
-    # This module_logger will now use the configuration set by common_setup_logging
     module_logger.info(
         f"update_gtfs.py CLI logging configured. Level: {logging.getLevelName(log_level_val)}, File: {log_file_path}"
     )
@@ -133,7 +155,7 @@ def main_cli() -> None:  # pragma: no cover
     parser.add_argument(
         "--log-file",
         dest="log_file_path",
-        default=LOG_FILE,  # Default to this script's specific log file
+        default=LOG_FILE,
         help=f"Path to the log file (default: {LOG_FILE}).",
     )
     parser.add_argument(
@@ -144,10 +166,9 @@ def main_cli() -> None:  # pragma: no cover
     )
     args = parser.parse_args()
 
-    # Setup logging using the (now modified) local function which calls the common one
     setup_update_gtfs_logging(
         log_level_str=args.log_level_str,
-        log_file_path=args.log_file_path,  # Use path from args
+        log_file_path=args.log_file_path,
         log_to_console=args.log_to_console,
     )
 

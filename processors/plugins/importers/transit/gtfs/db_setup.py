@@ -20,8 +20,20 @@ module_logger = logging.getLogger(__name__)
 
 def create_tables_from_schema(conn: PgConnection) -> None:
     """
-    Create database tables based on schema_definitions.GTFS_FILE_SCHEMAS.
-    Primary keys are added using ALTER TABLE based on 'pk_cols' in the schema.
+    Sets up the database schema for GTFS-related data.
+
+    This function creates tables in the database as defined by GTFS_FILE_SCHEMAS.
+    It ensures the necessary tables exist with the appropriate columns and, where
+    applicable, adds primary key constraints. A generic dead letter queue (DLQ)
+    table and a table for 'gtfs_shapes_lines' are also created or ensured.
+
+    Parameters:
+    conn : PgConnection
+        An active PostgreSQL database connection.
+
+    Raises:
+    psycopg.Error
+        If errors occur during table creation or primary key setup.
     """
     module_logger.info(
         "Setting up database schema based on schema_definitions.GTFS_FILE_SCHEMAS..."
@@ -39,7 +51,6 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                 continue
 
             table_name = details["db_table_name"]
-            # Changed from List[str] to List[sql.Composed]
             cols_defs_sql_list: List[sql.Composed] = []
 
             db_columns_def = details.get("columns", {})
@@ -54,21 +65,11 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                     "type", "TEXT"
                 )  # e.g., "TEXT", "INTEGER", "GEOMETRY(Point, 4326)"
 
-                # Start building the column definition with name and type
-                # sql.Identifier handles quoting for col_name
-                # sql.SQL treats col_type_str as a literal SQL snippet (e.g., a type)
                 column_definition_parts = [
                     sql.Identifier(col_name),
                     sql.SQL(col_type_str),
                 ]
 
-                # Example: Add other constraints if defined in col_props
-                # This part depends on how you might extend schema_definitions.py
-                # For instance, if you had a 'constraints' key in col_props:
-                # if "constraints" in col_props and col_props["constraints"]:
-                #     column_definition_parts.append(sql.SQL(col_props["constraints"]))
-
-                # Join parts for this column definition (e.g., "column_name TEXT")
                 cols_defs_sql_list.append(
                     sql.SQL(" ").join(column_definition_parts)
                 )
@@ -79,7 +80,6 @@ def create_tables_from_schema(conn: PgConnection) -> None:
                 )
                 continue
 
-            # Join all column definitions with a comma
             cols_sql_segment = sql.SQL(", ").join(cols_defs_sql_list)
 
             create_sql = sql.SQL(
@@ -195,6 +195,7 @@ def create_tables_from_schema(conn: PgConnection) -> None:
             module_logger.error(
                 f"Error creating generic DLQ table gtfs_dlq: {e.diag.message_primary if e.diag else str(e)}"
             )
+            # TODO: Check non-raising
             # Not raising, as DLQ might be non-critical
 
     module_logger.info("Database schema setup/verification complete.")
@@ -204,8 +205,33 @@ def add_foreign_keys_from_schema(
     conn: PgConnection,
 ) -> None:  # pragma: no cover
     """
-    Add foreign keys based on GTFS_FOREIGN_KEYS definitions.
-    This function expects to be run within an existing transaction.
+    Add foreign keys to the database schema after data loading.
+
+    This function attempts to add foreign key constraints to tables in a PostgreSQL
+    database using the connection provided. It iterates through a list of predefined
+    foreign key definitions and applies each constraint if both the source and target
+    tables of the foreign key relationship exist. Foreign key constraints are added
+    in a deferred mode, thus delaying their enforcement until the transaction is
+    committed. Detailed logs are produced throughout the process to track success
+    and failure for each foreign key operation.
+
+    Arguments:
+        conn: A connection object to a PostgreSQL database.
+
+    Raises:
+        psycopg.Error: If any database error occurs during the process of adding
+            foreign keys, such as an invalid SQL statement or database state.
+        Exception: For any unexpected error encountered during execution.
+
+    Notes:
+        - The foreign key constraints are applied in a deferred mode, meaning their
+          enforcement is postponed until the transaction in which they are created
+          is committed.
+        - If any of the source or target tables for a foreign key does not exist, the
+          corresponding foreign key creation is skipped and a warning is logged.
+        - The function assumes the existence of a predefined list of foreign key
+          metadata (GTFS_FOREIGN_KEYS) containing tuples with information about each
+          constraint to be added.
     """
     module_logger.info("Attempting to add foreign keys post-data load...")
     with conn.cursor() as cursor:
@@ -287,7 +313,25 @@ def add_foreign_keys_from_schema(
 def drop_all_gtfs_foreign_keys(
     conn: PgConnection,
 ) -> None:  # pragma: no cover
-    """Drop all defined GTFS foreign keys using Psycopg 3."""
+    """
+    Drops all existing GTFS foreign keys from the specified PostgreSQL database connection.
+
+    This function iterates through a predefined list of GTFS foreign key constraints,
+    represented by GTFS_FOREIGN_KEYS, and attempts to drop each of them from their
+    respective tables. It ensures the operations are performed only if the corresponding
+    table exists within the database. Logs messages are generated for executed actions
+    and any failures encountered during the process, including warnings for cases where
+    foreign keys cannot be dropped.
+
+    Parameters:
+        conn (PgConnection): Active PostgreSQL connection object used to communicate
+            with the target database.
+
+    Raises:
+        This function does not explicitly raise exceptions but logs them instead. Errors
+        encountered when attempting to drop foreign keys will be logged and handled
+        gracefully.
+    """
     module_logger.info("Dropping existing GTFS foreign keys...")
     with conn.cursor() as cursor:
         for from_table, _, _, _, fk_name in reversed(GTFS_FOREIGN_KEYS):

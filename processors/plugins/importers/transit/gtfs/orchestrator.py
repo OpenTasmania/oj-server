@@ -22,16 +22,32 @@ class GTFSConfigError(Exception):
 
 
 def process_and_setup_gtfs(
-    app_settings: AppSettings,  # Changed to accept AppSettings
-    # Individual parameters like gtfs_feed_url, db_params, project_root, etc.
-    # will be sourced from app_settings.
-    orchestrator_logger: Optional[
-        logging.Logger
-    ] = None,  # Logger for this orchestrator's messages
+    app_settings: AppSettings,
+    orchestrator_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
-    Main public function to set up environment, run GTFS ETL, verify, and configure cron job.
-    Uses app_settings for all configurations.
+    Processes and sets up a General Transit Feed Specification (GTFS) environment
+    by validating configuration, running an ETL pipeline, and configuring cron jobs
+    for automation. This function ensures the essential parameters, such as the
+    GTFS feed URL, are configured correctly in `app_settings`. The setup process
+    includes configuring the environment, executing the ETL pipeline, and verifying
+    its results, followed by scheduling updates with a cron job. Uses an optional
+    logger for detailed logging of operations during the setup.
+
+    Parameters:
+        app_settings (AppSettings): Configuration settings for GTFS processing,
+            including symbols, GTFS feed URL, and database parameters.
+        orchestrator_logger (Optional[logging.Logger]): Logger instance for
+            recording messages during the GTFS setup. If not provided, a default
+            module logger is used.
+
+    Raises:
+        GTFSConfigError: If the required GTFS feed URL is missing in the configuration.
+        RuntimeError: If a runtime error occurs during the GTFS processing.
+        Exception: For any other unexpected errors encountered during the setup process.
+
+    Returns:
+        None
     """
     effective_logger = (
         orchestrator_logger if orchestrator_logger else module_logger
@@ -45,7 +61,6 @@ def process_and_setup_gtfs(
         app_settings,
     )
 
-    # Validate essential parameters from app_settings
     if not app_settings.gtfs_feed_url:
         log_map_server(
             f"{symbols.get('error', '❌')} GTFS Feed URL is missing in configuration. Cannot proceed.",
@@ -54,21 +69,17 @@ def process_and_setup_gtfs(
             app_settings,
         )
         raise GTFSConfigError("GTFS Feed URL is required in AppSettings.")
-    # DB params are in app_settings.pg, no need to check individual keys here as Pydantic model ensures structure.
 
     try:
-        # Step 1: Setup GTFS processing environment (logging for GTFS modules, OS env vars)
-        # This setup_gtfs_environment will configure logging that subsequent GTFS modules use.
         log_map_server(
             f"{symbols.get('step', '➡️')} Step 1: Setting up GTFS environment (logging & OS vars)...",
             "info",
             effective_logger,
             app_settings,
         )
-        # setup_gtfs_environment now takes app_settings directly
         setup_gtfs_environment(
             app_settings=app_settings,
-            current_logger_for_setup=effective_logger,  # Pass logger for setup_gtfs_environment's own messages
+            current_logger_for_setup=effective_logger,
         )
         log_map_server(
             f"{symbols.get('success', '✅')} GTFS environment setup complete.",
@@ -77,8 +88,6 @@ def process_and_setup_gtfs(
             app_settings,
         )
 
-        # Step 2: Run the ETL pipeline and verify
-        # run_gtfs_etl_pipeline_and_verify now takes app_settings
         log_map_server(
             f"{symbols.get('step', '➡️')} Step 2: Running GTFS ETL pipeline and verification...",
             "info",
@@ -95,8 +104,6 @@ def process_and_setup_gtfs(
             app_settings,
         )
 
-        # Step 3: Configure cron job for automation
-        # configure_gtfs_update_cronjob now takes app_settings
         log_map_server(
             f"{symbols.get('step', '➡️')} Step 3: Configuring GTFS update cron job...",
             "info",

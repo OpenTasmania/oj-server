@@ -22,26 +22,43 @@ DEFAULT_CRON_GTFS_STDOUT_LOG_FILE = "/var/log/gtfs_cron_output.log"
 
 
 def configure_gtfs_update_cronjob(
-    app_settings: AppSettings,  # Changed to accept AppSettings
-    # project_root_path, feed_url, db_params will be sourced from app_settings
-    # cron_user_name, cron_output_log_file, python_executable_override can also be part of AppSettings.gtfs or AppSettings.automation
+    app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
+    """
+    Configures a cron job for daily GTFS (General Transit Feed Specification) updates. This function
+    uses the application's settings to determine parameters such as feed URL, database configurations,
+    and logging options. The cron job is set up to run a Python script within the application environment
+    at a predefined schedule.
+
+    This involves verifying the appropriate Python environment, generating environmental variables,
+    and handling the crontab setup for the specified or default user.
+
+    Parameters:
+        app_settings (AppSettings): The application settings containing configurations
+            for GTFS updates, database connection, and automation details.
+        current_logger (Optional[logging.Logger]): A logger for logging messages during cron job
+            configuration. If None is provided, a default module logger is used.
+
+    Raises:
+        EnvironmentError: If a valid Python executable cannot be located, preventing the cron job
+            from being configured.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
-    # Extract values from app_settings
-    # Assuming these might be nested under app_settings.gtfs or app_settings.automation in a more complete model
     project_root_path = Path(static_config.OSM_PROJECT_ROOT)  # Static path
     feed_url = str(app_settings.gtfs_feed_url)
-    db_params = {  # For cron job environment
+    db_params = {
         "PGPASSWORD": app_settings.pg.password,
         "PGUSER": app_settings.pg.user,
         "PGHOST": app_settings.pg.host,
         "PGPORT": str(app_settings.pg.port),
-        "PGDATABASE": app_settings.pg.database,  # Or map to PG_GIS_DB if update_gtfs expects that
+        "PGDATABASE": app_settings.pg.database,
     }
-    # These could be fields in AppSettings.gtfs.automation
     cron_run_user = (
         getattr(app_settings.gtfs, "cron_user", app_settings.pg.user)
         if hasattr(app_settings, "gtfs")
@@ -124,16 +141,11 @@ def configure_gtfs_update_cronjob(
 
     env_vars_list = [
         f"GTFS_FEED_URL='{feed_url}'",
-        # update_gtfs.py sets these for its child main_pipeline based on its DB_PARAMS/ENV
-        # So we need to ensure update_gtfs.py can get these.
-        # It reads PG_OSM_USER etc. from ENV.
         f"PG_OSM_PASSWORD='{db_params.get('PGPASSWORD', '')}'",
         f"PG_OSM_USER='{db_params.get('PGUSER', '')}'",
-        f"PG_GIS_DB='{db_params.get('PGDATABASE', '')}'",  # update_gtfs.py maps PGDATABASE to PG_GIS_DB
+        f"PG_GIS_DB='{db_params.get('PGDATABASE', '')}'",
         f"PG_HOST='{db_params.get('PGHOST', '')}'",
         f"PG_PORT='{db_params.get('PGPORT', '')}'",
-        # Pass log level for update_gtfs.py CLI if needed, e.g. from app_settings.gtfs.cron_log_level
-        # For now, update_gtfs.py defaults to INFO for its own logging.
     ]
     env_vars_str = "; ".join([f"export {var}" for var in env_vars_list])
 

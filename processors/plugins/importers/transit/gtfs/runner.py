@@ -15,10 +15,30 @@ module_logger = logging.getLogger(__name__)
 
 
 def run_gtfs_etl_pipeline_and_verify(
-    app_settings: AppSettings,  # Changed to accept AppSettings
-    # db_params for psql verification will be sourced from app_settings.pg
+    app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
+    """
+    Runs the GTFS ETL pipeline and verifies the data import.
+
+    This function serves as the main entry point for executing the GTFS ETL (Extract,
+    Transform, Load) pipeline and validating its results. The pipeline processes the GTFS
+    data using environment configurations and logs its execution. It also includes a
+    verification step to ensure the success of the data import by querying relevant GTFS
+    tables.
+
+    Arguments:
+        app_settings: An instance of AppSettings containing the application configuration.
+        current_logger: An optional logger instance to use for logging. If not provided,
+            a module-level logger will be used.
+
+    Raises:
+        ImportError: If the GTFS ETL pipeline core module cannot be imported.
+        RuntimeError: If the GTFS ETL pipeline execution fails.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
@@ -58,7 +78,7 @@ def run_gtfs_etl_pipeline_and_verify(
         app_settings,
     )
 
-    success = core_run_etl()  # This function reads from OS ENV for its config
+    success = core_run_etl()
 
     if not success:
         log_map_server(
@@ -84,8 +104,6 @@ def run_gtfs_etl_pipeline_and_verify(
         app_settings,
     )
     try:
-        # PGPASSWORD for psql tool is expected to be in OS environment,
-        # set by processors.gtfs.environment.setup_gtfs_environment from app_settings.pg.password
         psql_common_args = [
             "psql",
             "-h",
@@ -95,9 +113,8 @@ def run_gtfs_etl_pipeline_and_verify(
             "-U",
             app_settings.pg.user,
             "-d",
-            app_settings.pg.database,  # Assuming GTFS is loaded into the main DB
+            app_settings.pg.database,
         ]
-        # run_command now needs app_settings
         run_command(
             psql_common_args + ["-c", "SELECT COUNT(*) FROM gtfs_stops;"],
             app_settings,
