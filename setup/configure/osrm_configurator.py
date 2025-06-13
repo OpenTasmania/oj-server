@@ -302,7 +302,7 @@ def import_pbf_to_postgis_with_osm2pgsql(
 
     log_map_server(
         f"osm2pgsql command: {' '.join(osm2pgsql_cmd)}",
-        "debug",
+        "info",
         logger_to_use,
         app_settings,
     )
