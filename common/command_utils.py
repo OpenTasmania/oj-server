@@ -21,13 +21,23 @@ def log_map_server(
     level: str = "info",
     current_logger: Optional[logging.Logger] = None,
     app_settings: Optional[AppSettings] = None,
-    exc_info: bool = False,  # Add exc_info parameter, default to False
-    # Alternative for exc_info type: exc_info: Any = False, to match logging's flexibility
+    exc_info: bool = False,
 ) -> None:
     """
-    Log a message using the provided logger or a default module logger.
-    Uses symbols from app_settings if provided, otherwise default symbols.
-    Can also log exception information if exc_info is True.
+    Logs messages to a server-specific logger at a defined logging level. It supports different logging levels
+    and an option to include exception information.
+
+    Args:
+        message (str): The log message to be recorded.
+        level (str): The severity level of the log message. Defaults to "info". Common options
+            include "debug", "info", "warning", "error", and "critical".
+        current_logger (Optional[logging.Logger]): A logger instance to use for logging. If not provided,
+            a module-level logger will be used.
+        app_settings (Optional[AppSettings]): Optional application settings that can influence logging behavior.
+        exc_info (bool): Indicator to include exception details in the log. By default, this is set to False.
+
+    Returns:
+        None
     """
     effective_logger = current_logger if current_logger else module_logger
 
@@ -42,13 +52,9 @@ def log_map_server(
             message, exc_info=exc_info
         )  # Pass exc_info here
     elif level == "debug":
-        effective_logger.debug(
-            message, exc_info=exc_info
-        )  # Generally not used for exc_info, but possible
-    else:  # Default to info
-        effective_logger.info(
-            message, exc_info=exc_info
-        )  # Generally not used for exc_info, but possible
+        effective_logger.debug(message, exc_info=exc_info)
+    else:
+        effective_logger.info(message, exc_info=exc_info)
 
 
 def _get_elevated_command_prefix() -> List[str]:
@@ -257,7 +263,7 @@ def run_elevated_command(
     cmd_input: Optional[str] = None,
     current_logger: Optional[logging.Logger] = None,
     cwd: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,  # Added env parameter
+    env: Optional[Dict[str, str]] = None,
 ) -> subprocess.CompletedProcess:
     """
     Executes a command with elevated permissions. This function constructs the necessary
@@ -361,8 +367,8 @@ def elevated_command_exists(
         )
         return True
     except subprocess.CalledProcessError:
-        return False  # Command not found via elevated 'which'
-    except FileNotFoundError:  # sudo or which might be missing
+        return False
+    except FileNotFoundError:
         symbols = (
             app_settings.symbols
             if app_settings and app_settings.symbols
@@ -375,7 +381,7 @@ def elevated_command_exists(
             app_settings,
         )
         return False
-    except Exception as e:  # Other unexpected errors
+    except Exception as e:
         symbols = (
             app_settings.symbols
             if app_settings and app_settings.symbols
@@ -428,7 +434,7 @@ def check_package_installed(
         result = run_command(
             ["dpkg-query", "-W", "-f='${Status}'", package_name],
             app_settings,
-            check=False,  # dpkg-query returns non-zero if package not found
+            check=False,
             capture_output=True,
             text=True,
             current_logger=logger_to_use,
@@ -436,7 +442,7 @@ def check_package_installed(
         return (
             result.returncode == 0 and "install ok installed" in result.stdout
         )
-    except FileNotFoundError:  # If dpkg-query itself is not found
+    except FileNotFoundError:
         log_map_server(
             f"{symbols.get('error', '❌')} dpkg-query command not found. Cannot check package '{package_name}'.",
             "error",
@@ -444,7 +450,7 @@ def check_package_installed(
             app_settings,
         )
         return False
-    except Exception as e:  # Other unexpected errors
+    except Exception as e:
         log_map_server(
             f"{symbols.get('error', '❌')} Error checking if package '{package_name}' is installed: {e}",
             "error",
