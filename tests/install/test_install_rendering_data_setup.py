@@ -33,7 +33,7 @@ def test_rendering_data_setup_sequence_runs_correct_steps(
     mock_default_app_settings, monkeypatch, caplog
 ):
     """
-    Tests that running the installer with '--rendering-setup' executes
+    Tests that running the installer with '--rendering-prep' executes
     the expected steps related to rendering data setup and
     marks the steps as complete.
     """
@@ -101,13 +101,13 @@ def test_rendering_data_setup_sequence_runs_correct_steps(
     # Reset the pbf_path_holder to ensure it's empty before the test
     pbf_path_holder["path"] = None
 
-    # 4. Execute the installer with the --rendering-setup flag
-    cli_args = ["--rendering-setup"]
+    # 4. Execute the installer with the --rendering-prep flag
+    cli_args = ["--rendering-prep"]
     exit_code = main_map_server_entry(cli_args)
 
     # 5. Assertions
     assert exit_code == 0, (
-        f"Installer exited with {exit_code} instead of 0 for --rendering-setup"
+        f"Installer exited with {exit_code} instead of 0 for --rendering-prep"
     )
 
     # Verify that main_installer's initial setup functions were called
@@ -216,13 +216,13 @@ def test_rendering_data_setup_sequence_reuses_existing_pbf(
     # Set the pbf_path_holder to simulate an existing PBF file
     pbf_path_holder["path"] = "/path/to/existing.pbf"
 
-    # 4. Execute the installer with the --rendering-setup flag
-    cli_args = ["--rendering-setup"]
+    # 4. Execute the installer with the --rendering-prep flag
+    cli_args = ["--rendering-prep"]
     exit_code = main_map_server_entry(cli_args)
 
     # 5. Assertions
     assert exit_code == 0, (
-        f"Installer exited with {exit_code} instead of 0 for --rendering-setup"
+        f"Installer exited with {exit_code} instead of 0 for --rendering-prep"
     )
 
     # Verify that download_base_pbf was NOT called
@@ -321,13 +321,13 @@ def test_rendering_data_setup_sequence_handles_import_failure(
     # Reset the pbf_path_holder to ensure it's empty before the test
     pbf_path_holder["path"] = None
 
-    # 4. Execute the installer with the --rendering-setup flag
-    cli_args = ["--rendering-setup"]
+    # 4. Execute the installer with the --rendering-prep flag
+    cli_args = ["--rendering-prep"]
     exit_code = main_map_server_entry(cli_args)
 
     # 5. Assertions
     assert exit_code == 1, (
-        f"Installer exited with {exit_code} instead of 1 for --rendering-setup with import failure"
+        f"Installer exited with {exit_code} instead of 1 for --rendering-prep with import failure"
     )
 
     # Verify that download_base_pbf was called
