@@ -1,0 +1,9 @@
+--- /dev/fd/63	2025-06-14 09:37:53.927576344 +1000
++++ openstreetmap-carto-flex.lua	2025-06-14 09:37:22.519370384 +1000
+@@ -1,4 +1,5 @@
+-
++-- Source:
++-- https://raw.githubusercontent.com/gravitystorm/openstreetmap-carto/refs/heads/master/openstreetmap-carto-flex.lua
+ -- This is the osm2pgsql configuration for the OpenStreetMap Carto map style
+ -- using the osm2pgsql flex output.
+ 
