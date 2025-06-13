@@ -11,7 +11,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from common.command_utils import (
     command_exists,
@@ -249,8 +249,6 @@ def fetch_carto_external_data(
         static_config.OSM_PROJECT_ROOT
         / "external/openstreetmap-carto/scripts/get-external-data.py"
     )
-    # noinspection PyUnusedLocal
-    script_to_run_cmd: List[str] = []  # pylint: disable=unused-variable
 
     if custom_script_path.is_file():
         log_map_server(
@@ -285,7 +283,6 @@ def fetch_carto_external_data(
                 logger_to_use,
                 app_settings,
             )
-            # This is a significant issue, so re-raise to halt the Carto setup for this step.
             raise FileNotFoundError(
                 "get-external-data.py script not found at custom or default paths."
             )
@@ -293,10 +290,21 @@ def fetch_carto_external_data(
     try:
         os.chdir(OSM_CARTO_BASE_DIR)
         if script_to_run_cmd:
-            # Run command as current user (who now owns the directory)
-            # run_command expects app_settings
+            pg_credentials = [
+                "--database",
+                app_settings.pg.database,
+                "--host",
+                app_settings.pg.host,
+                "--port",
+                str(app_settings.pg.port),
+                "--username",
+                app_settings.pg.user,
+                "--password",
+                app_settings.pg.password,
+            ]
+
             run_command(
-                script_to_run_cmd,
+                script_to_run_cmd + pg_credentials,
                 app_settings,
                 current_logger=logger_to_use,
                 check=True,
@@ -307,7 +315,6 @@ def fetch_carto_external_data(
                 logger_to_use,
                 app_settings,
             )
-        # else case handled by prior raise if script_to_run_cmd is empty
     except Exception as e:
         log_map_server(
             f"{symbols.get('error', '❌')} Error during external data fetching for Carto: {e}",
@@ -315,7 +322,6 @@ def fetch_carto_external_data(
             logger_to_use,
             app_settings,
         )
-        raise  # Re-raise to signal failure
+        raise
     finally:
         os.chdir(original_cwd)
-        # Ownership reversion will be handled by a finalize step in carto_configurator.py
