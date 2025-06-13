@@ -1819,6 +1819,8 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                     "tag": task_tag,
                     "desc": task_desc,
                     "func": step_func,
+                    "cli_flag": f"--{arg_dest_name.replace('_', '-')}",
+                    "group_cli_flag": None,
                 })
     if parsed_cli_args.run_all_core_prerequisites and not any(
         t["tag"] == ALL_CORE_PREREQUISITES_GROUP_TAG for t in tasks_to_run
@@ -1826,7 +1828,16 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         action_taken = True
         tag, desc = cli_flag_to_task_details["run_all_core_prerequisites"]
         func = defined_tasks_callable_map["run_all_core_prerequisites"]
-        tasks_to_run.insert(0, {"tag": tag, "desc": desc, "func": func})
+        tasks_to_run.insert(
+            0,
+            {
+                "tag": tag,
+                "desc": desc,
+                "func": func,
+                "cli_flag": "--prereqs",
+                "group_cli_flag": None,
+            },
+        )
     if tasks_to_run:
 
         def get_sort_key(task_item: Dict[str, Any]) -> Tuple[int, int]:
@@ -1863,6 +1874,8 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 APP_CONFIG,
                 logger,
                 cli_prompt_for_rerun,
+                cli_flag=task.get("cli_flag"),
+                group_cli_flag=task.get("group_cli_flag"),
             ):
                 overall_success = False
     elif parsed_cli_args.full:
@@ -1960,6 +1973,8 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 APP_CONFIG,
                 logger,
                 cli_prompt_for_rerun,
+                cli_flag=None,
+                group_cli_flag="--full",
             ):
                 overall_success = False
                 log_map_server(

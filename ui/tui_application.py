@@ -31,7 +31,56 @@ module_logger = logging.getLogger(__name__)
 
 
 class InstallerTUI:
-    """Main class for the Installer Text User Interface."""
+    """
+    A text-based user interface (TUI) for managing server installation tasks.
+
+    This class provides a TUI for organizing and executing a sequence of tasks
+    related to server installation. It integrates task management, log display,
+    configuration viewing, and management state utilities within an interactive
+    UI, allowing users to view progress and manage workflows in real time. It
+    leverages the `urwid` library for rendering console-based user interfaces and
+    also interacts with application settings through the `AppSettings` instance
+    passed to it. The class also facilitates multi-threaded task execution and
+    handles log integration for improved error tracking and debugging.
+
+    Attributes:
+        defined_tasks: A list of tasks, where each task is a tuple containing
+            a tag, description, and a callable step function.
+        app_settings: The application settings instance, providing configuration
+            and shared parameters.
+        tui_log_handler: Optional `TuiLogHandler` instance for logging integration
+            in the TUI.
+        task_queue: A queue of tasks to be executed by the TUI.
+        is_task_running: Flag indicating whether a task is currently being
+            executed.
+        current_task_info: Contains details of the currently executing task, if
+            available.
+        _active_worker_thread: Internal reference to the current worker thread for
+            task execution.
+        _dialog_event: Internal thread synchronization event for managing dialog
+            prompts.
+        _dialog_prompt_message: Stores the message to display in dialog prompts.
+        _dialog_result: Stores the result of dialog interactions (e.g., `bool`).
+        _original_root_logger_level: Original logging level of the root logger,
+            used for restoring logger state.
+        _root_logger_level_modified_by_tui: Indicates whether the logger's state
+            was modified by the TUI.
+        _original_root_handlers: List of original root logger handlers prior to
+            modification by the TUI.
+        _removed_handlers_by_tui: List of handlers removed by the TUI for log
+            redirection purposes.
+        header: UI header displaying the title of the TUI.
+        footer_text: Text widget for the footer, containing help and navigation
+            information.
+        footer: UI footer providing navigation instructions and context.
+        log_display: Log display area within the TUI, where messages are shown.
+        main_menu_listbox: List box widget rendering the main menu options.
+        interactive_pane_placeholder: Placeholder widget for dynamically updating
+            interactive panes.
+        columns_view: Layout defining two-column UI layout (controls and logs).
+        frame: Main frame layout of the TUI, combining header, controls, and logs.
+        main_loop: Main loop managing user input and UI rendering.
+    """
 
     def __init__(
         self,
@@ -702,25 +751,24 @@ if __name__ == "__main__":  # pragma: no cover
 
     _original_real_execute_step_tui = execute_step  # Store original
 
-    # Define dummy_execute_step_for_tui_test with corrected parameter names
     def dummy_execute_step_for_tui_test(
-        step_tag: str,  # Was tag
-        step_description: str,  # Was desc
-        step_function: StepFunctionType,  # Was func, StepFunctionType is (AppSettings, Logger|None) -> None
-        app_settings: AppSettings,  # Was app_settings_param
+        step_tag: str,
+        step_description: str,
+        step_function: StepFunctionType,
+        app_settings: AppSettings,
         current_logger_instance: Optional[logging.Logger],
         prompt_user_for_rerun: Callable[  # Was prompt_user_for_rerun_cb
             [str, AppSettings, Optional[logging.Logger]], bool
         ],
+        cli_flag: Optional[str] = None,
+        group_cli_flag: Optional[str] = None,
     ) -> bool:
         effective_logger = current_logger_instance or module_logger
         effective_logger.info(
             f"[DummyTUI Exec] Attempting: {step_description} with app_settings.domain = {app_settings.vm_ip_or_domain}"
         )
         try:
-            step_function(
-                app_settings, effective_logger
-            )  # Use new param names
+            step_function(app_settings, effective_logger)
             effective_logger.info(
                 f"[DummyTUI Exec] Completed: {step_description}"
             )
@@ -729,18 +777,16 @@ if __name__ == "__main__":  # pragma: no cover
             effective_logger.error(
                 f"[DummyTUI Exec] FAILED: {step_description} with {e}"
             )
-            if prompt_user_for_rerun(  # Use new param name
+            if prompt_user_for_rerun(
                 f"'{step_description}' failed. Rerun?",
-                app_settings,  # Use new param name
+                app_settings,
                 effective_logger,
             ):
                 effective_logger.info(
                     f"[DummyTUI Exec] User chose to rerun: {step_description}"
                 )
                 try:
-                    step_function(
-                        app_settings, effective_logger
-                    )  # Use new param names
+                    step_function(app_settings, effective_logger)
                     effective_logger.info(
                         f"[DummyTUI Exec] Re-run OK: {step_description}"
                     )
@@ -756,27 +802,20 @@ if __name__ == "__main__":  # pragma: no cover
                 )
                 return False
 
-    execute_step = dummy_execute_step_for_tui_test  # Line 745 (approx)
+    execute_step = dummy_execute_step_for_tui_test
 
-    _original_view_completed_steps_tui = (
-        view_completed_steps  # Store original
-    )
+    _original_view_completed_steps_tui = view_completed_steps
 
-    # Define dummy_view_completed_steps_for_tui with corrected parameter names
     def dummy_view_completed_steps_for_tui(
-        app_settings: AppSettings,  # Was app_settings_param
-        current_logger: Optional[
-            logging.Logger
-        ] = None,  # Was current_logger_param
+        app_settings: AppSettings,
+        current_logger: Optional[logging.Logger] = None,
     ) -> List[str]:
         (current_logger or module_logger).info(
             f"[Dummy State] Viewing completed steps for config with domain '{app_settings.vm_ip_or_domain}'."
         )
         return ["PREVIOUS_DUMMY_STEP_1", "PREVIOUS_DUMMY_STEP_2"]
 
-    view_completed_steps = (
-        dummy_view_completed_steps_for_tui  # Line 758 (approx)
-    )
+    view_completed_steps = dummy_view_completed_steps_for_tui
 
     try:
         run_tui_installer(
@@ -784,9 +823,7 @@ if __name__ == "__main__":  # pragma: no cover
             app_settings=dummy_app_settings,
         )
     finally:
-        execute_step = _original_real_execute_step_tui  # Restore original
-        view_completed_steps = (
-            _original_view_completed_steps_tui  # Restore original
-        )
+        execute_step = _original_real_execute_step_tui
+        view_completed_steps = _original_view_completed_steps_tui
         has_beta_failed_once_tui_test = False
         print("Standalone TUI test finished.", file=sys.stderr)

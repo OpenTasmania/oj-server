@@ -31,6 +31,8 @@ def execute_step(
     prompt_user_for_rerun: Callable[
         [str, AppSettings, Optional[logging.Logger]], bool
     ],
+    cli_flag: Optional[str] = None,
+    group_cli_flag: Optional[str] = None,
 ) -> bool:
     """
     Execute a single setup step.
@@ -49,6 +51,8 @@ def execute_step(
         current_logger_instance: The logger instance to use.
         prompt_user_for_rerun: Callback for user prompts.
                                Expected signature: (prompt: str, app_settings: AppSettings, logger: Optional[logging.Logger]) -> bool
+        cli_flag: The individual command line flag that triggered this step.
+        group_cli_flag: The group command line flag that triggered this step.
 
     Returns:
         True if the step was successfully executed or if it was skipped.
@@ -94,6 +98,18 @@ def execute_step(
             logger_to_use,
             app_settings,
         )
+        if cli_flag or group_cli_flag:
+            cli_flag_info = f"CLI flag: {cli_flag}" if cli_flag else ""
+            group_flag_info = (
+                f"Group CLI flag: {group_cli_flag}" if group_cli_flag else ""
+            )
+            separator = " | " if cli_flag and group_cli_flag else ""
+            log_map_server(
+                f"   {symbols.get('info', 'ℹ️')} Triggered by: {cli_flag_info}{separator}{group_flag_info}",
+                "info",
+                logger_to_use,
+                app_settings,
+            )
         try:
             step_function(app_settings, logger_to_use)
 
