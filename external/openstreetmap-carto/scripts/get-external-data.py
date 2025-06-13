@@ -759,11 +759,11 @@ def main():
 
         renderuser = opts.renderuser or config["settings"].get("renderuser")
 
-        conn = None  # Initialize conn
+        conn = None
         try:
             with Downloader() as d:
                 conn = psycopg.connect(
-                    database=database,
+                    dbname=database,
                     host=host,
                     port=port,
                     user=user,
