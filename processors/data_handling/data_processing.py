@@ -10,7 +10,7 @@ from typing import (
     List,
     Optional,
     Tuple,
-)  # Added Callable, List, Tuple
+)
 
 from common.command_utils import log_map_server
 from processors.data_handling.raster_processor import raster_tile_prerender
@@ -18,7 +18,7 @@ from processors.plugins.importers.transit.gtfs.orchestrator import (
     process_and_setup_gtfs,
 )
 from setup import (
-    config as static_config,  # Used by main_installer for OSM_PROJECT_ROOT, potentially for tags
+    config as static_config,
 )
 from setup.cli_handler import cli_prompt_for_rerun
 from setup.config_models import AppSettings
@@ -26,7 +26,7 @@ from setup.step_executor import execute_step
 
 module_logger = logging.getLogger(__name__)
 
-# Define tag for GTFS processing if not already globally available via static_config
+
 GTFS_PROCESSING_TAG = getattr(
     static_config,
     "GTFS_PROCESS_AND_SETUP_TAG",
@@ -96,7 +96,6 @@ def data_prep_group(
         """
         process_and_setup_gtfs(app_settings=ac, orchestrator_logger=cl)
 
-    # Type hint the list of step definitions
     step_definitions: List[Tuple[str, str, StepFunctionType]] = [
         (
             GTFS_PROCESSING_TAG,
@@ -110,11 +109,11 @@ def data_prep_group(
         tag,
         desc,
         func_ref,
-    ) in step_definitions:  # func_ref is now StepFunctionType
+    ) in step_definitions:
         if not execute_step(
             tag,
             desc,
-            func_ref,  # This will be correctly typed
+            func_ref,
             app_cfg,
             logger_to_use,
             lambda prompt_msg,

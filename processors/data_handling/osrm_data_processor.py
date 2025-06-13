@@ -32,7 +32,41 @@ def _run_osrm_container_command_internal(
     step_name: str,
     region_name_log: str,
 ) -> bool:
-    """Helper to run OSRM tools via configured container runtime."""
+    """
+    Executes a container-based OSRM (Open Source Routing Machine) command using specified
+    arguments and configuration settings. The function provides detailed logging during
+    execution and handles potential exceptions. It also supports mounting host directories
+    to the container for data processing.
+
+    Arguments:
+        command_args: List[str]
+            Command line arguments to pass to the container.
+        app_settings: AppSettings
+            Application settings object containing container runtime configuration and other settings.
+        region_osrm_data_dir_host: str
+            Host directory path containing OSRM data to be mounted into the container.
+        pbf_host_path_for_mount: Optional[str]
+            Host directory path containing PBF data to be mounted into the container.
+        pbf_filename_in_container_mount: Optional[str]
+            Filename of the PBF file in the container mount directory.
+        current_logger: Optional[logging.Logger]
+            Logger object to be used for logging. Defaults to module-level logger if None.
+        step_name: str
+            Name of the process step for logging purposes.
+        region_name_log: str
+            Name of the region being processed, used for logging.
+
+    Returns:
+        bool
+            Returns True if the OSRM container command is executed successfully without errors;
+            otherwise, returns False.
+
+    Raises:
+        subprocess.CalledProcessError
+            If the container command execution fails with a non-zero exit code.
+        Exception
+            For any other unforeseen runtime exceptions during the command execution.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     container_cmd = app_settings.container_runtime_command
@@ -120,6 +154,27 @@ def extract_regional_pbfs_with_osmium(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> Dict[str, str]:
+    """
+    Extract regional PBF files using Osmium from a base PBF file and specified GeoJSON boundaries.
+
+    This function processes a given base PBF file and a directory of GeoJSON boundary files
+    to create region-specific PBF files using the Osmium tool. It extracts regions defined
+    in the GeoJSON boundaries and saves the extracted PBF files in the same directory as
+    the corresponding GeoJSON file. The function also logs various stages of the process
+    and handles scenarios where the required files or directories are missing.
+
+    Arguments:
+        base_pbf_full_path: str
+            The filesystem path to the base PBF file to extract regions from.
+        app_settings: AppSettings
+            Application settings object containing configurations like symbols and directory paths.
+        current_logger: Optional[logging.Logger], optional
+            Logger instance to use for logging messages. Defaults to a module-level logger.
+
+    Returns:
+        Dict[str, str]
+            A dictionary mapping unique region keys to the filesystem paths of the extracted PBF files.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     osrm_data_cfg = app_settings.osrm_data
@@ -241,6 +296,27 @@ def build_osrm_graphs_for_region(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> bool:
+    """
+    Builds OSRM graphs for a specified region based on a regional PBF file.
+
+    This function orchestrates the processing pipeline for generating OSRM routing graphs
+    for a given region. The process includes verifying the availability of the regional
+    PBF file, executing OSRM processing commands such as `osrm-extract`, `osrm-partition`,
+    and `osrm-customize`, and finally storing the processed data in a designated directory.
+    Temporary directories are used for intermediate steps, and appropriate permissions
+    are managed when files are processed within Docker containers. Results are logged
+    throughout the operation, and error handling ensures that any failures are logged
+    and the operation is aborted when necessary.
+
+    Args:
+        region_name_key (str): Unique identifier for the region to be processed.
+        regional_pbf_host_path (str): File path to the regional PBF file used for routing data.
+        app_settings (AppSettings): Settings object containing configuration parameters.
+        current_logger (Optional[logging.Logger]): Logger to log messages; defaults to a module-specific logger if not provided.
+
+    Returns:
+        bool: True if OSRM graph building completed successfully, else False.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     osrm_data_cfg = app_settings.osrm_data
