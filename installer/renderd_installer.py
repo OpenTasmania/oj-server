@@ -22,24 +22,29 @@ from setup.config_models import AppSettings  # For type hinting
 
 module_logger = logging.getLogger(__name__)
 
-# RENDERD_USER and RENDERD_GROUP are system-level, usually static
-RENDERD_SYSTEM_USER = (
-    "www-data"  # User renderd runs as (often www-data for Apache integration)
-)
+RENDERD_SYSTEM_USER = "www-data"
 RENDERD_SYSTEM_GROUP = "www-data"
-# RENDERD_CONF_PATH is where the config file will be, path from static_config or hardcoded
-# The actual path for renderd.conf is defined in configure/renderd_configurator.py
-# and the service file needs to point to it.
-# For the service file template, we can use a placeholder if this path becomes configurable.
-RENDERD_CONF_FILE_SYSTEM_PATH = (
-    "/etc/renderd.conf"  # Standard path for renderd.conf
-)
+RENDERD_CONF_FILE_SYSTEM_PATH = "/etc/renderd.conf"
 
 
 def ensure_renderd_packages_installed(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Confirms Renderd and mapnik-utils packages are installed."""
+    """
+    Ensures that required Renderd and Mapnik-related packages are installed and logs the
+    status of these packages. If any package is missing, an error will be raised, as it
+    indicates a critical issue with the system's prerequisite setup.
+
+    Raises:
+        EnvironmentError: If one or more essential Renderd/Mapnik packages are not installed.
+
+    Args:
+        app_settings (AppSettings): Application settings containing configurations such
+            as logging and symbol mapping.
+        current_logger (Optional[logging.Logger]): A logger instance to use for logging
+            messages. If not provided, a default module-level logger will be used.
+
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -49,7 +54,6 @@ def ensure_renderd_packages_installed(
         app_settings,
     )
 
-    # These package names are fairly static
     packages_to_check = ["renderd", "mapnik-utils"]
     all_found = True
     for pkg in packages_to_check:
@@ -86,7 +90,20 @@ def ensure_renderd_packages_installed(
 def create_renderd_directories(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates necessary directories for Renderd and sets permissions, using paths from app_settings."""
+    """
+    Creates necessary directories for Renderd and sets their ownership and permissions.
+
+    This function ensures that the required directories for Renderd exist, setting appropriate
+    ownership and permissions. If a custom logger is provided, it is used for logging information.
+    Otherwise, a module-level logger is employed. Additionally, it utilizes app-specific settings
+    to manage directory paths and user/group ownership.
+
+    Arguments:
+        app_settings (AppSettings): The application settings object containing Renderd-specific
+            configuration, including directory paths, user, and group information.
+        current_logger (Optional[logging.Logger]): A custom logger to use for logging messages.
+            Defaults to None, in which case the module-level logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -96,7 +113,6 @@ def create_renderd_directories(
         app_settings,
     )
 
-    # Get paths from app_settings.renderd
     tile_cache_dir = str(
         app_settings.renderd.tile_cache_dir
     )  # Ensure string for commands
@@ -134,7 +150,28 @@ def create_renderd_directories(
 def create_renderd_systemd_service_file(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates the systemd service file for Renderd."""
+    """
+    Creates or updates a systemd service file for the renderd daemon.
+
+    This function generates a systemd service file for the renderd application,
+    which is responsible for rendering map tiles. It uses the provided application
+    settings to create the content of the service file, specifically customizing
+    paths and other necessary parameters. The generated file is then written to
+    the appropriate location on the system using elevated privileges. Logging is
+    performed for both success and failure cases to assist with debugging and
+    confirm correct operation.
+
+    Arguments:
+        app_settings (AppSettings): The application settings containing configuration
+            needed to create the service file.
+        current_logger (Optional[logging.Logger], optional): A logger instance for
+            logging during the operation. If not provided, a default module-level
+            logger is used.
+
+    Raises:
+        Exception: Re-raises errors encountered during the creation or update
+            of the service file after logging the failure.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
@@ -153,12 +190,9 @@ def create_renderd_systemd_service_file(
         app_settings,
     )
 
-    renderd_service_path = (
-        "/etc/systemd/system/renderd.service"  # Standard system path
-    )
+    renderd_service_path = "/etc/systemd/system/renderd.service"
 
-    # Template for systemd service file. Could also be moved to config_models.py for full configuration.
-    # For now, key parameters are substituted.
+    # TODO: Work out move to config.models and to the yaml config files
     renderd_service_content_template = f"""[Unit]
 Description=Map tile rendering daemon (renderd)
 Documentation=man:renderd(8)
@@ -180,6 +214,7 @@ SyslogIdentifier=renderd
 WantedBy=multi-user.target
 # File created by script V{{script_hash}}
 """
+    # TODO: Configurable conf file
     # RENDERD_CONF_FILE_SYSTEM_PATH is the static path /etc/renderd.conf
     # where configure/renderd_configurator.py will write the actual config.
     # This path is hardcoded here as it's where systemd expects to find it based on common practice.

@@ -5,10 +5,11 @@ Handles initial setup for OSRM: dependency checks, directory creation,
 PBF download, and region boundary file preparation.
 """
 
-import logging
-import os
-import shutil
+from logging import Logger, getLogger
+from os import getgid, getuid, walk
+from os.path import isfile
 from pathlib import Path
+from shutil import copy2
 from typing import Optional
 
 from common.command_utils import (
@@ -18,15 +19,16 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
+from common.file_utils import ensure_directory_owned_by_current_user
 from common.json_utils import JsonFileType, check_json_file
-from setup import config as static_config  # For OSM_PROJECT_ROOT
+from setup import config as static_config
 from setup.config_models import AppSettings
 
-module_logger = logging.getLogger(__name__)
+module_logger = getLogger(__name__)
 
 
 def ensure_osrm_dependencies(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> None:
     """Ensures configured container runtime and Osmium (via osmium-tool) are available."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -93,7 +95,7 @@ def ensure_osrm_dependencies(
 
 
 def setup_osrm_data_directories(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> None:
     """Creates base directories for OSRM source data and processed files from app_settings."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -111,8 +113,8 @@ def setup_osrm_data_directories(
     osm_data_regions_dir = str(Path(osm_data_base_dir) / "regions")
     osrm_base_processed_dir = str(osrm_data_cfg.processed_dir)
 
-    current_uid_str = str(os.getuid())
-    current_gid_str = str(os.getgid())
+    current_uid_str = str(getuid())
+    current_gid_str = str(getgid())
 
     dirs_to_create = [
         osm_data_base_dir,
@@ -153,7 +155,7 @@ def setup_osrm_data_directories(
 
 
 def download_base_pbf(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> str:
     """Downloads the base PBF file using URLs and paths from app_settings.osrm_data."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -162,7 +164,16 @@ def download_base_pbf(
 
     pbf_download_url = str(osrm_data_cfg.base_pbf_url)
     pbf_filename = osrm_data_cfg.base_pbf_filename
-    pbf_full_path = str(Path(osrm_data_cfg.base_dir) / pbf_filename)
+    base_dir_path = Path(osrm_data_cfg.base_dir)
+    pbf_full_path = str(base_dir_path / pbf_filename)
+
+    ensure_directory_owned_by_current_user(
+        dir_path=base_dir_path,
+        make_directory=True,
+        world_access=False,
+        app_settings=app_settings,
+        current_logger=logger_to_use,
+    )
 
     log_map_server(
         f"{symbols.get('step', '➡️')} Managing base PBF file: {pbf_filename}...",
@@ -171,17 +182,18 @@ def download_base_pbf(
         app_settings,
     )
 
-    if not os.path.isfile(pbf_full_path):
+    if not isfile(pbf_full_path):
         log_map_server(
-            f"{symbols.get('info', 'ℹ️')} Downloading {pbf_filename} from {pbf_download_url} to {osrm_data_cfg.base_dir}...",
+            f"{symbols.get('info', 'ℹ️')} Downloading {pbf_filename} from {pbf_download_url} to {base_dir_path}...",
             "info",
             logger_to_use,
             app_settings,
         )
+        # This command runs as the current user, who now owns the directory
         run_command(
             ["wget", pbf_download_url, "-O", pbf_full_path],
             app_settings,
-            cwd=str(osrm_data_cfg.base_dir),
+            cwd=str(base_dir_path),
             current_logger=logger_to_use,
         )
         log_map_server(
@@ -198,7 +210,7 @@ def download_base_pbf(
             app_settings,
         )
 
-    if not os.path.isfile(pbf_full_path):
+    if not isfile(pbf_full_path):
         raise FileNotFoundError(
             f"Base PBF file {pbf_full_path} not found after download attempt."
         )
@@ -206,7 +218,7 @@ def download_base_pbf(
 
 
 def prepare_region_boundaries(
-    app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
+    app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> None:
     """Copies GeoJSON region boundary files from project assets to OSRM data regions directory."""
     logger_to_use = current_logger if current_logger else module_logger
@@ -238,10 +250,10 @@ def prepare_region_boundaries(
 
     copied_files_count = 0
     malformed_files = []
-    current_uid_str = str(os.getuid())
-    current_gid_str = str(os.getgid())
+    current_uid_str = str(getuid())
+    current_gid_str = str(getgid())
 
-    for root, _, files in os.walk(assets_source_regions_dir):
+    for root, _, files in walk(assets_source_regions_dir):
         source_root_path = Path(root)
         relative_path = source_root_path.relative_to(
             assets_source_regions_dir
@@ -258,7 +270,7 @@ def prepare_region_boundaries(
             if json_status == JsonFileType.VALID_JSON:
                 target_file = target_current_dir / file_name
                 try:
-                    shutil.copy2(source_file, target_file)
+                    copy2(source_file, target_file)
                     run_elevated_command(
                         [
                             "chown",

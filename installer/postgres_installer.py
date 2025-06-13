@@ -10,7 +10,7 @@ from typing import Optional
 
 from common.command_utils import check_package_installed, log_map_server
 from setup import (
-    config,  # For SYMBOLS and package list reference (config.POSTGRES_PACKAGES)
+    config,
 )
 from setup.config_models import AppSettings
 
@@ -18,12 +18,25 @@ module_logger = logging.getLogger(__name__)
 
 
 def ensure_postgres_packages_are_installed(
-    app_settings: AppSettings,  # Added app_settings parameter
+    app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
-    Confirms that PostgreSQL packages (expected to be installed by a core
-    prerequisite step) are present.
+    Ensures that all required PostgreSQL packages listed in the configuration are installed.
+    This function checks the installation status of required PostgreSQL packages specified
+    in the configuration file. It uses a logger to report the status of each package, either
+    as installed or missing. If any package is missing, an error is raised. If no packages
+    are listed in the configuration, a warning is logged and the function exits without
+    performing further actions.
+
+    Args:
+        app_settings: The application settings object containing the necessary configuration
+            for package installation checks.
+        current_logger: An optional logger instance to be used for logging messages. If not
+            provided, the module-level logger is used instead.
+
+    Raises:
+        EnvironmentError: Raised if one or more required PostgreSQL packages are not installed.
     """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
@@ -39,6 +52,7 @@ def ensure_postgres_packages_are_installed(
             "warning",
             logger_to_use,
         )
+        # TODO: Decide if to error or pass
         # Depending on desired behavior, this could be an error or just a pass.
         # For now, we assume if it's empty, it's intentional.
         return
@@ -49,7 +63,7 @@ def ensure_postgres_packages_are_installed(
         ):  # Pass app_settings
             log_map_server(
                 f"{config.SYMBOLS['success']} Package '{pkg}' is installed.",
-                "debug",  # More verbose, success is for the overall step
+                "debug",
                 logger_to_use,
             )
         else:
@@ -72,7 +86,3 @@ def ensure_postgres_packages_are_installed(
             "success",
             logger_to_use,
         )
-
-
-# If there were other setup-specific actions before configuration, they'd go here.
-# For PostgreSQL, most actions are configuration after the package install.

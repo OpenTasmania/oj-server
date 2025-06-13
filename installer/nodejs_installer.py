@@ -20,6 +20,24 @@ module_logger = logging.getLogger(__name__)
 def install_nodejs_lts(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Install Node.js LTS using the NodeSource Node.js Binary Distributions.
+
+    This function automates the setup and installation of the Long Term Support (LTS)
+    version of Node.js by downloading and executing the NodeSource setup script. It
+    subsequently installs Node.js using the system's package manager and logs the
+    progress and results.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application-specific
+            settings, including symbols for progress logging and Node.js setup parameters.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        Exception: Propagates any exception encountered during the Node.js installation
+            process.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -29,7 +47,6 @@ def install_nodejs_lts(
         app_settings,
     )
     try:
-        # NodeSource setup URL - could be made configurable in AppSettings.nodejs if different versions needed
         nodesource_version_setup = getattr(
             app_settings, "nodejs_version_setup_script", "setup_lts.x"
         )

@@ -16,7 +16,7 @@ from common.command_utils import (
     run_elevated_command,
 )
 from common.system_utils import (
-    get_debian_codename,  # Ensure this is refactored
+    get_debian_codename,
 )
 from setup.config_models import AppSettings
 
@@ -26,6 +26,37 @@ module_logger = logging.getLogger(__name__)
 def install_docker_engine(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Sets up Docker Engine and its associated components on a Debian-based Linux system.
+
+    This function configures the system to enable Docker installation by performing
+    the following:
+    - Downloads and installs the GPG key for Docker from Docker's official source.
+    - Configures the Docker apt source for the appropriate system architecture and
+      Debian codename.
+    - Updates the package index and installs required Docker packages including
+      `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, and
+      `docker-compose-plugin`.
+    - Adds the current user to the 'docker' group for Docker CLI access without
+      needing elevated privileges.
+
+    Exception handling is provided for every critical step, logging errors as they
+    occur to assist debugging and provide feedback to the user.
+
+    Parameters:
+        app_settings (AppSettings): An object containing application-level
+            configuration, including logging and system-level utilities.
+        current_logger (Optional[logging.Logger]): An optional logger instance. If
+            not provided, a module-level logger is used.
+
+    Raises:
+        Exception: Raised for failures in any intermediate steps needed to configure
+            and install Docker Engine. This includes missing system configurations
+            or execution errors during critical commands.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(

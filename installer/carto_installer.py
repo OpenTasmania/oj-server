@@ -28,14 +28,31 @@ from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
 
-# OSM_CARTO_BASE_DIR is a static path, keep as module constant or from static_config
+
 OSM_CARTO_BASE_DIR = "/opt/openstreetmap-carto"
 
 
 def install_carto_cli(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Installs the CartoCSS compiler (carto) globally via npm."""
+    """
+    Installs the CartoCSS compiler (carto CLI) using npm and handles the required
+    dependencies and processes to ensure successful installation. Logs the
+    progress, success, or failure details.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application
+            settings needed during the installation process.
+        current_logger (Optional[logging.Logger], optional): Logger instance to be
+            used for logging the operations. If not provided, the default module
+            logger is used.
+
+    Raises:
+        EnvironmentError: Raised when npm (Node Package Manager) is not found in
+            the system environment.
+        Exception: Propagates any failure during the installation process and logs
+            the issue for debugging/alerting purposes.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -93,7 +110,25 @@ def install_carto_cli(
 def setup_osm_carto_repository(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Clones or confirms existence of the OpenStreetMap-Carto git repository."""
+    """
+    Sets up the OpenStreetMap-Carto repository by either cloning it from a remote
+    repository or verifying the repository's existence at a predefined location.
+
+    This function ensures that the OpenStreetMap-Carto repository is properly set
+    up in the specified directory. If the directory does not exist, it clones
+    the repository; otherwise, it logs that the directory already exists.
+
+    Arguments:
+        app_settings: AppSettings
+            The application settings containing configurations used for the
+            setup process.
+        current_logger: Optional[logging.Logger]
+            The logger to use for logging messages. If none is provided, a
+            module-level default logger will be used.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -147,14 +182,31 @@ def setup_osm_carto_repository(
 def prepare_carto_directory_for_processing(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Temporarily changes ownership of the Carto directory to the current user for script execution."""
+    """
+    Prepares the Carto directory for processing by temporarily changing its ownership
+    to the current user and group to allow script execution.
+
+    Parameters
+    ----------
+    app_settings : AppSettings
+        The application settings that include configuration details such as symbols
+        for logging and other application-specific preferences.
+    current_logger : Optional[logging.Logger], optional
+        A logger instance to be used for logging messages during the execution.
+        If not provided, a default module logger will be used.
+
+    Raises
+    ------
+    KeyError
+        If the group ID cannot be resolved to a group name.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     current_user = getpass.getuser()
     try:
         current_group_info = grp.getgrgid(os.getgid())
         current_group_name = current_group_info.gr_name
-    except KeyError:  # Fallback if group name can't be found
+    except KeyError:
         current_group_name = str(os.getgid())
 
     log_map_server(

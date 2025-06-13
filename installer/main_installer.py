@@ -12,7 +12,7 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-import yaml  # Added for YAML output
+import yaml
 
 from common.command_utils import log_map_server
 from common.core_utils import setup_logging as common_setup_logging
@@ -144,6 +144,7 @@ logger = logging.getLogger(__name__)
 APP_CONFIG: Optional[AppSettings] = None
 
 StepExecutorFunc = Callable[[AppSettings, Optional[logging.Logger]], None]
+pbf_path_holder: Dict[str, Optional[str]] = {"path": None}
 
 PREREQ_BOOT_VERBOSITY_TAG = "PREREQ_BOOT_VERBOSITY_TAG"
 PREREQ_CORE_CONFLICTS_TAG = "PREREQ_CORE_CONFLICTS_TAG"
@@ -221,6 +222,7 @@ WEBSITE_CONTENT_DEPLOY_TAG = "WEBSITE_CONTENT_DEPLOY"
 SYSTEMD_RELOAD_TASK_TAG = "SYSTEMD_RELOAD_TASK"
 OSM_PBF_DOWNLOAD_TAG = "OSM_PBF_DOWNLOAD"
 DATAPROC_OSM2PGSQL_IMPORT_TAG = "DATAPROC_OSM2PGSQL_IMPORT"
+RENDERING_DATA_SETUP = "RENDERING_DATA_SETUP"
 
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {
@@ -269,6 +271,13 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
             CONFIG_CARTO_DEPLOY_XML,
             CONFIG_CARTO_FINALIZE_DIR,
             CONFIG_SYSTEM_FONT_CACHE,
+        ],
+    },
+    {
+        "name": "Rendering Data Setup",
+        "steps": [
+            OSM_PBF_DOWNLOAD_TAG,
+            DATAPROC_OSM2PGSQL_IMPORT_TAG,
         ],
     },
     {
@@ -346,7 +355,6 @@ group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
     for index, group_info in enumerate(INSTALLATION_GROUPS_ORDER)
 }
-pbf_path_holder: Dict[str, Optional[str]] = {"path": None}
 
 
 def _download_pbf_wrapper(
@@ -796,6 +804,77 @@ def pg_tileserv_full_setup_sequence(
     )
 
 
+def rendering_data_setup_sequence(
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> None:
+    """
+    Orchestrates the setup of data for map rendering.
+    This sequence handles downloading the PBF file and importing it to PostGIS.
+    """
+    logger_to_use = current_logger if current_logger else logger
+    log_map_server(
+        f"--- {app_cfg.symbols.get('step', '➡️')} Rendering Data Setup ---",
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
+    )
+
+    def _download_pbf_step(
+        ac: AppSettings, cl: Optional[logging.Logger]
+    ) -> None:
+        # Check if the PBF path is already set in the module-level pbf_path_holder
+        if pbf_path_holder["path"]:
+            log_map_server(
+                f"Using existing PBF file from previous download: {pbf_path_holder['path']}",
+                level="info",
+                current_logger=cl,
+                app_settings=ac,
+            )
+        else:
+            # Fall back to downloading if not already available
+            pbf_path_holder["path"] = download_base_pbf(ac, cl)
+
+    def _import_pbf_to_postgis_step(
+        ac: AppSettings, cl: Optional[logging.Logger]
+    ) -> None:
+        pbf_path = pbf_path_holder["path"]
+        if not pbf_path:
+            raise RuntimeError(
+                "Base PBF path not set or is invalid for import to PostGIS."
+            )
+        if not import_pbf_to_postgis_with_osm2pgsql(pbf_path, ac, cl):
+            raise RuntimeError(
+                f"Failed to import PBF file {pbf_path} to PostGIS."
+            )
+
+    # Execute the steps in order
+    steps: List[Tuple[str, str, StepExecutorFunc]] = [
+        (
+            OSM_PBF_DOWNLOAD_TAG,
+            "Download Base OpenStreetMap PBF Data",
+            _download_pbf_step,
+        ),
+        (
+            DATAPROC_OSM2PGSQL_IMPORT_TAG,
+            "Import OSM Data into PostGIS (for Rendering)",
+            _import_pbf_to_postgis_step,
+        ),
+    ]
+
+    for tag, desc, func in steps:
+        if not execute_step(
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+        ):
+            raise RuntimeError(f"Rendering data setup step '{desc}' failed.")
+
+    log_map_server(
+        f"--- {app_cfg.symbols.get('success', '✅')} Rendering Data Setup Completed ---",
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
+    )
+
+
 def osrm_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
@@ -823,6 +902,8 @@ def osrm_full_setup_sequence(
         else:
             # Fall back to downloading if not already available
             base_pbf_path_holder["path"] = download_base_pbf(ac, cl)
+            # Store the path in the module-level variable for potential reuse
+            pbf_path_holder["path"] = base_pbf_path_holder["path"]
 
     regional_pbf_map_holder: Dict[str, Dict[str, str]] = {"map": {}}
 
@@ -1437,6 +1518,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         ("nginx", NGINX_FULL_SETUP, "Nginx full setup."),
         ("certbot", CERTBOT_FULL_SETUP, "Certbot full setup."),
         ("pgtileserv", PGTILESERV_FULL_SETUP, "pg_tileserv full setup."),
+        ("rendering_setup", RENDERING_DATA_SETUP, "Rendering data setup."),
         ("osrm", OSRM_FULL_SETUP, "OSRM full setup & data processing."),
         ("gtfs_prep", GTFS_PROCESS_AND_SETUP_TAG, "Full GTFS Pipeline."),
         ("raster_prep", RASTER_PREP_TAG, "Raster tile pre-rendering."),
@@ -1461,6 +1543,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         for key in [
             "ufw",
             "postgres",
+            "rendering-setup",
             "pgtileserv",
             "carto",
             "renderd",
@@ -1498,7 +1581,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     )
     dev_grp = parser.add_argument_group("Developer Options")
     dev_grp.add_argument(
-        "--dev-override-all-settings",
+        "--dev-override",
         action="store_true",
         dest="dev_override_unsafe_password",
         help="Override safety checks for development environments. Allows use of default/unsafe passwords and automatically sets vm_ip_or_domain to the primary IP address if it's set to 'example.com'.",
@@ -1526,7 +1609,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             log_map_server(
                 f"{APP_CONFIG.symbols.get('error', '❌')} vm_ip_or_domain is set to '{VM_IP_OR_DOMAIN_DEFAULT}'. "
                 f"This is unsafe for production use. Please set a proper domain or IP address. \n"
-                f"    To run an installation with this default, use the --dev-override-all-settings flag. \n"
+                f"    To run an installation with this default, use the --dev-override flag. \n"
                 f"    This check is bypassed for non-install actions like --view-config or --status.",
                 "critical",
                 current_logger=logger,
@@ -1542,7 +1625,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             if primary_ip:
                 APP_CONFIG.vm_ip_or_domain = primary_ip
                 log_map_server(
-                    f"{APP_CONFIG.symbols.get('info', 'ℹ️')} vm_ip_or_domain was '{VM_IP_OR_DOMAIN_DEFAULT}' but --dev-override-all-settings "
+                    f"{APP_CONFIG.symbols.get('info', 'ℹ️')} vm_ip_or_domain was '{VM_IP_OR_DOMAIN_DEFAULT}' but --dev-override "
                     f"was specified. Using primary IP address: {primary_ip}",
                     "info",
                     current_logger=logger,
@@ -1685,6 +1768,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "ufw_activate": activate_ufw_service,
         "ufw": ufw_full_setup_sequence,
         "postgres": postgres_full_setup_sequence,
+        "rendering_setup": rendering_data_setup_sequence,
         "carto": carto_full_setup_sequence,
         "renderd": renderd_full_setup_sequence,
         "apache": apache_full_setup_sequence,
@@ -1707,6 +1791,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         ),
         "ufw": (UFW_FULL_SETUP, "UFW Full Setup"),
         "postgres": (POSTGRES_FULL_SETUP, "PostgreSQL Full Setup"),
+        "rendering_setup": (RENDERING_DATA_SETUP, "Rendering Data Setup"),
         "carto": (CARTO_FULL_SETUP, "Carto Full Setup"),
         "renderd": (RENDERD_FULL_SETUP, "Renderd Full Setup"),
         "apache": (APACHE_FULL_SETUP, "Apache Full Setup"),
@@ -1801,14 +1886,9 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 postgres_full_setup_sequence,
             ),
             (
-                OSM_PBF_DOWNLOAD_TAG,
-                "Download Base OpenStreetMap PBF Data",
-                _download_pbf_wrapper,
-            ),
-            (
-                DATAPROC_OSM2PGSQL_IMPORT_TAG,
-                "Import OSM Data into PostGIS (for Rendering)",
-                _import_pbf_to_postgis_wrapper,
+                RENDERING_DATA_SETUP,
+                "Rendering Data Setup",
+                rendering_data_setup_sequence,
             ),
             (
                 PGTILESERV_FULL_SETUP,
