@@ -34,8 +34,27 @@ from psycopg import sql  # Added for safe SQL identifier formatting
 
 
 def database_setup(conn, temp_schema, schema, metadata_table):
+    """
+    Sets up the database by creating a temporary schema and a metadata table.
+    If the schema or table already exists, they will not be duplicated.
+    This function ensures the necessary structures are in place for further operations.
+
+    Arguments:
+        conn: Connection
+            A database connection object used to execute SQL statements.
+        temp_schema: str
+            The name of the temporary schema to create if it does not already exist.
+        schema: str
+            The name of the schema where the metadata table will reside.
+        metadata_table: str
+            The name of the metadata table to create within the specified schema.
+
+    Raises:
+        No specific errors are raised explicitly by this function, but errors from
+        the database such as connection issues or SQL execution errors might propagate.
+
+    """
     with conn.cursor() as cur:
-        # Use sql.Identifier for schema names
         cur.execute(
             sql.SQL("""CREATE SCHEMA IF NOT EXISTS {temp_schema};""").format(
                 temp_schema=sql.Identifier(temp_schema)
@@ -61,15 +80,55 @@ def database_setup(conn, temp_schema, schema, metadata_table):
 
 
 class Table:
+    """
+    Represents a database table and provides utilities for managing it.
+
+    This class allows the user to perform operations such as cleaning temporary tables,
+    fetching the timestamp of the last modification, granting access to a role, indexing
+    tables, and replacing tables within a database schema. It facilitates interaction
+    with the database using SQL commands and ensures that changes are applied and committed
+    appropriately.
+
+    Attributes:
+        _name (str): The name of the table.
+        _conn: The database connection object.
+        _temp_schema (str): The schema in the database associated with temporary tables.
+        _dst_schema (str): The schema in the database where the table resides.
+        _metadata_table (str): The name of the metadata table used for tracking.
+
+    """
+
     def __init__(self, name, conn, temp_schema, schema, metadata_table):
+        """
+        Initializes an instance of the class with the provided parameters and sets up
+        the instance variables for use in further operations.
+
+        Args:
+            name (str): The name associated with the instance.
+            conn: The connection object to interact with the database.
+            temp_schema (str): The name of the temporary schema to be used.
+            schema (str): The destination schema for operations.
+            metadata_table (str): The name of the metadata table to use.
+
+        """
         self._name = name
         self._conn = conn
         self._temp_schema = temp_schema
         self._dst_schema = schema
         self._metadata_table = metadata_table
 
-    # Clean up the temporary schema in preparation for loading
     def clean_temp(self):
+        """
+        Drops a temporary table in the specified schema if it exists.
+
+        This method executes an SQL command to drop a temporary table in a
+        given schema using a database connection. The method commits the
+        transaction after executing the SQL command.
+
+        Raises:
+            Any exceptions that may occur during the execution of the SQL query
+            or committing the transaction.
+        """
         with self._conn.cursor() as cur:
             cur.execute(
                 sql.SQL(
@@ -81,8 +140,17 @@ class Table:
             )
             self._conn.commit()
 
-    # get the last modified date from the metadata table
     def last_modified(self):
+        """
+        Fetches the last modified timestamp for a specific record in the metadata table.
+
+        This method retrieves the last modified timestamp of an entry in the specified
+        metadata table within the given schema. If no entry is found for the specified
+        name, it commits the current transaction and returns None.
+
+        Returns:
+            datetime: The timestamp of the last modification if found, otherwise None.
+        """
         with self._conn.cursor() as cur:
             cur.execute(
                 sql.SQL(
@@ -98,16 +166,24 @@ class Table:
             results = cur.fetchone()
             if results is not None:
                 return results[0]
-            # No commit needed for SELECT typically, but psycopg2 example had it.
-            # In psycopg3, if a transaction was started by this SELECT (it would be, by default),
-            # and nothing else is done, an explicit commit or rollback would clear it.
-            # Given this function only reads, an explicit commit is harmless but often not strictly necessary
-            # if the connection is managed elsewhere or if it's the end of a read-only operation.
-            # However, to maintain closer behavior to the original that had a commit, keeping it is fine.
-            # If no transaction was started (e.g. autocommit=True on connection), it's a no-op.
-            self._conn.commit()  # Or self._conn.rollback() if it's purely read-only and no side-effects are intended.
+
+            self._conn.commit()
+            return None
 
     def grant_access(self, user_role):  # parameter renamed for clarity
+        """
+        Grants SELECT permissions on a specified database schema and table to a user role.
+        This method executes a SQL statement to provide access to the table, defined
+        by the instance, within a temporary schema for the specified user role.
+
+        Args:
+            user_role (str): The name of the database user role to which SELECT
+                permissions are to be granted.
+
+        Raises:
+            psycopg2.Error: If there is an issue executing the SQL command or
+                committing the transaction.
+        """
         with self._conn.cursor() as cur:
             cur.execute(
                 sql.SQL(
@@ -121,8 +197,24 @@ class Table:
             self._conn.commit()
 
     def index(self):
+        """
+        Executes a sequence of SQL operations on a given table within a specified schema to modify
+        its structure and optimize its performance. The operations include disabling autovacuum,
+        dropping an unnecessary column (if it exists), deleting rows with NULL values in a specific
+        column, setting constraints, creating and deleting indices, clustering, and vacuuming the
+        target table.
+
+        Attributes:
+            _conn (psycopg.Connection): The database connection object used to execute SQL queries.
+            _name (str): The name of the target table being modified and optimized.
+            _temp_schema (str): The name of the schema in which the target table resides.
+
+        Raises:
+            psycopg.errors.UndefinedColumn: If the specified column to drop does not exist in the
+            target table, this is caught and logged as a warning.
+
+        """
         with self._conn.cursor() as cur:
-            # Disable autovacuum while manipulating the table, since it'll get clustered towards the end.
             cur.execute(
                 sql.SQL(
                     """ALTER TABLE {temp_schema}.{name} SET ( autovacuum_enabled = FALSE );"""
@@ -132,8 +224,6 @@ class Table:
                 )
             )
 
-            # ogr creates a ogc_fid column we don't need
-            # Add error handling in case column doesn't exist (IF EXISTS) for robustness if needed
             try:
                 cur.execute(
                     sql.SQL(
@@ -148,7 +238,6 @@ class Table:
                     f"Column ogc_fid not found on table {self._temp_schema}.{self._name}, skipping drop."
                 )
 
-            # Null geometries are useless for rendering
             cur.execute(
                 sql.SQL(
                     """DELETE
@@ -168,7 +257,6 @@ class Table:
                 )
             )
 
-            # sorting static tables helps performance and reduces size from the column drop above
             idx_name = self._name + "_order"
 
             cur.execute(
@@ -189,9 +277,8 @@ class Table:
                     temp_schema=sql.Identifier(self._temp_schema),
                     index_identifier=sql.Identifier(idx_name),
                 )
-            )  # CLUSTER uses unquoted index name
+            )
 
-            # The index is created within the temp_schema, so it should be dropped from there.
             cur.execute(
                 sql.SQL(
                     """DROP INDEX {temp_schema}.{index_identifier};"""
@@ -210,8 +297,6 @@ class Table:
                 )
             )
 
-            # Reset autovacuum. The table is static, so this doesn't really
-            # matter since it'll never need a vacuum.
             cur.execute(
                 sql.SQL(
                     """ALTER TABLE {temp_schema}.{name} RESET ( autovacuum_enabled );"""
@@ -222,7 +307,6 @@ class Table:
             )
             self._conn.commit()
 
-        # VACUUM can't be run in transaction, so autocommit needs to be turned on
         old_autocommit = self._conn.autocommit
         try:
             self._conn.autocommit = True
@@ -239,11 +323,18 @@ class Table:
             self._conn.autocommit = old_autocommit
 
     def replace(self, new_last_modified):
-        with self._conn.cursor() as cur:
-            # Explicit BEGIN is not strictly necessary in psycopg3 if this is the start of a transaction block,
-            # as a transaction will be started implicitly. However, it doesn't harm.
-            # cur.execute(sql.SQL('''BEGIN;''')) # Optional
+        """
+        Replaces an existing table by moving a temporary table to the destination schema.
+        Updates or inserts metadata information of the replaced table in a metadata table.
 
+        Args:
+            new_last_modified (str): A string representing the new last modified timestamp
+                for the replaced table.
+
+        Raises:
+            psycopg2.DatabaseError: If there are issues executing the SQL commands.
+        """
+        with self._conn.cursor() as cur:
             cur.execute(
                 sql.SQL("""DROP TABLE IF EXISTS {schema}.{name};""").format(
                     name=sql.Identifier(self._name),
@@ -260,7 +351,6 @@ class Table:
                 )
             )
 
-            # We checked if the metadata table had this table way up above
             cur.execute(
                 sql.SQL(
                     """SELECT 1
@@ -301,24 +391,101 @@ class Table:
 
 
 class Downloader:
+    """
+    Downloader class is responsible for HTTP file downloads and local caching.
+
+    Provides functionality for fetching remote resources while optionally caching
+    files locally. Supports HTTP headers like 'If-Modified-Since' to optimize
+    requests by avoiding re-downloads if a local cached copy is up-to-date. Offers
+    support for handling cached files and metadata and includes cleanup mechanisms.
+
+    Attributes:
+        session: An instance of requests.Session, initialized with custom headers
+                 for User-Agent to identify downloader usage.
+
+    Methods:
+        __enter__: Manages initialization for context manager support.
+        __exit__: Closes the session when exiting the context.
+        _download: Handles downloading resources from either HTTP or local file
+                   sources. Headers can be provided for conditional requests.
+        download: Manages downloading with caching logic, supporting options such
+                  as forced updates, cache usage, and deletion of outdated cache.
+    """
+
     def __init__(self):
+        """
+        This class handles initialization of an HTTP session with custom headers
+        to be used for making HTTP requests. It is configured to include a specific
+        User-Agent string in its requests.
+
+        Attributes:
+            session (requests.Session): An instance of the requests.Session class
+            used to manage HTTP session settings and handle requests.
+
+        """
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "get-external-data.py/osm-carto"
         })
 
     def __enter__(self):
+        """
+        Provides the context management setup for the object, enabling support for
+        the `with` statement. This method is invoked automatically when the object
+        is used as the context expression in a `with` block.
+
+        Returns:
+            The object instance itself, to be used as the context manager.
+        """
         return self
 
     def __exit__(self, *args, **kwargs):
+        """
+        Closes the session when exiting a context.
+
+        This method is intended to be used for cleanup purposes when exiting a context
+        manager. It ensures the session associated with the object is properly closed.
+
+        Args:
+            *args: Optional positional arguments provided to the context manager's
+                exit handling.
+            **kwargs: Optional keyword arguments provided to the context manager's
+                exit handling.
+        """
         self.session.close()
 
     def _download(self, url, headers=None):
+        """
+        Downloads content from a given URL or file path. The method distinguishes between
+        file URLs starting with "file://" and other URLs, handling them differently. For
+        file URLs, it reads the content directly from the local file system, optionally
+        checking for modification timestamps. For non-file URLs, the method performs
+        an HTTP GET request using the provided headers.
+
+        Parameters:
+            url (str): The URL or file path to download content from. For local files,
+            the URL should start with "file://".
+            headers (Optional[dict]): Optional headers to be included in the HTTP request.
+            If provided, may include the "If-Modified-Since" header for timestamp-based
+            conditional requests.
+
+        Returns:
+            DownloadResult: A named tuple that contains:
+                - status_code (int): The HTTP status code or equivalent status for local
+                  file operations (e.g., requests.codes.not_modified for unmodified files).
+                - content (bytes): The downloaded content in bytes format.
+                - last_modified (Optional[str]): The last modification timestamp of the
+                  resource, represented as a string. For local files, it reflects the
+                  modification time of the file; for HTTP responses, it corresponds to
+                  the "Last-Modified" header.
+
+        Raises:
+            requests.exceptions.HTTPError: If the HTTP GET request encounters an error
+            (e.g., unreachable URL, failed response).
+        """
         if url.startswith("file://"):
             filename = url[7:]
             if headers and "If-Modified-Since" in headers:
-                # Ensure comparison is between strings or handle types carefully
-                # os.path.getmtime returns float
                 if (
                     str(int(os.path.getmtime(filename)))
                     == headers["If-Modified-Since"]
@@ -341,6 +508,24 @@ class Downloader:
         )
 
     def download(self, url, name, opts, data_dir, table_last_modified):
+        """
+        Downloads a file from a specified URL, implements caching, and manages conditional requests.
+        The function checks for cached versions of the file and updates it only if necessary based on
+        HTTP headers or options provided. It supports cache deletion, conditional GET requests using
+        'If-Modified-Since' headers, and logs the download process.
+
+        Parameters:
+        url (str): The URL of the file to download.
+        name (str): A descriptive name of the file, mainly for logging purposes.
+        opts (Options): An object containing options like no_update, force, cache, and delete_cache.
+        data_dir (str): The local directory path where the file cache is stored.
+        table_last_modified (str | None): Optional HTTP 'Last-Modified' date of the table data for conditional requests.
+
+        Returns:
+        DownloadResult | None: A DownloadResult object containing the status code, file content, and last modified
+        information if the download is successful or cached data is used. Returns None if the download fails
+        or no content is retrieved.
+        """
         filename = os.path.join(
             data_dir, os.path.basename(urlparse(url).path)
         )
@@ -359,7 +544,6 @@ class Downloader:
             lastmod_cache = None
 
         result = None
-        # Variable used to tell if we downloaded something
         download_happened = False
 
         if opts.no_update and (cached_data or table_last_modified):
@@ -368,7 +552,7 @@ class Downloader:
             if opts.force:
                 headers = {}
             else:
-                # Ensure If-Modified-Since is correctly formatted HTTP-date
+                # TODO: Ensure If-Modified-Since is correctly formatted HTTP-date
                 # table_last_modified and lastmod_cache might need parsing/reformatting if not already HTTP-date strings
                 # For simplicity, assuming they are either None or valid HTTP-date strings
                 headers = {
@@ -388,13 +572,10 @@ class Downloader:
                 if opts.cache:
                     with open(filename, "wb") as fp:
                         fp.write(response.content)
-                    # Ensure last_modified is a string before writing
                     if response.last_modified is not None:
                         with open(filename_lastmod, "w") as fp:
                             fp.write(str(response.last_modified))
-                    elif os.path.exists(
-                        filename_lastmod
-                    ):  # if server didn't send one, remove old
+                    elif os.path.exists(filename_lastmod):
                         os.remove(filename_lastmod)
 
                 result = response
@@ -407,16 +588,13 @@ class Downloader:
                             url
                         )
                     )
-                    result = cached_data  # Use cached data as source said not modified
+                    result = cached_data
                 else:
-                    # This case means the server reported 304 based on table_last_modified
-                    # but we don't have a local cache file. The original data is in the table.
                     logging.info(
                         "  Remote data for {} not modified based on table metadata.".format(
                             name
                         )
                     )
-                    # We need a DownloadResult that signifies "not modified" but has the last_modified value
                     result = DownloadResult(
                         status_code=requests.codes.not_modified,
                         last_modified=table_last_modified,
@@ -443,6 +621,15 @@ class Downloader:
 
 
 class DownloadResult:
+    """
+    Represents the result of a download operation.
+
+    This class encapsulates the details of a download operation, including the
+    HTTP status code, the downloaded content (if available), and the last modified
+    timestamp of the resource (if applicable). It provides a structured way to
+    store and access these details.
+    """
+
     def __init__(self, status_code, content=None, last_modified=None):
         self.status_code = status_code
         self.content = content
@@ -575,7 +762,6 @@ def main():
         conn = None  # Initialize conn
         try:
             with Downloader() as d:
-                # Changed psycopg2.connect to psycopg.connect
                 conn = psycopg.connect(
                     database=database,
                     host=host,
@@ -614,10 +800,8 @@ def main():
                         source["url"], name, opts, data_dir, table_lm
                     )
 
-                    # Check if there is need to import
-                    # A download_result.content being None can happen if status_code is 304 (Not Modified)
                     needs_import = True
-                    if download_result is None:  # Download failed critically
+                    if download_result is None:
                         logging.warning(
                             f"  Skipping import for table {name} due to download failure."
                         )
@@ -648,7 +832,6 @@ def main():
                     if not needs_import:
                         continue
 
-                    # Ensure we have content if we decided to import
                     if (
                         download_result.content is None
                         and download_result.status_code == requests.codes.ok
@@ -656,7 +839,7 @@ def main():
                         logging.error(
                             f"  Table {name} needs import, but download content is missing unexpectedly."
                         )
-                        continue  # or raise error
+                        raise
 
                     logging.info(
                         f"  Proceeding with import for table {name}."
@@ -681,8 +864,7 @@ def main():
                         for member in source["archive"]["files"]:
                             zip_file.extract(member, workingdir)
 
-                    # --- ogr2ogr part remains largely the same ---
-                    ogrpg = f"PG:dbname='{database}'"  # Use f-string for clarity, ensure values are quoted if they can have spaces
+                    ogrpg = f"PG:dbname='{database}'"
 
                     if port is not None:
                         ogrpg += f" port='{port}'"
@@ -690,6 +872,7 @@ def main():
                         ogrpg += f" user='{user}'"
                     if host is not None:
                         ogrpg += f" host='{host}'"
+                    # TODO: Fix
                     # Password should be handled carefully, often via PGPASSFILE or service file for security
                     # Including it directly in the connection string is less secure.
                     # The original script did this, so maintaining behavior.
@@ -704,18 +887,16 @@ def main():
                         "ogr2ogr",
                         "-f",
                         "PostgreSQL",
-                        ogrpg,  # Destination datasource name
-                        os.path.join(
-                            workingdir, source["file"]
-                        ),  # Source datasource name
+                        ogrpg,
+                        os.path.join(workingdir, source["file"]),
                         "-lco",
                         "GEOMETRY_NAME=way",
                         "-lco",
-                        "SPATIAL_INDEX=FALSE",  # We create index later
-                        # '-lco', 'EXTRACT_SCHEMA_FROM_LAYER_NAME=YES', # This might conflict with -nln
+                        "SPATIAL_INDEX=FALSE",
+                        # '-lco', 'EXTRACT_SCHEMA_FROM_LAYER_NAME=YES',
                         "-nln",
-                        ogr_target_table,  # Target layer name (schema.table)
-                        "-overwrite",  # Overwrite if the layer exists in temp schema
+                        ogr_target_table,
+                        "-overwrite",
                     ]
 
                     if "ogropts" in source:
@@ -729,7 +910,6 @@ def main():
                     )
 
                     try:
-                        # Capture stderr to a variable to include in logs if needed
                         process = subprocess.run(
                             ogrcommand,
                             capture_output=True,
@@ -740,7 +920,7 @@ def main():
                             logging.debug(
                                 f"ogr2ogr stdout:\n{process.stdout}"
                             )
-                        if process.stderr:  # ogr2ogr often prints informational messages to stderr
+                        if process.stderr:
                             logging.info(f"ogr2ogr stderr:\n{process.stderr}")
                     except subprocess.CalledProcessError as e:
                         logging.critical(
@@ -759,7 +939,6 @@ def main():
                             )
                         if e.stderr:
                             logging.critical("Error was\n{}".format(e.stderr))
-                        # Attempt to clean up the temporary table if ogr2ogr failed mid-way
                         this_table.clean_temp()
                         raise RuntimeError(
                             "ogr2ogr error when loading table {}".format(name)
@@ -771,22 +950,20 @@ def main():
                     if renderuser is not None:
                         this_table.grant_access(renderuser)
 
-                    # Use the last_modified from the downloaded data, not the table (which might be old)
                     this_table.replace(download_result.last_modified)
 
                     shutil.rmtree(workingdir, ignore_errors=True)
-        except psycopg.Error as e:  # Catch psycopg specific errors
+        except psycopg.Error as e:
             logging.error(f"Database error: {e}")
-            logging.error(
-                f"SQL: {e.diag.sqlstate if e.diag else 'N/A'}"
-            )  # More detailed error
+            logging.error(f"SQL: {e.diag.sqlstate if e.diag else 'N/A'}")
             logging.error(
                 f"Message: {e.diag.message_primary if e.diag else 'N/A'}"
             )
+            raise
 
-        except Exception as e:  # Catch other general errors
+        except Exception as e:
             logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-
+            raise
         finally:
             if conn:
                 conn.close()
