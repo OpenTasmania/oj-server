@@ -10,17 +10,25 @@ def get_db_connection(
     db_params: Optional[Dict[str, str]] = None,
 ) -> Optional[psycopg.Connection]:
     """
-    Establish and return a PostgreSQL database connection using Psycopg 3.
-
-    Uses provided `db_params` or falls back to `DEFAULT_DB_PARAMS`
-    defined in this module.
+    Attempts to establish a connection to a PostgreSQL database using the Psycopg
+    client library by constructing a connection string from provided parameters or
+    default values. Handles various scenarios including placeholder password usage,
+    logging database details, and managing connection errors.
 
     Args:
-        db_params: Optional dictionary with database connection parameters
-                   (dbname, user, password, host, port).
+        db_params (Optional[Dict[str, str]]): A dictionary containing database
+        connection parameters such as dbname, user, password, host, and port. If not
+        provided, defaults stored in the DEFAULT_DB_PARAMS are used.
 
     Returns:
-        A psycopg.Connection object if successful, None otherwise.
+        Optional[psycopg.Connection]: A connection object to the PostgreSQL
+        database if the connection is successful, None otherwise.
+
+    Raises:
+        psycopg.OperationalError: Specifically raised by Psycopg when an issue
+        occurs during the connection attempt.
+        psycopg.Error: For any other general errors raised by Psycopg during the
+        connection.
     """
     params_to_use = DEFAULT_DB_PARAMS.copy()
     if db_params:
@@ -48,14 +56,10 @@ def get_db_connection(
             "port"
         ),  # This is typically a string from env/defaults
     }
-    # Filter out any keys that have None values
     conn_kwargs_filtered = {
         k: v for k, v in conn_kwargs.items() if v is not None
     }
 
-    # Construct a DSN connection string
-    # e.g., "dbname=gis user=osmuser host=localhost port=5432 password=xxx"
-    # Values in conn_kwargs_filtered are already strings.
     dsn_parts = [
         f"{key}={value}" for key, value in conn_kwargs_filtered.items()
     ]
@@ -65,10 +69,7 @@ def get_db_connection(
         module_logger.debug(
             f"Attempting to connect to database using Psycopg 3 with DSN: '{conninfo_str}'"
         )
-        # Pass the DSN string to psycopg.connect
         conn = psycopg.connect(conninfo_str)
-        # Extract actual dbname, host, port for logging if possible, from the connection object itself
-        # or from conn_kwargs_filtered as before, as conninfo_str might hide password for logs.
         log_db_details = {
             k: v for k, v in conn_kwargs_filtered.items() if k != "password"
         }
@@ -77,12 +78,12 @@ def get_db_connection(
             f"{log_db_details.get('host', 'N/A')}:{log_db_details.get('port', 'N/A')} using Psycopg 3."
         )
         return conn
-    except psycopg.OperationalError as e:  # More specific Psycopg 3 error
+    except psycopg.OperationalError as e:
         module_logger.error(
             f"Psycopg 3 database connection failed (OperationalError): {e}",
             exc_info=True,
         )
-    except psycopg.Error as e:  # General Psycopg 3 errors
+    except psycopg.Error as e:
         module_logger.error(
             f"Psycopg 3 database connection failed: {e}", exc_info=True
         )

@@ -42,8 +42,32 @@ def setup_logging(
     log_prefix: Optional[str] = None,
 ) -> None:
     """
-    Set up basic logging configuration for the application.
-    (Implementation as previously refactored)
+    Configures logging for an application.
+
+    This function sets up a flexible logging configuration, allowing logging information to be directed to a file, the console,
+    or both. It also supports customization of the log format and optional prefixing of log messages. The function ensures that
+    logging is always configured properly, even when no handlers are explicitly defined. Additionally, it provides safeguards
+    against invalid configurations and will fallback to defaults as necessary.
+
+    Parameters:
+    log_level: int
+        The logging level to configure. Defaults to logging.INFO.
+    log_file: Optional[str]
+        The file path for the log file. If specified, logs will be written to this file. Defaults to None.
+    log_to_console: bool
+        Whether to log to the console (stdout). Defaults to True.
+    log_format_str: Optional[str]
+        A custom log format string. If specified, it will be used for formatting log messages. If left None, a default format
+        will be applied. Defaults to None.
+    log_prefix: Optional[str]
+        An optional string to prefix log messages with. If specified, the prefix is added to the log messages. Defaults to None.
+
+    Raises:
+    Exception
+        If an error occurs while attempting to create a file log handler, a warning is printed to stderr.
+
+    Returns:
+    None
     """
     handlers: List[logging.Handler] = []
     if log_file:
@@ -107,6 +131,3 @@ def setup_logging(
     logger_for_this_message.info(
         f"Logging configured. Level: {logging.getLevelName(log_level)}. Format: '{final_format_str}'"
     )
-
-
-# REMOVE cleanup_directory function from here.

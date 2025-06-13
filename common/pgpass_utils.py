@@ -62,7 +62,7 @@ def setup_pgpass(
             pg_password == PGPASSWORD_DEFAULT and not allow_default_for_dev
         ):  # Check against imported default
             log_map_server(
-                "   Specify a unique password (CLI -W, config.yaml, or PG_PASSWORD ENV) or use --dev-override-all-settings.",
+                "   Specify a unique password (CLI -W, config.yaml, or PG_PASSWORD ENV) or use --dev-override.",
                 "info",
                 logger_to_use,
                 app_settings,

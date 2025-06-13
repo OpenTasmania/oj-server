@@ -22,15 +22,25 @@ class JsonFileType(Enum):
 
 def check_json_file(file_path: Path) -> JsonFileType:
     """
-    Checks if a file is a valid, malformed, or not a JSON file by attempting to parse it.
+    Determines the type of a JSON file by attempting to parse it.
 
-    This function does not rely on the file extension.
+    This function reads a file and checks if it contains valid JSON. It distinguishes
+    between valid JSON, malformed JSON, and files that are not JSON at all, such as
+    binary files or files that cannot be read due to permissions or other errors.
 
-    Args:
-        file_path: The path to the file to check.
+    Parameters:
+    file_path: Path
+        The path to the file to be checked.
 
     Returns:
-        A JsonFileType enum value indicating the status of the file.
+    JsonFileType
+        Returns JsonFileType.VALID_JSON if the file contains valid JSON,
+        JsonFileType.MALFORMED_JSON if the file contains invalid JSON,
+        or JsonFileType.NOT_JSON if the file is not readable, is binary,
+        or is not JSON.
+
+    Raises:
+    None
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -39,5 +49,4 @@ def check_json_file(file_path: Path) -> JsonFileType:
     except json.JSONDecodeError:
         return JsonFileType.MALFORMED_JSON
     except (IOError, OSError, UnicodeDecodeError):
-        # Catches file read errors, permission errors, or if it's a binary file
         return JsonFileType.NOT_JSON

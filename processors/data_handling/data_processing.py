@@ -38,7 +38,6 @@ RASTER_PREP_TAG = getattr(
     "RASTER_PREP",
 )
 
-# Define a type alias for the expected step function signature
 StepFunctionType = Callable[[AppSettings, Optional[logging.Logger]], None]
 
 
@@ -46,8 +45,25 @@ def data_prep_group(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:
     """
-    Run all data preparation steps as a group.
-    Uses app_cfg for all configurations.
+    Executes a series of predefined data preparation steps as a part of the data preparation group.
+
+    This function coordinates the execution of multiple data preparation steps,
+    logging progress and errors as appropriate. It utilizes an application configuration
+    and a logger (if provided) to perform step-wise operations. Each step's execution
+    status will influence whether subsequent steps are executed or the process halts.
+
+    Parameters:
+    app_cfg: AppSettings
+        The application configuration object containing all necessary settings
+        and metadata for the data preparation steps.
+    current_logger: Optional[logging.Logger]
+        An optional logger instance to capture log messages during execution.
+        Defaults to a module-level logger if not provided.
+
+    Returns:
+    bool
+        A boolean indicating the success or failure of the entire data preparation group.
+        True if all steps succeed; False if any step fails.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_cfg.symbols
@@ -59,13 +75,24 @@ def data_prep_group(
     )
     overall_success = True
 
-    # Wrapper for GTFS processing to match execute_step signature
     def _run_gtfs_processing_step(
         ac: AppSettings, cl: Optional[logging.Logger]
     ) -> None:  # Explicit return type
         """
-        Calls the main GTFS processing orchestrator.
-        It relies on `app_settings` (passed as 'ac') for all its configurations.
+        Groups and orchestrates data preparation steps for GTFS processing. This includes
+        initiating necessary processes and ensuring proper setup is completed for GTFS
+        application configuration.
+
+        Parameters:
+        app_cfg (AppSettings): The application configuration required to set up
+            and process GTFS data.
+        current_logger (Optional[logging.Logger]): The logger instance to log
+            the process details or information during the GTFS preparation.
+
+        Returns:
+        bool: Indicates whether the data preparation steps were completed
+            successfully.
+
         """
         process_and_setup_gtfs(app_settings=ac, orchestrator_logger=cl)
 

@@ -261,6 +261,7 @@ def get_debian_codename(
         )
         return None
     except subprocess.CalledProcessError:  # Command failed
+        # TODO: Fix this assumption
         # Error is already logged by run_command if check=True and it raises
         # If check=False, or if run_command itself handles and logs, then this might be redundant or not hit.
         # Assuming run_command with check=True re-raises CalledProcessError
@@ -280,10 +281,27 @@ def calculate_threads(
     app_settings: Optional[AppSettings],
     current_logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
+    """
+    Calculates the number of threads to be used based on app settings and system CPU
+    information. The function retrieves the CPU core and socket information using the
+    'lscpu' command, applies a configurable multiplier, and returns a string representing
+    the number of threads. It also logs relevant messages using the provided or default
+    logger.
+
+    Parameters:
+        app_settings (Optional[AppSettings]): The application settings object. It must
+            contain symbols for feedback messages and a valid renderd configuration object
+            to perform calculations.
+        current_logger (Optional[logging.Logger]): Logger instance to be used for logging
+            messages. If not provided, a module-level default logger is used.
+
+    Returns:
+        Optional[str]: The calculated number of threads as a string, or None if the
+            calculations fail or necessary configurations are unavailable.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols_to_use = SYMBOLS_DEFAULT
     num_threads_str = "0"
-    # Ensure app_settings and renderd are accessible
     if (
         app_settings
         and hasattr(app_settings, "symbols")
@@ -320,7 +338,6 @@ def calculate_threads(
             if float(renderd_cfg.num_threads_multiplier) > 0:
                 physical_core_count = None
                 try:
-                    # Use stdout_val from the run_command call
                     physical_cores = {
                         line
                         for line in stdout_val.strip().split("\n")
@@ -356,9 +373,8 @@ def calculate_threads(
         )
         return None
     except subprocess.CalledProcessError:
-        # run_command with check=True already logs the error, just return None
         return None
-    except Exception as e:  # Other errors
+    except Exception as e:
         log_map_server(
             f"{symbols_to_use.get('warning', '!')} Unexpected error calculating threads: {e}",
             "warning",

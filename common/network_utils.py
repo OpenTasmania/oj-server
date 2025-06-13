@@ -20,6 +20,32 @@ def validate_cidr(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> bool:
+    """
+    Validates a given CIDR (Classless Inter-Domain Routing) string.
+
+    This function checks the format of the provided CIDR string, ensuring
+    it adheres to IPv4 structure with a valid prefix range (0-32). If the CIDR
+    is invalid, appropriate log messages are generated using the provided
+    logger or module-level logger. Additional settings, such as symbol mapping
+    for log messages, are handled via the provided AppSettings instance.
+
+    Parameters:
+    cidr: str
+        The CIDR string to be validated.
+    app_settings: AppSettings
+        Configuration settings containing symbols and other utility attributes.
+    current_logger: Optional[logging.Logger]
+        Optional custom logger to use. If not provided, a module-level logger is used.
+
+    Returns:
+    bool
+        Returns True if the CIDR is valid, False otherwise.
+
+    Raises:
+    ValueError
+        Raised internally within the function when encountering invalid conversions
+        of string parts to integers.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
@@ -32,7 +58,6 @@ def validate_cidr(
         )
         return False
 
-    # Regex for basic CIDR format xxx.xxx.xxx.xxx/yy
     match = re.fullmatch(
         r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$", cidr
     )
@@ -48,7 +73,7 @@ def validate_cidr(
     ip_part, prefix_str = cidr.split("/")
     try:
         prefix = int(prefix_str)
-        if not (0 <= prefix <= 32):  # Validate prefix range
+        if not (0 <= prefix <= 32):
             log_map_server(
                 f"{symbols.get('warning', '!')} CIDR prefix '/{prefix}' is out of range (0-32).",
                 "warning",
@@ -58,9 +83,7 @@ def validate_cidr(
             return False
 
         octets_str = ip_part.split(".")
-        if (
-            len(octets_str) != 4
-        ):  # Should be caught by regex, but good for robustness
+        if len(octets_str) != 4:
             log_map_server(
                 f"{symbols.get('warning', '!')} CIDR IP part '{ip_part}' does not have 4 octets.",
                 "warning",
@@ -68,7 +91,7 @@ def validate_cidr(
                 app_settings,
             )
             return False
-        for o_str in octets_str:  # Validate each octet range
+        for o_str in octets_str:
             octet_val = int(o_str)
             if not (0 <= octet_val <= 255):
                 log_map_server(
@@ -78,8 +101,8 @@ def validate_cidr(
                     app_settings,
                 )
                 return False
-        return True  # All checks passed
-    except ValueError:  # If int() conversion fails for prefix or octets
+        return True
+    except ValueError:
         log_map_server(
             f"{symbols.get('warning', '!')} CIDR '{cidr}' contains non-integer parts.",
             "warning",
