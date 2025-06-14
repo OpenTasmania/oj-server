@@ -10,7 +10,6 @@ import shutil
 import subprocess
 from typing import Dict, List, Optional, Union
 
-# Import AppSettings for type hinting and SYMBOLS_DEFAULT for fallback
 from setup.config_models import SYMBOLS_DEFAULT, AppSettings
 
 module_logger = logging.getLogger(__name__)
