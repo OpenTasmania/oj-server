@@ -128,7 +128,7 @@ APACHE_TILE_SITE_TEMPLATE_DEFAULT: str = """\
     ServerName {server_name_apache}
     ServerAdmin {admin_email_apache}
 
-    AddTileConfig /{renderd_uri_path_segment}/ tile.openstreetmap.org
+    AddTileConfig /{renderd_uri_path_segment}/ default
 
     ErrorLog ${{APACHE_LOG_DIR}}/tiles_error.log
     CustomLog ${{APACHE_LOG_DIR}}/tiles_access.log combined

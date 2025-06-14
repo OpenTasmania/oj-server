@@ -100,7 +100,7 @@ apache:
         ServerAdmin {admin_email_apache}
 
         # The URI /hot/ should match the URI in renderd.conf (e.g., [default] URI=/hot/).
-        AddTileConfig /hot/ tile.openstreetmap.org 
+        AddTileConfig /hot/ default 
 
         ErrorLog ${{APACHE_LOG_DIR}}/tiles_error.log
         CustomLog ${{APACHE_LOG_DIR}}/tiles_access.log combined
@@ -225,7 +225,7 @@ renderd:
     font_dir=/usr/share/fonts/
     font_dir_recurse=1
 
-    [tile.openstreetmap.org]
+    [default]
     URI=/{renderd_uri_path_segment}/
     XML={mapnik_xml_stylesheet_path}
     HOST={renderd_host}
