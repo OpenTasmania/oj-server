@@ -1584,7 +1584,14 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "--dev-override",
         action="store_true",
         dest="dev_override_unsafe_password",
-        help="Override safety checks for development environments. Allows use of default/unsafe passwords and automatically sets vm_ip_or_domain to the primary IP address if it's set to 'example.com'.",
+        help="Override safety checks for development environments. Allows use of default/unsafe values: "
+        "password (default: 'yourStrongPasswordHere'), "
+        "vm_ip_or_domain (default: 'example.com' - will be set to primary IP), "
+        "pghost (default: '127.0.0.1'), "
+        "pgport (default: 5432), "
+        "pgdatabase (default: 'gis'), "
+        "pguser (default: 'osmuser'), "
+        "admin_group_ip (default: '192.168.128.0/22').",
     )
 
     parsed_cli_args = parser.parse_args(
