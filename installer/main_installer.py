@@ -1131,8 +1131,6 @@ def get_packages_for_tasks(
     # This complements the group flags.
     # (This logic might need refinement based on how granular your task flags are vs. group flags)
     individual_task_flag_to_pkgs: Dict[str, List[str]] = {
-        # if 'ufw_pkg_check' implies 'ufw' package, and it's not covered by a group flag if run standalone
-        "ufw_pkg_check": ["ufw"],
         "postgres_pkg_check": static_config.POSTGRES_PACKAGES,
         # Assuming SETUP_POSTGRES_PKG_CHECK flag is postgres_pkg_check
         "renderd_pkg_check": ["renderd", "mapnik-utils"],
@@ -1507,10 +1505,11 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         ),
         ("docker_install", PREREQ_DOCKER_ENGINE_TAG, "Docker installation."),
         ("nodejs_install", PREREQ_NODEJS_LTS_TAG, "Node.js installation."),
-        ("ufw_pkg_check", UFW_PACKAGE_CHECK_TAG, "UFW Package Check."),
-        ("ufw_rules", CONFIG_UFW_RULES, "Configure UFW Rules."),
-        ("ufw_activate", UFW_ACTIVATE_SERVICE_TAG, "Activate UFW Service."),
-        ("ufw", UFW_FULL_SETUP, "UFW full setup."),
+        (
+            "ufw",
+            UFW_FULL_SETUP,
+            "UFW full setup (package check, rules configuration, and service activation).",
+        ),
         ("postgres", POSTGRES_FULL_SETUP, "PostgreSQL full setup."),
         ("carto", CARTO_FULL_SETUP, "Carto full setup."),
         ("renderd", RENDERD_FULL_SETUP, "Renderd full setup."),
@@ -1770,9 +1769,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "docker_install": install_docker_engine,
         "nodejs_install": install_nodejs_lts,
         "run_all_core_prerequisites": _wrapped_core_prerequisites_group,
-        "ufw_pkg_check": ensure_ufw_package_installed,
-        "ufw_rules": apply_ufw_rules,
-        "ufw_activate": activate_ufw_service,
         "ufw": ufw_full_setup_sequence,
         "postgres": postgres_full_setup_sequence,
         "render_prep": rendering_data_setup_sequence,
