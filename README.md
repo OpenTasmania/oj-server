@@ -5,11 +5,6 @@
 [![Latest Release](https://gitlab.com/opentasmania/osm-osrm-server/-/badges/release.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/releases)
 
 [![Latest Tag (SemVer)](https://img.shields.io/gitlab/v/tag/opentasmania/osm-osrm-server?sort=semver)](https://gitlab.com/opentasmania/osm-osrm-server/-/tags)
-<!--
-[![Pipeline Status](https://gitlab.com/opentasmania/osm-osrm-server/badges/main/pipeline.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/pipelines)
-
-[![coverage report](https://gitlab.com/opentasmania/osm-osrm-server/badges/master/coverage.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/commits/master)
-!-->
 
 **Date:** 2025-06-26
 
@@ -211,7 +206,7 @@ Developer Options:
   --dev-override
                         Override safety checks for development environments. Allows use of default/unsafe values: 
                         password (default: 'yourStrongPasswordHere'), 
-                        vm_ip_or_domain (default: 'example.com' - will be set to primary IP), 
+                        vm_ip_or_domain (will be set to primary IP), 
                         pghost (default: '127.0.0.1'), 
                         pgport (default: 5432), 
                         pgdatabase (default: 'gis'), 
