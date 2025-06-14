@@ -181,9 +181,17 @@ def get_current_script_hash(
     """
     global CACHED_SCRIPT_HASH
     if CACHED_SCRIPT_HASH is None:
-        CACHED_SCRIPT_HASH = calculate_project_hash(
-            project_root_dir, app_settings, current_logger=logger_instance
-        )
+        try:
+            CACHED_SCRIPT_HASH = calculate_project_hash(
+                project_root_dir, app_settings, current_logger=logger_instance
+            )
+        except Exception as e:
+            logger = logger_instance or logging.getLogger(__name__)
+            warning_symbol = app_settings.symbols.get("warning", "⚠️")
+            logger.warning(
+                f"{warning_symbol} Could not calculate project hash: {e}",
+                exc_info=False,
+            )
     return CACHED_SCRIPT_HASH
 
 
