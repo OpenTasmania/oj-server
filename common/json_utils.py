@@ -1,19 +1,10 @@
-# common/json_utils.py
-# -*- coding: utf-8 -*-
-"""
-Utility functions for handling JSON files.
-"""
-
 import json
-import logging
 from enum import Enum
 from pathlib import Path
 
-module_logger = logging.getLogger(__name__)
 
-
-class JsonFileType(Enum):
-    """Enumeration for JSON file validation status."""
+class JsonFileType(str, Enum):
+    """Enumeration for the different states of a JSON file check."""
 
     VALID_JSON = "VALID_JSON"
     MALFORMED_JSON = "MALFORMED_JSON"
@@ -22,31 +13,32 @@ class JsonFileType(Enum):
 
 def check_json_file(file_path: Path) -> JsonFileType:
     """
-    Determines the type of a JSON file by attempting to parse it.
+    Checks if a file is a valid JSON, malformed JSON, or not a JSON file.
 
-    This function reads a file and checks if it contains valid JSON. It distinguishes
-    between valid JSON, malformed JSON, and files that are not JSON at all, such as
-    binary files or files that cannot be read due to permissions or other errors.
+    The distinction between MALFORMED_JSON and NOT_JSON is made based on the
+    file extension. A file with a .json extension that fails to parse is
+    considered malformed. Any other file that fails to parse is considered
+    not JSON.
 
-    Parameters:
-    file_path: Path
-        The path to the file to be checked.
+    Args:
+        file_path: The path to the file to check.
 
     Returns:
-    JsonFileType
-        Returns JsonFileType.VALID_JSON if the file contains valid JSON,
-        JsonFileType.MALFORMED_JSON if the file contains invalid JSON,
-        or JsonFileType.NOT_JSON if the file is not readable, is binary,
-        or is not JSON.
-
-    Raises:
-    None
+        The type of the file as a JsonFileType enum member.
     """
+    if not file_path.is_file():
+        return JsonFileType.NOT_JSON
+
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            json.load(f)
+        content = file_path.read_text(encoding="utf-8")
+    except (IOError, UnicodeDecodeError):
+        return JsonFileType.NOT_JSON
+
+    try:
+        json.loads(content)
         return JsonFileType.VALID_JSON
     except json.JSONDecodeError:
-        return JsonFileType.MALFORMED_JSON
-    except (IOError, OSError, UnicodeDecodeError):
-        return JsonFileType.NOT_JSON
+        if file_path.suffix.lower() == ".json":
+            return JsonFileType.MALFORMED_JSON
+        else:
+            return JsonFileType.NOT_JSON
