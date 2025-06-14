@@ -263,6 +263,8 @@ def import_pbf_to_postgis_with_osm2pgsql(
     osm_carto_dir = (
         static_config.OSM_PROJECT_ROOT / "external" / "openstreetmap-carto"
     )
+    # TODO:
+    # Decide if we want openstreetmap-carto.lua or openstreetmap-carto-flex.lua or something else
     osm_carto_lua_script = osm_carto_dir / "openstreetmap-carto.lua"
 
     if not osm_carto_lua_script.is_file():
@@ -282,7 +284,7 @@ def import_pbf_to_postgis_with_osm2pgsql(
         "--create",
         "--database",
         str(postgis_cfg.database),
-        "--username",
+        "--user",
         str(postgis_cfg.user),
         "--host",
         str(postgis_cfg.host),
