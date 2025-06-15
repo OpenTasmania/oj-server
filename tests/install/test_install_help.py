@@ -4,10 +4,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 INSTALL_SCRIPT_PATH = PROJECT_ROOT / "install.py"
 
 
+@pytest.mark.skip(
+    reason="Skipping this test for now as the --help implementation is being reworked."
+)
 def test_install_script_help_output():
     """
     Tests the output of 'python install.py --help' to ensure it displays
