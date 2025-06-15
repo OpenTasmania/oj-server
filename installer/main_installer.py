@@ -15,6 +15,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 import yaml
 
 from common.command_utils import log_map_server
+from common.constants_loader import (
+    get_constant,
+    is_feature_enabled,
+)
 from common.core_utils import setup_logging as common_setup_logging
 from common.pgpass_utils import setup_pgpass
 from common.system_utils import (
@@ -46,8 +50,8 @@ from installer.pg_tileserv_installer import (
 )
 
 # Not available yet for debian trixie
-# from installer.pgadmin_installer import install_pgadmin
-# from installer.pgagent_installer import install_pgagent
+from installer.pgadmin_installer import install_pgadmin
+from installer.pgagent_installer import install_pgagent
 from installer.postgres_installer import (
     ensure_postgres_packages_are_installed,
 )
@@ -227,7 +231,7 @@ SYSTEMD_RELOAD_TASK_TAG = "SYSTEMD_RELOAD_TASK"
 OSM_PBF_DOWNLOAD_TAG = "OSM_PBF_DOWNLOAD"
 DATAPROC_OSM2PGSQL_IMPORT_TAG = "DATAPROC_OSM2PGSQL_IMPORT"
 RENDERING_DATA_SETUP = "RENDERING_DATA_SETUP"
-# PGADMIN_TOOLS_SETUP = "PGADMIN_TOOLS_SETUP"
+PGADMIN_TOOLS_SETUP = "PGADMIN_TOOLS_SETUP"
 
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {
@@ -334,7 +338,7 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
         "steps": [SETUP_CERTBOT_PACKAGES, CONFIG_CERTBOT_RUN],
     },
     {"name": "Application Content", "steps": [WEBSITE_CONTENT_DEPLOY_TAG]},
-    #     {"name": "PostgreSQL Tools", "steps": [PGADMIN_TOOLS_SETUP]},
+    {"name": "PostgreSQL Tools", "steps": [PGADMIN_TOOLS_SETUP]},
     {"name": "GTFS Data Pipeline", "steps": [GTFS_PROCESS_AND_SETUP_TAG]},
     {"name": "Raster Tile Pre-rendering", "steps": [RASTER_PREP_TAG]},
     {"name": "Systemd Reload", "steps": [SYSTEMD_RELOAD_TASK_TAG]},
@@ -356,7 +360,7 @@ task_execution_details_lookup.update({
     OSRM_FULL_SETUP: ("OSRM Service & Data Processing", 0),
     APACHE_FULL_SETUP: ("Apache Service", 0),
     CERTBOT_FULL_SETUP: ("Certbot Service", 0),
-    #     PGADMIN_TOOLS_SETUP: ("PostgreSQL Tools", 0),
+    PGADMIN_TOOLS_SETUP: ("PostgreSQL Tools", 0),
 })
 group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
@@ -483,75 +487,79 @@ def postgres_full_setup_sequence(
     )
 
 
-# def postgres_tools_setup_sequence(
-#     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
-# ) -> None:
-#     """
-#     Setup sequence for PostgreSQL-related tools (pgAdmin, pgAgent).
-#
-#    Args:
-#        app_cfg: The application settings object containing the necessary configuration.
-#        current_logger: An optional logger instance to be used for logging messages.
-#    """
-#    logger_to_use = current_logger if current_logger else logger
-#
-#    # Only install PostgreSQL tools if PostgreSQL is installed
-#    # Check if the main PostgreSQL package is installed
-#    from common.command_utils import check_package_installed
-#
-#    if not check_package_installed("postgresql-17", app_cfg, logger_to_use):
-#        log_map_server(
-#            f"{app_cfg.symbols.get('info', 'ℹ️')} PostgreSQL is not installed. Skipping PostgreSQL tools installation.",
-#            "info",
-#            logger_to_use,
-#            app_settings=app_cfg,
-#        )
-#        return
-#
-#    log_map_server(
-#        f"--- {app_cfg.symbols.get('step', '➡️')} PostgreSQL Tools Setup ---",
-#        level="info",
-#        current_logger=logger_to_use,
-#        app_settings=app_cfg,
-#    )
-#
-#    steps = []
-#
-#    if app_cfg.pgadmin.install:
-#        steps.append((
-#            "SETUP_PGADMIN",
-#            "Install pgAdmin",
-#            install_pgadmin,
-#        ))
-#
-#    if app_cfg.pgagent.install:
-#        steps.append((
-#            "SETUP_PGAGENT",
-#            "Install pgAgent",
-#            install_pgagent,
-#        ))
-#
-#    if not steps:
-#        log_map_server(
-#            f"{app_cfg.symbols.get('info', 'ℹ️')} No PostgreSQL tools are enabled for installation.",
-#            "info",
-#            logger_to_use,
-#            app_settings=app_cfg,
-#        )
-#        return
-#
-#    for tag, desc, func in steps:
-#        if not execute_step(
-#            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
-#        ):
-#            raise RuntimeError(f"PostgreSQL tools step '{desc}' failed.")
-#
-#    log_map_server(
-#        f"--- {app_cfg.symbols.get('success', '✅')} PostgreSQL Tools Setup Completed ---",
-#        level="success",
-#        current_logger=logger_to_use,
-#        app_settings=app_cfg,
-#    )
+def postgres_tools_setup_sequence(
+    app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+) -> None:
+    """
+    Setup sequence for PostgreSQL-related tools (pgAdmin, pgAgent).
+
+    Args:
+        app_cfg: The application settings object containing the necessary configuration.
+        current_logger: An optional logger instance to be used for logging messages.
+    """
+    logger_to_use = current_logger if current_logger else logger
+
+    # Only install PostgreSQL tools if PostgreSQL is installed
+    # Check if the main PostgreSQL package is installed
+    from common.command_utils import check_package_installed
+
+    if not check_package_installed("postgresql-17", app_cfg, logger_to_use):
+        log_map_server(
+            f"{app_cfg.symbols.get('info', 'ℹ️')} PostgreSQL is not installed. Skipping PostgreSQL tools installation.",
+            "info",
+            logger_to_use,
+            app_settings=app_cfg,
+        )
+        return
+
+    log_map_server(
+        f"--- {app_cfg.symbols.get('step', '➡️')} PostgreSQL Tools Setup ---",
+        level="info",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
+    )
+
+    steps = []
+
+    # Check both the constant and the config setting for pgadmin
+    pgadmin_enabled = is_feature_enabled("pgadmin_enabled", False)
+    if pgadmin_enabled and app_cfg.pgadmin.install:
+        steps.append((
+            "SETUP_PGADMIN",
+            "Install pgAdmin",
+            install_pgadmin,
+        ))
+
+    # Check both the constant and the config setting for pgagent
+    pgagent_enabled = is_feature_enabled("pgagent_enabled", False)
+    if pgagent_enabled and app_cfg.pgagent.install:
+        steps.append((
+            "SETUP_PGAGENT",
+            "Install pgAgent",
+            install_pgagent,
+        ))
+
+    if not steps:
+        log_map_server(
+            f"{app_cfg.symbols.get('info', 'ℹ️')} No PostgreSQL tools are enabled for installation.",
+            "info",
+            logger_to_use,
+            app_settings=app_cfg,
+        )
+        return
+
+    for tag, desc, func in steps:
+        if not execute_step(
+            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+        ):
+            raise RuntimeError(f"PostgreSQL tools step '{desc}' failed.")
+
+    log_map_server(
+        f"--- {app_cfg.symbols.get('success', '✅')} PostgreSQL Tools Setup Completed ---",
+        level="success",
+        current_logger=logger_to_use,
+        app_settings=app_cfg,
+    )
 
 
 def carto_full_setup_sequence(
@@ -1176,11 +1184,17 @@ def get_packages_for_tasks(
     # This needs to be comprehensive.
     flag_to_pkg_lists_map: Dict[str, List[List[str]]] = {
         "run_all_core_prerequisites": [  # --prereqs group
-            static_config.CORE_PREREQ_PACKAGES,
-            static_config.PYTHON_SYSTEM_PACKAGES,
-            static_config.POSTGRES_PACKAGES,
-            static_config.MAPPING_PACKAGES,
-            static_config.FONT_PACKAGES,
+            get_constant(
+                "packages.core_prereq", static_config.CORE_PREREQ_PACKAGES
+            ),
+            get_constant(
+                "packages.python_system", static_config.PYTHON_SYSTEM_PACKAGES
+            ),
+            get_constant(
+                "packages.postgres", static_config.POSTGRES_PACKAGES
+            ),
+            get_constant("packages.mapping", static_config.MAPPING_PACKAGES),
+            get_constant("packages.font", static_config.FONT_PACKAGES),
             [
                 "unattended-upgrades",
                 "tzdata",
@@ -1188,7 +1202,7 @@ def get_packages_for_tasks(
         ],
         "ufw": [["ufw"]],  # --ufw orchestrator
         "postgres": [
-            static_config.POSTGRES_PACKAGES
+            get_constant("packages.postgres", static_config.POSTGRES_PACKAGES)
         ],  # --postgres orchestrator
         "renderd": [["renderd", "mapnik-utils"]],  # --renderd orchestrator
         "apache": [
@@ -1209,7 +1223,9 @@ def get_packages_for_tasks(
     # This complements the group flags.
     # (This logic might need refinement based on how granular your task flags are vs. group flags)
     individual_task_flag_to_pkgs: Dict[str, List[str]] = {
-        "postgres_pkg_check": static_config.POSTGRES_PACKAGES,
+        "postgres_pkg_check": get_constant(
+            "packages.postgres", static_config.POSTGRES_PACKAGES
+        ),
         # Assuming SETUP_POSTGRES_PKG_CHECK flag is postgres_pkg_check
         "renderd_pkg_check": ["renderd", "mapnik-utils"],
         "apache_pkg_check": ["apache2", "libapache2-mod-tile"],
@@ -1242,11 +1258,25 @@ def get_packages_for_tasks(
             for pkg_list in list_of_pkg_lists:
                 relevant_pkgs.update(pkg_list)
         # Ensure all core packages are included if --full is run, as they are fundamental
-        relevant_pkgs.update(static_config.CORE_PREREQ_PACKAGES)
-        relevant_pkgs.update(static_config.PYTHON_SYSTEM_PACKAGES)
-        relevant_pkgs.update(static_config.POSTGRES_PACKAGES)
-        relevant_pkgs.update(static_config.MAPPING_PACKAGES)
-        relevant_pkgs.update(static_config.FONT_PACKAGES)
+        relevant_pkgs.update(
+            get_constant(
+                "packages.core_prereq", static_config.CORE_PREREQ_PACKAGES
+            )
+        )
+        relevant_pkgs.update(
+            get_constant(
+                "packages.python_system", static_config.PYTHON_SYSTEM_PACKAGES
+            )
+        )
+        relevant_pkgs.update(
+            get_constant("packages.postgres", static_config.POSTGRES_PACKAGES)
+        )
+        relevant_pkgs.update(
+            get_constant("packages.mapping", static_config.MAPPING_PACKAGES)
+        )
+        relevant_pkgs.update(
+            get_constant("packages.font", static_config.FONT_PACKAGES)
+        )
         relevant_pkgs.add("unattended-upgrades")
         relevant_pkgs.add("tzdata")
 
@@ -1610,7 +1640,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         ("gtfs_prep", GTFS_PROCESS_AND_SETUP_TAG, "Full GTFS Pipeline."),
         ("raster_prep", RASTER_PREP_TAG, "Raster tile pre-rendering."),
         ("website_setup", WEBSITE_CONTENT_DEPLOY_TAG, "Deploy test website."),
-        # ("pgadmin", PGADMIN_TOOLS_SETUP, "Install pgAdmin and pgAgent."),
+        ("pgadmin", PGADMIN_TOOLS_SETUP, "Install pgAdmin and pgAgent."),
         (
             "task_systemd_reload",
             SYSTEMD_RELOAD_TASK_TAG,
@@ -1872,7 +1902,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "gtfs_prep": run_full_gtfs_module_wrapper,
         "raster_prep": raster_tile_prerender,
         "website_setup": deploy_test_website_content,
-        # "pgadmin": postgres_tools_setup_sequence,
+        "pgadmin": postgres_tools_setup_sequence,
         "task_systemd_reload": systemd_reload,
     }
     cli_flag_to_task_details: Dict[str, Tuple[str, str]] = {
@@ -1894,7 +1924,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "pgtileserv": (PGTILESERV_FULL_SETUP, "pg_tileserv Full Setup"),
         "osrm": (OSRM_FULL_SETUP, "OSRM Full Setup"),
         "website_setup": (WEBSITE_CONTENT_DEPLOY_TAG, "Deploy test website"),
-        # "pgadmin": (PGADMIN_TOOLS_SETUP, "Install pgAdmin and pgAgent"),
+        "pgadmin": (PGADMIN_TOOLS_SETUP, "Install pgAdmin and pgAgent"),
     })
 
     overall_success = True

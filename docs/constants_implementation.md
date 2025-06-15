@@ -45,6 +45,7 @@ Currently, the project manages constants in several ways:
    - Default values from `setup/config_models.py`
    - Service configuration defaults
    - System-wide settings
+   - Package lists from `setup/config.py`
 
 2. **Organize Constants by Category**:
    - Features: Flags that enable/disable features
@@ -52,10 +53,25 @@ Currently, the project manages constants in several ways:
    - Paths: File and directory paths
    - URLs: Default URLs for external resources
    - Templates: Default templates for configuration files
+   - Packages: Lists of packages to install
 
 3. **Update Code to Use Constants**:
    - Modify code to reference constants from the centralized file
    - Ensure backward compatibility with existing configuration
+
+### Phase 4: Move Package Lists to Constants
+
+1. **Define Package Lists in Constants**:
+   - Add a `packages` section to `constants.yaml` with subsections for each package list
+   - Move package lists from `setup/config.py` to `constants.yaml`
+
+2. **Update Package Installation Logic**:
+   - Modify `setup/core_prerequisites.py` to use constants_loader.py for package lists
+   - Update `installer/main_installer.py` to use constants_loader.py for package lists
+
+3. **Ensure Backward Compatibility**:
+   - Use fallbacks to static_config values if constants are not found
+   - Keep the original package lists in `setup/config.py` for backward compatibility
 
 ## Constants File Structure
 
@@ -112,6 +128,44 @@ defaults:
       zones_australia: "select Hobart"
     unattended_upgrades:
       enable_auto_updates: "true boolean"
+
+# Package lists for installation
+packages:
+  # Core prerequisite packages
+  core_prereq:
+    - "git"
+    - "unzip"
+    - "vim"
+    - "build-essential"
+    # ... other core packages
+
+  # Python system packages
+  python_system:
+    - "python3"
+    - "python3-pip"
+    - "python3-venv"
+    - "python3-dev"
+
+  # PostgreSQL packages
+  postgres:
+    - "postgresql-17"
+    - "libpq-dev"
+    - "postgresql-common"
+    - "postgis"
+    - "postgresql-17-postgis-3"
+    - "postgresql-17-postgis-3-scripts"
+
+  # Font packages
+  font:
+    - "fontconfig"
+    - "fonts-noto-core"
+    # ... other font packages
+
+  # Mapping packages
+  mapping:
+    - "cmake"
+    - "libbz2-dev"
+    # ... other mapping packages
 
 # Tasks and Steps definitions
 # Steps make up tasks, and tasks can contain steps, tasks, or both
@@ -253,6 +307,35 @@ def is_feature_enabled(feature_name: str, default: bool = False) -> bool:
         True if the feature is enabled, False otherwise
     """
     return get_constant(f"features.{feature_name}", default)
+
+# Example of using package lists from constants.yaml
+def install_packages_from_constants():
+    """
+    Example function showing how to use package lists from constants.yaml.
+    """
+    # Get the core prerequisite packages
+    core_packages = get_constant("packages.core_prereq", [])
+
+    # Get the Python system packages
+    python_packages = get_constant("packages.python_system", [])
+
+    # Get the PostgreSQL packages
+    postgres_packages = get_constant("packages.postgres", [])
+
+    # Get the font packages
+    font_packages = get_constant("packages.font", [])
+
+    # Get the mapping packages
+    mapping_packages = get_constant("packages.mapping", [])
+
+    # Use the package lists for installation
+    for package in core_packages:
+        # Install the package
+        print(f"Installing {package}")
+
+    # Combine multiple package lists
+    all_packages = core_packages + python_packages + postgres_packages + font_packages + mapping_packages
+    print(f"Total packages to install: {len(all_packages)}")
 
 def get_task(task_name: str) -> Optional[Dict[str, Any]]:
     """
@@ -436,4 +519,6 @@ def install_pgadmin(
 
 This implementation plan provides a structured approach to centralizing constants in the OSM-OSRM Server project. By moving constants to a dedicated file, we improve maintainability, make configuration more explicit, and provide a single source of truth for important values in the system.
 
-The plan focuses first on addressing the immediate need to move pgadmin configuration to constants, followed by a broader migration of other constants. This approach allows for incremental implementation and testing, reducing the risk of introducing bugs or breaking existing functionality.
+The plan focuses first on addressing the immediate need to move pgadmin configuration to constants, followed by a broader migration of other constants, including package lists for installation. This approach allows for incremental implementation and testing, reducing the risk of introducing bugs or breaking existing functionality.
+
+The migration of package lists from `setup/config.py` to `constants.yaml` makes it easier to maintain and configure the packages that need to be installed. It also allows for more flexibility in customizing the installation process without modifying the code.

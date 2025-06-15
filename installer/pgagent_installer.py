@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from common.command_utils import log_map_server, run_command
+from common.constants_loader import is_feature_enabled
 from setup import config
 from setup.config_models import AppSettings
 
@@ -24,9 +25,12 @@ def install_pgagent(
     """
     logger_to_use = current_logger if current_logger else module_logger
 
-    if not app_settings.pgagent.install:
+    # Check both the constant and the config setting
+    pgagent_enabled = is_feature_enabled("pgagent_enabled", False)
+
+    if not pgagent_enabled or not app_settings.pgagent.install:
         log_map_server(
-            f"{config.SYMBOLS['info']} pgAgent installation is disabled in configuration. Skipping.",
+            f"{config.SYMBOLS['info']} pgAgent installation is disabled. Skipping.",
             "info",
             logger_to_use,
         )

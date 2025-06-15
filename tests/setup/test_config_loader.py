@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 # Add the project root to the Python path
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from setup.config_loader import load_service_config

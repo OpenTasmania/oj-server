@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from common.command_utils import log_map_server, run_command
+from common.constants_loader import is_feature_enabled
 from setup import config
 from setup.config_models import AppSettings
 
@@ -24,9 +25,12 @@ def install_pgadmin(
     """
     logger_to_use = current_logger if current_logger else module_logger
 
-    if not app_settings.pgadmin.install:
+    # Check both the constant and the config setting
+    pgadmin_enabled = is_feature_enabled("pgadmin_enabled", False)
+
+    if not pgadmin_enabled or not app_settings.pgadmin.install:
         log_map_server(
-            f"{config.SYMBOLS['info']} pgAdmin installation is disabled in configuration. Skipping.",
+            f"{config.SYMBOLS['info']} pgAdmin installation is disabled. Skipping.",
             "info",
             logger_to_use,
         )

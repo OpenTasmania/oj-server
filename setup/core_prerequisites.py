@@ -21,6 +21,7 @@ from common.command_utils import (
     log_map_server,
     run_elevated_command,
 )
+from common.constants_loader import get_constant
 from common.file_utils import backup_file
 from installer.docker_installer import install_docker_engine
 from installer.nodejs_installer import install_nodejs_lts
@@ -199,7 +200,24 @@ def apply_preseed_and_install_package(
 def boot_verbosity(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Improves boot verbosity and adds user to systemd-journal group."""
+    """
+    Improves the boot verbosity of the system by modifying GRUB configuration, updating
+    the bootloader, and ensuring the user is added to the 'systemd-journal' group for
+    journal access. This function involves making changes to system-level files and
+    configurations, and hence requires elevated privileges.
+
+    Args:
+        app_settings (AppSettings): Configuration settings object containing details
+        such as logging preferences and file paths.
+
+        current_logger (Optional[logging.Logger]): Logger instance to be used for
+        logging messages. If not provided, a module-level logger will be used.
+
+    Raises:
+        Exception: If an error occurs during the GRUB file update, running associated
+        elevated commands, or adding the user to the 'systemd-journal' group. Errors
+        will be logged with appropriate severity.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -289,7 +307,24 @@ def boot_verbosity(
 def core_conflict_removal(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Removes potentially conflicting system-installed Node.js packages."""
+    """
+    Removes conflicting system-installed Node.js and npm packages, if any, using elevated
+    commands to ensure compatibility with custom tools or applications.
+
+    This function interacts with the system's environment and package configuration,
+    modifying the `DEBIAN_FRONTEND` to run apt in a non-interactive manner. If
+    conflicting system packages are detected, it performs their removal along with
+    dependent configurations. Logs the entire process using the provided or default logger.
+
+    Args:
+        app_settings (AppSettings): Contains application configuration values required for
+            operations such as symbols for logging, and other related settings.
+        current_logger (Optional[logging.Logger]): A logger instance to record messages;
+            if not provided, a default module-level logger is utilized.
+
+    Raises:
+        Exception: Any exceptions raised during execution will be logged and re-raised.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -352,6 +387,26 @@ def core_conflict_removal(
 def install_essential_utilities(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Installs essential utilities and updates the system for the provided application settings.
+
+    This function performs a system update and ensures that a predefined set of
+    essential utilities are installed on the system. It logs progress and errors
+    using the specified logger or the default module logger. The function also
+    handles the 'DEBIAN_FRONTEND' environment variable to suppress prompts during
+    package installation.
+
+    Parameters:
+        app_settings (AppSettings): The application's settings object containing
+            configuration details and logging preferences.
+        current_logger (Optional[logging.Logger]): A custom logger to use for logging
+            progress and errors. If not provided, the module's default logger will
+            be used.
+
+    Raises:
+        Exception: If any error occurs during the system update or essential utility
+            installation.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -374,7 +429,13 @@ def install_essential_utilities(
             current_logger=logger_to_use,
         )
 
-        essential_utils = list(set(static_config.CORE_PREREQ_PACKAGES))
+        essential_utils = list(
+            set(
+                get_constant(
+                    "packages.core_prereq", static_config.CORE_PREREQ_PACKAGES
+                )
+            )
+        )
         if not essential_utils:  # pragma: no cover
             log_map_server(
                 f"{symbols.get('info', 'ℹ️')} No essential utility packages listed to install.",
@@ -390,7 +451,6 @@ def install_essential_utilities(
                 app_settings,
             )
             for pkg_name in essential_utils:
-                # tzdata is a common package needing preseed, run_dpkg_reconfigure helps apply timezone
                 needs_reconfigure = pkg_name == "tzdata"
                 apply_preseed_and_install_package(
                     pkg_name,
@@ -428,7 +488,24 @@ def _install_package_list(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
-    """Helper to install a list of packages using the preseeding mechanism."""
+    """
+    Installs a list of packages with optional logging and app-specific configurations.
+
+    The function handles the installation of system packages provided in the package list,
+    utilizing app-specific settings and logging mechanisms. When no packages are specified,
+    a corresponding log message is generated. This function also ensures informative logging
+    of the installation process, success, and errors that might occur during execution.
+
+    Parameters:
+    package_list: List[str]
+        A list of package names to be installed.
+    list_description: str
+        A brief description of the package list (e.g., "system", "application") used in log messages.
+    app_settings: AppSettings
+        Application settings providing configurations such as symbols and other utilities.
+    current_logger: Optional[logging.Logger]
+        A logger instance to be used for logging messages. Defaults to module_logger if not provided.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
@@ -449,8 +526,6 @@ def _install_package_list(
     )
     try:
         for pkg_name in package_list:
-            # Most system packages don't need dpkg-reconfigure immediately after install
-            # unless specified like tzdata or unattended-upgrades
             apply_preseed_and_install_package(
                 pkg_name,
                 app_settings,
@@ -477,8 +552,25 @@ def _install_package_list(
 def install_python_system_packages(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Installs required Python system packages based on application settings.
+
+    This function handles the installation of Python system packages by retrieving
+    a predefined list of package names and invoking an internal utility function
+    to manage the installation process. It operates using the application's
+    configuration and an optional logger for reporting progress and potential issues.
+
+    Parameters:
+    app_settings : AppSettings
+        The application settings object that provides necessary configurations
+        for the installation process.
+    current_logger : Optional[logging.Logger]
+        An optional logger instance for logging installation progress or issues.
+    """
     _install_package_list(
-        static_config.PYTHON_SYSTEM_PACKAGES,
+        get_constant(
+            "packages.python_system", static_config.PYTHON_SYSTEM_PACKAGES
+        ),
         "Python system",
         app_settings,
         current_logger,
@@ -488,8 +580,25 @@ def install_python_system_packages(
 def install_postgres_packages(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Install PostgreSQL-related packages based on the provided application settings.
+
+    This function is responsible for installing a predefined list of PostgreSQL-related
+    packages. It uses a helper function to perform the actual installation process.
+    The installation operation takes into consideration application settings and an
+    optional logger instance for logging purposes.
+
+    Parameters:
+        app_settings (AppSettings): The application settings object that contains
+            configuration details used for installing PostgreSQL packages.
+        current_logger (Optional[logging.Logger]): An optional logger instance
+            that may be used to log information about the installation process.
+
+    Returns:
+        None
+    """
     _install_package_list(
-        static_config.POSTGRES_PACKAGES,
+        get_constant("packages.postgres", static_config.POSTGRES_PACKAGES),
         "PostgreSQL",
         app_settings,
         current_logger,
@@ -499,10 +608,25 @@ def install_postgres_packages(
 def install_mapping_and_font_packages(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    # Combine map and font packages for efficient installation if many
-    combined_list = (
-        static_config.MAPPING_PACKAGES + static_config.FONT_PACKAGES
-    )
+    """
+    Install required mapping and font packages.
+
+    This function retrieves a combined list of mapping and font package names
+    and passes it to the `_install_package_list` function for installation.
+    It utilizes configuration constants and logs the process using the
+    provided logger.
+
+    Arguments:
+        app_settings (AppSettings): Configuration settings required for installing packages.
+        current_logger (Optional[logging.Logger]): Logger instance for logging details
+            about the installation process. If None, no logging occurs.
+
+    Returns:
+        None
+    """
+    combined_list = get_constant(
+        "packages.mapping", static_config.MAPPING_PACKAGES
+    ) + get_constant("packages.font", static_config.FONT_PACKAGES)
     _install_package_list(
         combined_list, "mapping and font", app_settings, current_logger
     )
@@ -511,7 +635,25 @@ def install_mapping_and_font_packages(
 def install_unattended_upgrades(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Installs and configures unattended-upgrades using the new preseeding helper."""
+    """
+    Installs and configures the 'unattended-upgrades' package using provided application
+    settings and logger. Ensures preseed configuration is applied and package is
+    reconfigured if required.
+
+    Parameters
+    ----------
+    app_settings : AppSettings
+        Configuration settings required for installing and configuring the package.
+    current_logger : Optional[logging.Logger], optional
+        A logger instance to be used for logging messages. If not provided, the
+        module-level logger will be used.
+
+    Raises
+    ------
+    Exception
+        Propagates any exceptions encountered during the installation or configuration
+        process after logging the error details.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     package_name = "unattended-upgrades"
@@ -527,7 +669,7 @@ def install_unattended_upgrades(
             package_name,
             app_settings,
             logger_to_use,
-            run_dpkg_reconfigure=True,  # This package benefits from reconfigure
+            run_dpkg_reconfigure=True,
         )
         log_map_server(
             f"{symbols.get('success', '✅')} '{package_name}' installed & configured.",
@@ -546,13 +688,31 @@ def install_unattended_upgrades(
         raise
 
 
-# Removed install_tzdata_with_preseed as it's handled by install_essential_utilities
-
-
 def core_prerequisites_group(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:
-    """Runs ALL core prerequisite installation steps, passing app_cfg."""
+    """
+    Executes a comprehensive sequence of core prerequisite steps for system preparation.
+
+    The function runs a defined set of prerequisite steps in sequence, each with its
+    own description and functionality. These steps include tasks such as improving
+    boot verbosity, resolving conflicts, installing essential utilities, configuring
+    packages, and setting up services like Docker and Node.js LTS. If any of the steps
+    fail, execution halts, and the failure is logged. The function also communicates
+    progress and results using the provided or a default logger.
+
+    Parameters:
+    app_cfg (AppSettings): Configuration settings for the application.
+    current_logger (Optional[logging.Logger]): Logger instance to be used
+        for logging messages. Defaults to None, in which case a module-level
+        logger is used.
+
+    Returns:
+    bool: True if all steps in the group are completed successfully, otherwise False.
+
+    Raises:
+    None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     log_map_server(
         f"--- {app_cfg.symbols.get('info', 'ℹ️')} Starting Comprehensive Core Prerequisites Group ---",

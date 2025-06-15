@@ -13,7 +13,7 @@ defaults:
   vm_ip_or_domain: "example.com"
   pg_tileserv_binary_location: "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
   log_prefix: "[MAP-SETUP]"
-  
+
   # Database defaults
   postgres:
     host: "127.0.0.1"
@@ -21,12 +21,12 @@ defaults:
     database: "gis"
     user: "osmuser"
     password: "yourStrongPasswordHere"
-  
+
   # Container defaults
   container:
     runtime_command: "docker"
     osrm_image_tag: "osrm/osrm-backend:latest"
-  
+
   # OSRM defaults
   osrm:
     data_base_dir: "/opt/osm_data"
@@ -36,11 +36,11 @@ defaults:
     car_profile_port: 5000
     max_table_size_routed: 8000
     profile_lua_in_container: "/opt/car.lua"
-  
+
   # Web server defaults
   apache:
     listen_port: 8080
-  
+
   # Package preseeding
   package_preseeding:
     tzdata:
@@ -48,6 +48,93 @@ defaults:
       zones_australia: "select Hobart"
     unattended_upgrades:
       enable_auto_updates: "true boolean"
+
+# Package lists for installation
+packages:
+  # Core prerequisite packages
+  core_prereq:
+    - "git"
+    - "unzip"
+    - "vim"
+    - "build-essential"
+    - "gir1.2-packagekitglib-1.0"
+    - "gir1.2-glib-2.0"
+    - "packagekit"
+    - "python-apt-common"
+    - "dirmngr"
+    - "gnupg"
+    - "apt-transport-https"
+    - "lsb-release"
+    - "ca-certificates"
+    - "qemu-guest-agent"
+    - "ufw"
+    - "curl"
+    - "wget"
+    - "bash"
+    - "btop"
+    - "screen"
+
+  # Python system packages
+  python_system:
+    - "python3"
+    - "python3-pip"
+    - "python3-venv"
+    - "python3-dev"
+
+  # PostgreSQL packages
+  postgres:
+    - "postgresql-17"
+    - "libpq-dev"
+    - "postgresql-common"
+    - "postgis"
+    - "postgresql-17-postgis-3"
+    - "postgresql-17-postgis-3-scripts"
+
+  # Font packages
+  font:
+    - "fontconfig"
+    - "fonts-noto-core"
+    - "fonts-noto-cjk"
+    - "fonts-noto-ui-core"
+    - "fonts-noto-mono"
+    - "fonts-dejavu"
+    - "fonts-dejavu-core"
+    - "fonts-dejavu-extra"
+    - "fonts-unifont"
+    - "fonts-hanazono"
+    - "fonts-sil-gentium-basic"
+    - "fonts-firacode"
+    - "fonts-crosextra-carlito"
+    - "fonts-takao-gothic"
+    - "fonts-takao-mincho"
+    - "fonts-takao"
+
+  # Mapping packages
+  mapping:
+    - "cmake"
+    - "libbz2-dev"
+    - "libstxxl-dev"
+    - "libstxxl1v5"
+    - "libxml2-dev"
+    - "libzip-dev"
+    - "libboost-all-dev"
+    - "lua5.4"
+    - "liblua5.4-dev"
+    - "libtbb-dev"
+    - "libluabind-dev"
+    - "pkg-config"
+    - "apache2"
+    - "libapache2-mod-tile"
+    - "renderd"
+    - "mapnik-utils"
+    - "python3-mapnik"
+    - "libmapnik-dev"
+    - "xmlstarlet"
+    - "nginx"
+    - "osm2pgsql"
+    - "gdal-bin"
+    - "osmium-tool"
+    - "osmcoastline"
 
 # Tasks and Steps definitions
 # Steps make up tasks, and tasks can contain steps, tasks, or both
@@ -61,7 +148,7 @@ tasks:
     steps:
       - pgadmin
       - pgagent
-  
+
   # Individual Tasks
   pgadmin:
     name: "pgAdmin"
@@ -69,7 +156,7 @@ tasks:
     enabled: false
     steps:
       - install_pgadmin_packages
-  
+
   pgagent:
     name: "pgAgent"
     description: "Install pgAgent job scheduler for PostgreSQL"
@@ -83,7 +170,7 @@ steps:
     name: "Install pgAdmin Packages"
     description: "Install pgAdmin packages from apt repositories"
     command: "sudo apt-get install -y pgadmin4"
-  
+
   install_pgagent_packages:
     name: "Install pgAgent Packages"
     description: "Install pgAgent packages from apt repositories"
