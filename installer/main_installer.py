@@ -44,6 +44,10 @@ from installer.pg_tileserv_installer import (
     download_and_install_pg_tileserv_binary,
     setup_pg_tileserv_binary_permissions,
 )
+
+# Not available yet for debian trixie
+# from installer.pgadmin_installer import install_pgadmin
+# from installer.pgagent_installer import install_pgagent
 from installer.postgres_installer import (
     ensure_postgres_packages_are_installed,
 )
@@ -223,6 +227,7 @@ SYSTEMD_RELOAD_TASK_TAG = "SYSTEMD_RELOAD_TASK"
 OSM_PBF_DOWNLOAD_TAG = "OSM_PBF_DOWNLOAD"
 DATAPROC_OSM2PGSQL_IMPORT_TAG = "DATAPROC_OSM2PGSQL_IMPORT"
 RENDERING_DATA_SETUP = "RENDERING_DATA_SETUP"
+# PGADMIN_TOOLS_SETUP = "PGADMIN_TOOLS_SETUP"
 
 INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     {
@@ -329,6 +334,7 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
         "steps": [SETUP_CERTBOT_PACKAGES, CONFIG_CERTBOT_RUN],
     },
     {"name": "Application Content", "steps": [WEBSITE_CONTENT_DEPLOY_TAG]},
+    #     {"name": "PostgreSQL Tools", "steps": [PGADMIN_TOOLS_SETUP]},
     {"name": "GTFS Data Pipeline", "steps": [GTFS_PROCESS_AND_SETUP_TAG]},
     {"name": "Raster Tile Pre-rendering", "steps": [RASTER_PREP_TAG]},
     {"name": "Systemd Reload", "steps": [SYSTEMD_RELOAD_TASK_TAG]},
@@ -350,6 +356,7 @@ task_execution_details_lookup.update({
     OSRM_FULL_SETUP: ("OSRM Service & Data Processing", 0),
     APACHE_FULL_SETUP: ("Apache Service", 0),
     CERTBOT_FULL_SETUP: ("Certbot Service", 0),
+    #     PGADMIN_TOOLS_SETUP: ("PostgreSQL Tools", 0),
 })
 group_order_lookup: Dict[str, int] = {
     group_info["name"]: index
@@ -474,6 +481,77 @@ def postgres_full_setup_sequence(
         current_logger=logger_to_use,
         app_settings=app_cfg,
     )
+
+
+# def postgres_tools_setup_sequence(
+#     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
+# ) -> None:
+#     """
+#     Setup sequence for PostgreSQL-related tools (pgAdmin, pgAgent).
+#
+#    Args:
+#        app_cfg: The application settings object containing the necessary configuration.
+#        current_logger: An optional logger instance to be used for logging messages.
+#    """
+#    logger_to_use = current_logger if current_logger else logger
+#
+#    # Only install PostgreSQL tools if PostgreSQL is installed
+#    # Check if the main PostgreSQL package is installed
+#    from common.command_utils import check_package_installed
+#
+#    if not check_package_installed("postgresql-17", app_cfg, logger_to_use):
+#        log_map_server(
+#            f"{app_cfg.symbols.get('info', 'ℹ️')} PostgreSQL is not installed. Skipping PostgreSQL tools installation.",
+#            "info",
+#            logger_to_use,
+#            app_settings=app_cfg,
+#        )
+#        return
+#
+#    log_map_server(
+#        f"--- {app_cfg.symbols.get('step', '➡️')} PostgreSQL Tools Setup ---",
+#        level="info",
+#        current_logger=logger_to_use,
+#        app_settings=app_cfg,
+#    )
+#
+#    steps = []
+#
+#    if app_cfg.pgadmin.install:
+#        steps.append((
+#            "SETUP_PGADMIN",
+#            "Install pgAdmin",
+#            install_pgadmin,
+#        ))
+#
+#    if app_cfg.pgagent.install:
+#        steps.append((
+#            "SETUP_PGAGENT",
+#            "Install pgAgent",
+#            install_pgagent,
+#        ))
+#
+#    if not steps:
+#        log_map_server(
+#            f"{app_cfg.symbols.get('info', 'ℹ️')} No PostgreSQL tools are enabled for installation.",
+#            "info",
+#            logger_to_use,
+#            app_settings=app_cfg,
+#        )
+#        return
+#
+#    for tag, desc, func in steps:
+#        if not execute_step(
+#            tag, desc, func, app_cfg, logger_to_use, cli_prompt_for_rerun
+#        ):
+#            raise RuntimeError(f"PostgreSQL tools step '{desc}' failed.")
+#
+#    log_map_server(
+#        f"--- {app_cfg.symbols.get('success', '✅')} PostgreSQL Tools Setup Completed ---",
+#        level="success",
+#        current_logger=logger_to_use,
+#        app_settings=app_cfg,
+#    )
 
 
 def carto_full_setup_sequence(
@@ -1177,6 +1255,16 @@ def get_packages_for_tasks(
     # The `generate_preseed_yaml` function will handle this logic.
     # This function just returns the identified packages based on flags.
 
+    # Add pgAdmin and pgAgent packages if they are enabled
+    # if (
+    #     hasattr(requested_cli_args, "services")
+    #     and requested_cli_args.services
+    # ):
+    #     if app_settings.pgadmin.install:
+    #         relevant_pkgs.add("pgadmin4")
+    #     if app_settings.pgagent.install:
+    #         relevant_pkgs.add("pgagent")
+
     return relevant_pkgs
 
 
@@ -1522,6 +1610,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         ("gtfs_prep", GTFS_PROCESS_AND_SETUP_TAG, "Full GTFS Pipeline."),
         ("raster_prep", RASTER_PREP_TAG, "Raster tile pre-rendering."),
         ("website_setup", WEBSITE_CONTENT_DEPLOY_TAG, "Deploy test website."),
+        # ("pgadmin", PGADMIN_TOOLS_SETUP, "Install pgAdmin and pgAgent."),
         (
             "task_systemd_reload",
             SYSTEMD_RELOAD_TASK_TAG,
@@ -1551,6 +1640,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             "nginx",
             "certbot",
             "website-setup",
+            # "pgadmin",
         ]
     ]
     services_help_detail = (
@@ -1782,6 +1872,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "gtfs_prep": run_full_gtfs_module_wrapper,
         "raster_prep": raster_tile_prerender,
         "website_setup": deploy_test_website_content,
+        # "pgadmin": postgres_tools_setup_sequence,
         "task_systemd_reload": systemd_reload,
     }
     cli_flag_to_task_details: Dict[str, Tuple[str, str]] = {
@@ -1803,6 +1894,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         "pgtileserv": (PGTILESERV_FULL_SETUP, "pg_tileserv Full Setup"),
         "osrm": (OSRM_FULL_SETUP, "OSRM Full Setup"),
         "website_setup": (WEBSITE_CONTENT_DEPLOY_TAG, "Deploy test website"),
+        # "pgadmin": (PGADMIN_TOOLS_SETUP, "Install pgAdmin and pgAgent"),
     })
 
     overall_success = True
@@ -1901,6 +1993,11 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 "PostgreSQL Full Setup",
                 postgres_full_setup_sequence,
             ),
+            # (
+            #     "POSTGRES_TOOLS_SETUP",
+            #     "PostgreSQL Tools Setup",
+            #     postgres_tools_setup_sequence,
+            # ),
             (
                 RENDERING_DATA_SETUP,
                 "Rendering Data Setup",
@@ -2006,6 +2103,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             "nginx",
             "certbot",
             "website_setup",
+            # "pgadmin",
         ]
         for key in service_orchestrator_cli_keys:
             if not overall_success:

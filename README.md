@@ -31,7 +31,10 @@ The system is deployed on a GNU/Linux system with the following key components:
 
 * **Development Environment:** [Python](https://www.python.org/) package (`gtfs_processor`) managed with `uv` and
   defined by `pyproject.toml`, suitable for development in IDEs like [PyCharm](https://www.jetbrains.com/pycharm/).
-* **Database:** PostgreSQL with ith PostGIS and HStore extensions for storing OSM and GTFS data.
+* **Database:** 
+  * PostgreSQL with PostGIS and HStore extensions for storing OSM and GTFS data.
+  * pgAdmin for database administration through a web interface. (Work in progress)
+  * pgAgent for scheduling and executing PostgreSQL jobs. (Work in progress)
 * **Routing Engine:**
     * The `osrm/osrm-backend` [Docker](https://www.docker.com/) image is used, primarily due to dependency issues in
       development.

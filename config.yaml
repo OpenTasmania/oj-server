@@ -19,7 +19,17 @@ dev_override_unsafe_password: false # Set to true only for development to overri
 container_runtime_command: "docker" # e.g., "docker" or "podman"
 osrm_image_tag: "osrm/osrm-backend:latest" # OSRM Docker image to use
 
-# PostgreSQL Connection Settings
+# ----------------------------------------------------------------------
+# pgAdmin and pgAgent Configuration
+# ----------------------------------------------------------------------
+pgadmin:
+  # Not yet available for debian trixie
+  install: false
+
+pgagent:
+  # Not yet available for debian trixie
+  install: true
+
 pg:
   host: "127.0.0.1"
   port: 5432
@@ -33,35 +43,35 @@ pg:
   # Placeholders like {pg_database}, {pg_user}, {admin_group_ip}, {script_hash}
   # will be formatted by the setup script using other configuration values.
   # Use YAML's literal block scalar style for multi-line strings.
-hba_template: |
-  # pg_hba.conf configured by script V{script_hash}
-  # TYPE  DATABASE        USER            ADDRESS                 METHOD
-  local   all             postgres                                peer
-  local   all             all                                     peer
-  local   {pg_database}    {pg_user}                                scram-sha-256
-  host    all             all             127.0.0.1/32            scram-sha-256
-  host    {pg_database}    {pg_user}        127.0.0.1/32            scram-sha-256
-  host    {pg_database}    {pg_user}        {admin_group_ip}       scram-sha-256
-  host    all             all             ::1/128                 scram-sha-256
-  host    {pg_database}    {pg_user}        ::1/128                 scram-sha-256
+  hba_template: |
+    # pg_hba.conf configured by script V{script_hash}
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             postgres                                peer
+    local   all             all                                     peer
+    local   {pg_database}    {pg_user}                                scram-sha-256
+    host    all             all             127.0.0.1/32            scram-sha-256
+    host    {pg_database}    {pg_user}        127.0.0.1/32            scram-sha-256
+    host    {pg_database}    {pg_user}        {admin_group_ip}       scram-sha-256
+    host    all             all             ::1/128                 scram-sha-256
+    host    {pg_database}    {pg_user}        ::1/128                 scram-sha-256
   # Template for additions to postgresql.conf.
   # Supports placeholder {script_hash}.
-postgresql_conf_additions_template: |
-  # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash} ---
-  listen_addresses = '*'
-  shared_buffers = 2GB
-  work_mem = 256MB
-  maintenance_work_mem = 2GB
-  checkpoint_timeout = 15min
-  max_wal_size = 4GB
-  min_wal_size = 2GB
-  checkpoint_completion_target = 0.9
-  effective_cache_size = 6GB
-  logging_collector = on
-  log_directory = 'log'
-  log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
-  log_min_duration_statement = 250ms
-  # --- END TRANSIT SERVER CUSTOMISATIONS ---
+  postgresql_conf_additions_template: |
+    # --- TRANSIT SERVER CUSTOMISATIONS - Appended by script V{script_hash} ---
+    listen_addresses = '*'
+    shared_buffers = 2GB
+    work_mem = 256MB
+    maintenance_work_mem = 2GB
+    checkpoint_timeout = 15min
+    max_wal_size = 4GB
+    min_wal_size = 2GB
+    checkpoint_completion_target = 0.9
+    effective_cache_size = 6GB
+    logging_collector = on
+    log_directory = 'log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_min_duration_statement = 250ms
+    # --- END TRANSIT SERVER CUSTOMISATIONS ---
 
 # Apache Web Server Settings
 apache:

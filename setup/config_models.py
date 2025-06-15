@@ -599,6 +599,28 @@ class CertbotSettings(BaseSettings):
     )
 
 
+class PgAdminSettings(BaseSettings):
+    """pgAdmin specific settings."""
+
+    model_config = SettingsConfigDict(env_prefix="PGADMIN_", extra="ignore")
+    install: bool = Field(
+        default=False,
+        description="Whether to install pgAdmin.",
+    )
+    # Add any other pgAdmin-specific settings here
+
+
+class PgAgentSettings(BaseSettings):
+    """pgAgent specific settings."""
+
+    model_config = SettingsConfigDict(env_prefix="PGAGENT_", extra="ignore")
+    install: bool = Field(
+        default=False,
+        description="Whether to install pgAgent.",
+    )
+    # Add any other pgAgent-specific settings here
+
+
 class WebAppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="WEBAPP_", extra="ignore")
     root_dir: Path = Field(
@@ -685,6 +707,8 @@ class AppSettings(BaseSettings):
     renderd: RenderdSettings = Field(default_factory=RenderdSettings)
     certbot: CertbotSettings = Field(default_factory=CertbotSettings)
     webapp: WebAppSettings = Field(default_factory=WebAppSettings)
+    pgadmin: PgAdminSettings = Field(default_factory=PgAdminSettings)
+    pgagent: PgAgentSettings = Field(default_factory=PgAgentSettings)
 
     # Centralized package preseeding configurations
     package_preseeding_values: Dict[str, Dict[str, str]] = Field(
