@@ -231,7 +231,28 @@ def prepare_carto_directory_for_processing(
 def fetch_carto_external_data(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Fetches external data (shapefiles, etc.) for the OpenStreetMap-Carto style."""
+    """
+    Fetch external data for the OpenStreetMap-Carto style.
+
+    This function is responsible for managing the process of locating and executing
+    either a custom or default script for fetching external data required by the
+    OpenStreetMap-Carto style. It verifies the presence of the fetching script in
+    custom and default locations, logs necessary updates and warnings, and executes
+    the script with relevant PostgreSQL database credentials.
+
+    Parameters:
+        app_settings (AppSettings): Configuration object containing application
+            settings and PostgreSQL details.
+        current_logger (Optional[logging.Logger]): Logger instance to be used for
+            logging throughout the function. Defaults to the module-scoped logger if
+            None is provided.
+
+    Raises:
+        FileNotFoundError: If neither the custom nor the default external data
+            fetching script is found at expected paths.
+        Exception: Any errors during the script execution or execution stage are
+            logged and re-raised for external handling.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -244,7 +265,6 @@ def fetch_carto_external_data(
     original_cwd = os.getcwd()
     python_exe_path = sys.executable
 
-    # OSM_PROJECT_ROOT comes from static_config
     custom_script_path = (
         static_config.OSM_PROJECT_ROOT
         / "external/openstreetmap-carto/scripts/get-external-data.py"

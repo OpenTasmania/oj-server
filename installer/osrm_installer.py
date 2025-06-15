@@ -30,7 +30,23 @@ module_logger = getLogger(__name__)
 def ensure_osrm_dependencies(
     app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> None:
-    """Ensures configured container runtime and Osmium (via osmium-tool) are available."""
+    """
+    Ensures that the necessary dependencies for the OSRM (Open Source Routing
+    Machine) are available and functional in the environment. This includes
+    verifying the availability of a container runtime, the 'osmium-tool' package,
+    and the 'wget' command. If any dependency is missing or non-functional, the
+    appropriate error is logged and an exception is raised.
+
+    Parameters:
+        app_settings (AppSettings): An object containing configuration settings
+            for the application, including OSRM-related configurations.
+        current_logger (Optional[Logger]): Optional custom logger to use for
+            logging. If not provided, a module-level logger is used.
+
+    Raises:
+        EnvironmentError: Raised if any of the required dependencies (container
+            runtime, 'osmium-tool', 'wget') is not available or non-functional.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     container_cmd = app_settings.container_runtime_command
@@ -97,7 +113,23 @@ def ensure_osrm_dependencies(
 def setup_osrm_data_directories(
     app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> None:
-    """Creates base directories for OSRM source data and processed files from app_settings."""
+    """
+    Sets up the required OSRM data directories and ensures appropriate permissions.
+
+    The function creates specified directories if they do not exist, sets their
+    ownership to the current user, and grants necessary permissions, ensuring that
+    they are ready for use by OSRM processes. This setup process includes logging
+    of actions performed during the creation and configuration steps.
+
+    Arguments:
+        app_settings (AppSettings): The application settings containing configuration details
+            including paths for OSRM data and logging symbols.
+        current_logger (Optional[Logger]): An optional logger instance to log the directory
+            setup process. Defaults to the module-level logger if not provided.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     osrm_data_cfg = app_settings.osrm_data
@@ -157,7 +189,28 @@ def setup_osrm_data_directories(
 def download_base_pbf(
     app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> str:
-    """Downloads the base PBF file using URLs and paths from app_settings.osrm_data."""
+    """
+    Downloads the base PBF (Protocolbuffer Binary Format) file required for map data
+    processing if it does not already exist in the specified directory, ensuring the
+    directory's ownership is properly managed. The function utilizes configurations
+    from the provided application settings and logging mechanisms.
+
+    If the file is absent, it attempts a download using the provided URL, places the
+    file in the target directory, and verifies its presence post-download.
+
+    Arguments:
+        app_settings (AppSettings): The application settings containing configuration
+            for OSRM data, symbols, and other related settings.
+        current_logger (Optional[Logger]): Optional logger instance for capturing log
+            messages. Defaults to the module-level logger if not provided.
+
+    Returns:
+        str: Full path to the base PBF file.
+
+    Raises:
+        FileNotFoundError: Raised if the base PBF file is not found after a download
+            attempt.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     osrm_data_cfg = app_settings.osrm_data
@@ -220,7 +273,30 @@ def download_base_pbf(
 def prepare_region_boundaries(
     app_settings: AppSettings, current_logger: Optional[Logger] = None
 ) -> None:
-    """Copies GeoJSON region boundary files from project assets to OSRM data regions directory."""
+    """
+    Prepare region boundary files by copying GeoJSON files from a source directory to a
+    target directory, validating JSON files, and setting their file permissions.
+
+    This function processes all GeoJSON files located in the specified "assets/regions"
+    directory. It validates their formatting, copies valid files to the target directory,
+    applies proper permissions, and logs the results. If the source directory does not
+    exist or if files are malformed, appropriate warnings are logged.
+
+    This function relies on external commands for file permissions management and assumes
+    specific user/group ownership for the copied files. The function is designed to be
+    resilient by handling errors during file operations, and malformed files are
+    skipped without halting the overall process. It provides detailed logging at each
+    step, including informational, debug, warning, and error messages.
+
+    Parameters:
+        app_settings (AppSettings): Application-specific settings containing
+            configurations such as symbol mappings and directory paths.
+        current_logger (Optional[Logger]): Logger to use for logging information.
+            If not provided, a default module logger will be used.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     osrm_data_cfg = app_settings.osrm_data

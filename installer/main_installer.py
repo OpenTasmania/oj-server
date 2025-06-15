@@ -2,8 +2,27 @@
 # -*- coding: utf-8 -*-
 """
 Main entry point and orchestrator for the Map Server Setup script.
-Handles argument parsing, logging setup, and calls a sequence of setup steps
-from various modules.
+
+This module serves as the central coordinator for the entire installation process.
+It handles command-line argument parsing, configuration loading, logging setup,
+and orchestrates the execution of various setup sequences including:
+
+- Core prerequisites installation
+- Firewall (UFW) setup
+- PostgreSQL database installation and configuration
+- PostgreSQL tools (pgAdmin, pgAgent) setup
+- Cartography (OSM Carto) setup
+- Renderd (tile rendering daemon) setup
+- Apache web server setup
+- Nginx web server setup
+- SSL certificate (Certbot) setup
+- pg_tileserv (vector tile server) setup
+- OSRM (Open Source Routing Machine) setup
+- GTFS (transit data) processing
+- Raster tile pre-rendering
+
+Each setup sequence is implemented as a separate function that orchestrates
+the execution of individual setup steps using the execute_step function.
 """
 
 import argparse
@@ -408,6 +427,20 @@ def get_dynamic_help(base_help: str, task_tag: str) -> str:
 def ufw_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the complete UFW (Uncomplicated Firewall) setup sequence.
+
+    This function orchestrates the installation and configuration of UFW,
+    including package installation, rule application, and service activation.
+    UFW provides a simplified interface for managing iptables firewall rules.
+
+    Args:
+        app_cfg: The application settings object containing configuration parameters.
+        current_logger: Optional logger instance. If None, the module logger will be used.
+
+    Raises:
+        RuntimeError: If any UFW setup step fails.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Starting UFW Full Setup ---",
@@ -444,6 +477,20 @@ def ufw_full_setup_sequence(
 def postgres_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the complete PostgreSQL setup sequence.
+
+    This function orchestrates the installation and configuration of PostgreSQL,
+    including package installation, database creation, extension enablement,
+    permission setting, and service configuration.
+
+    Args:
+        app_cfg: The application settings object containing configuration parameters.
+        current_logger: Optional logger instance. If None, the module logger will be used.
+
+    Raises:
+        RuntimeError: If any PostgreSQL setup step fails.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} PostgreSQL Full Setup ---",
@@ -974,6 +1021,20 @@ def rendering_data_setup_sequence(
 def osrm_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the complete OSRM (Open Source Routing Machine) setup sequence.
+
+    This function orchestrates the installation and configuration of OSRM,
+    including dependency installation, data directory setup, PBF download,
+    region boundary preparation, regional PBF extraction, and graph building.
+
+    Args:
+        app_cfg: The application settings object containing configuration parameters.
+        current_logger: Optional logger instance. If None, the module logger will be used.
+
+    Raises:
+        RuntimeError: If any OSRM setup step fails.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} OSRM Full Setup & Data Processing ---",
@@ -1302,15 +1363,14 @@ def get_packages_for_tasks(
     # The `generate_preseed_yaml` function will handle this logic.
     # This function just returns the identified packages based on flags.
 
-    # Add pgAdmin and pgAgent packages if they are enabled
-    # if (
-    #     hasattr(requested_cli_args, "services")
-    #     and requested_cli_args.services
-    # ):
-    #     if app_settings.pgadmin.install:
-    #         relevant_pkgs.add("pgadmin4")
-    #     if app_settings.pgagent.install:
-    #         relevant_pkgs.add("pgagent")
+    if (
+        hasattr(requested_cli_args, "services")
+        and requested_cli_args.services
+    ):
+        if app_settings.pgadmin.install:
+            relevant_pkgs.add("pgadmin4")
+        if app_settings.pgagent.install:
+            relevant_pkgs.add("pgagent")
 
     return relevant_pkgs
 
@@ -1328,14 +1388,12 @@ def generate_preseed_yaml_for_tasks(
     symbols = app_cfg.symbols
     preseed_data_to_output: Dict[str, Dict[str, str]] = {}
 
-    # Check if specific tasks/groups were provided directly to --generate-preseed-yaml
     specific_tasks = (
         parsed_args.generate_preseed_yaml
         if isinstance(parsed_args.generate_preseed_yaml, list)
         else []
     )
 
-    # If specific tasks were provided directly to --generate-preseed-yaml
     if specific_tasks:
         log_map_server(
             f"{symbols.get('info', 'ℹ️')} Generating preseed values for specified tasks/groups: {', '.join(specific_tasks)}",
@@ -1344,18 +1402,14 @@ def generate_preseed_yaml_for_tasks(
             app_cfg,
         )
 
-        # Create a temporary namespace with the specified tasks set to True
         temp_args = argparse.Namespace()
         for arg_name, arg_value in vars(parsed_args).items():
             setattr(temp_args, arg_name, arg_value)
 
-        # Set the specified tasks to True in the temporary namespace
         for task in specific_tasks:
-            # Convert task names like "postgres" to the corresponding CLI flag
             task_flag = task.replace("-", "_")
             setattr(temp_args, task_flag, True)
 
-        # Get packages for the specified tasks
         relevant_packages = get_packages_for_tasks(temp_args, app_cfg)
 
         if relevant_packages:
@@ -1372,7 +1426,6 @@ def generate_preseed_yaml_for_tasks(
                 if pkg_name in relevant_packages:
                     preseed_data_to_output[pkg_name] = preseed_values
 
-            # Add placeholder comments for packages that don't have preseed data
             missing_packages = [
                 pkg
                 for pkg in relevant_packages
@@ -1385,7 +1438,6 @@ def generate_preseed_yaml_for_tasks(
                     logger_to_use,
                     app_cfg,
                 )
-                # We'll add these as comments in the YAML output
         else:
             log_map_server(
                 f"{symbols.get('warning', '!')} No packages found for specified tasks: {', '.join(specific_tasks)}",
@@ -1394,8 +1446,6 @@ def generate_preseed_yaml_for_tasks(
                 app_cfg,
             )
     else:
-        # Original logic for when no specific tasks are provided to --generate-preseed-yaml
-        # Determine if any task-related flags were passed
         user_requested_specific_tasks = False
         if (
             parsed_args.full
@@ -1449,10 +1499,8 @@ def generate_preseed_yaml_for_tasks(
             app_cfg,
         )
     else:
-        # Prepare the YAML output
         output_data = {"package_preseeding_values": preseed_data_to_output}
 
-        # Add placeholder comments for missing packages
         if "missing_packages" in locals() and missing_packages:
             print("\n--- Start of Suggested Preseed YAML ---")
             yaml.dump(
@@ -1464,7 +1512,6 @@ def generate_preseed_yaml_for_tasks(
             )
             print("--- End of Suggested Preseed YAML ---")
 
-            # Print placeholder comments for packages without preseed data
             print(
                 "\n# Packages without preseed data (consider adding if needed):"
             )
@@ -1498,6 +1545,20 @@ def generate_preseed_yaml_for_tasks(
 
 
 def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
+    """
+    Main entry point for the Map Server installation process.
+
+    This function parses command-line arguments, loads configuration settings,
+    and orchestrates the execution of various installation tasks based on the
+    requested actions.
+
+    Args:
+        cli_args_list: Optional list of command-line arguments. If None,
+                      sys.argv[1:] will be used.
+
+    Returns:
+        An integer exit code: 0 for success, non-zero for failure.
+    """
     global APP_CONFIG
     parser = argparse.ArgumentParser(
         description="Map Server Installer Script",
@@ -1784,7 +1845,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 )
                 return 1
     except SystemExit as e:  # pragma: no cover
-        # Use log_map_server with the module-level logger before common_setup_logging is called
         log_map_server(
             f"Failed to load or validate application configuration: {e}",
             "critical",
@@ -1803,14 +1863,10 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         f"Successfully loaded and validated configuration. Log prefix: {APP_CONFIG.log_prefix}"
     )
 
-    # Handle --generate-preseed-yaml if present
-    if (
-        parsed_cli_args.generate_preseed_yaml is not None
-    ):  # Check if the argument exists, not if it's True
+    if parsed_cli_args.generate_preseed_yaml is not None:
         logger.info(
             f"{APP_CONFIG.symbols.get('yaml', '📜')} Generating preseed YAML based on specified tasks or defaults..."
         )
-        # PyYAML is needed here, ensure it's a project dependency
         try:
             import yaml  # noqa: F401
         except ImportError:  # pragma: no cover
@@ -1819,9 +1875,8 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             )
             return 1
 
-        # Pass the list of specified tasks/groups to the function
         generate_preseed_yaml_for_tasks(APP_CONFIG, parsed_cli_args, logger)
-        return 0  # Exit after generating YAML
+        return 0
 
     log_map_server(
         message=f"{APP_CONFIG.symbols.get('sparkles', '✨')} Map Server Setup (v{static_config.SCRIPT_VERSION}) HASH:{get_current_script_hash(static_config.OSM_PROJECT_ROOT, APP_CONFIG, logger) or 'N/A'} ...",
@@ -1908,7 +1963,6 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
             )
         return 0
 
-    # ... (rest of your main_map_server_entry logic for executing tasks) ...
     defined_tasks_callable_map: Dict[str, StepExecutorFunc] = {
         "boot_verbosity": prereq_boot_verbosity,
         "core_conflicts": core_conflict_removal,
@@ -2049,11 +2103,11 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 "PostgreSQL Full Setup",
                 postgres_full_setup_sequence,
             ),
-            # (
-            #     "POSTGRES_TOOLS_SETUP",
-            #     "PostgreSQL Tools Setup",
-            #     postgres_tools_setup_sequence,
-            # ),
+            (
+                "POSTGRES_TOOLS_SETUP",
+                "PostgreSQL Tools Setup",
+                postgres_tools_setup_sequence,
+            ),
             (
                 RENDERING_DATA_SETUP,
                 "Rendering Data Setup",
@@ -2226,7 +2280,7 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         or parsed_cli_args.view_state
         or parsed_cli_args.clear_state
         or parsed_cli_args.generate_preseed_yaml
-    ):  # Added generate_preseed_yaml here
+    ):
         log_map_server(
             message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No action specified. Displaying help.",
             level="info",

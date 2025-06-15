@@ -99,6 +99,18 @@ SYMBOLS_OUTER = {
 
 
 def ensure_pip_installed_prereq(logger_instance: logging.Logger) -> bool:
+    """
+    Ensures that pip (Python package installer) is installed on the system.
+
+    This function checks if pip is available, and if not, attempts to install it
+    using apt. It first checks for pip3, then falls back to pip if pip3 is not found.
+
+    Args:
+        logger_instance: Logger instance for logging messages.
+
+    Returns:
+        bool: True if pip is available or was successfully installed, False otherwise.
+    """
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python', '🐍')} Checking for 'pip' command...",
         "info",
@@ -323,6 +335,19 @@ def _install_uv_with_pipx_prereq(
 
 
 def install_uv_prereq(logger_instance: logging.Logger) -> bool:
+    """
+    Ensures that uv (Python package manager and virtual environment tool) is installed.
+
+    This function checks if uv is available, and if not, attempts to install it
+    using apt (for supported Debian versions) or pipx as a fallback. It detects
+    the Debian codename to determine the appropriate installation method.
+
+    Args:
+        logger_instance: Logger instance for logging messages.
+
+    Returns:
+        bool: True if uv is available or was successfully installed, False otherwise.
+    """
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'uv' installation...",
         "info",
@@ -403,6 +428,19 @@ def install_uv_prereq(logger_instance: logging.Logger) -> bool:
 def ensure_pg_config_or_libpq_dev_installed_prereq(
     logger_instance: logging.Logger,
 ) -> bool:
+    """
+    Ensures that pg_config (required for psycopg compilation) is available.
+
+    This function checks if pg_config is available, and if not, attempts to install
+    the libpq-dev package using apt, which provides pg_config. This is necessary
+    for compiling Python database drivers like psycopg.
+
+    Args:
+        logger_instance: Logger instance for logging messages.
+
+    Returns:
+        bool: True if pg_config is available or was successfully installed, False otherwise.
+    """
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'pg_config' (for psycopg compilation)...",
         "info",
@@ -471,6 +509,16 @@ def ensure_pg_config_or_libpq_dev_installed_prereq(
 
 
 def get_venv_python_executable(project_root: str, venv_dir_name: str) -> str:
+    """
+    Returns the path to the Python executable in a virtual environment.
+
+    Args:
+        project_root: The root directory of the project.
+        venv_dir_name: The name of the virtual environment directory.
+
+    Returns:
+        str: The full path to the Python executable in the virtual environment.
+    """
     return os.path.join(project_root, venv_dir_name, "bin", "python3")
 
 
@@ -561,6 +609,19 @@ print("# and its content into your config.yaml file to customize preseed values.
 
 
 def main() -> int:
+    """
+    Main entry point for the install script.
+
+    This function:
+    1. Sets up logging
+    2. Ensures prerequisites are installed (uv, pg_config)
+    3. Creates a virtual environment
+    4. Installs project dependencies
+    5. Launches the main map server installer
+
+    Returns:
+        int: Exit code (0 for success, non-zero for failure)
+    """
     common_setup_logging(
         log_level=logging.INFO,
         log_to_console=True,
@@ -574,9 +635,12 @@ def main() -> int:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
-    # --- Custom Help Text ---
-    # We defer the full help text generation until after we know if the user wants help.
     def get_install_py_help_text():
+        """
+        Returns the help text for the install.py script.
+
+        The help text generation is deferred until we know if the user wants help.
+        """
         return f"""
 Usage: {script_name} <action_flag_or_help> [arguments_for_main_map_server_entry]
 
@@ -595,7 +659,6 @@ Arguments for {MAP_SERVER_INSTALLER_NAME}:
   (Displayed below if accessible when --help)
 """
 
-    # --- Argument Parsing Setup ---
     parser = argparse.ArgumentParser(
         description="Prerequisite installer for the Map Server Setup.",
         formatter_class=argparse.RawTextHelpFormatter,
@@ -611,12 +674,8 @@ Arguments for {MAP_SERVER_INSTALLER_NAME}:
 
     args, unknown_args = parser.parse_known_args()
 
-    # --- Handle Help Explicitly ---
     if args.help:
         print(get_install_py_help_text())
-        # Attempt to show main_installer help regardless of other flags if help is requested.
-        # This part will try to use venv if available, else system python.
-        # The venv setup happens later, so this is a "best effort" for a clean --help call.
         print("\n" + "=" * 80)
         print(
             f"Help information for the main setup module ({MAP_SERVER_INSTALLER_NAME}):"
@@ -649,7 +708,6 @@ Arguments for {MAP_SERVER_INSTALLER_NAME}:
             )
         return 0
 
-    # --- Prerequisite installations ---
     if not install_uv_prereq(prereq_script_logger):  # pragma: no cover
         log_map_server(
             f"{SYMBOLS_OUTER.get('critical', '!!')} Failed to install 'uv'. Critical prerequisite. Aborting.",
@@ -684,7 +742,6 @@ Arguments for {MAP_SERVER_INSTALLER_NAME}:
         )
         return 1
 
-    # --- Virtual Environment Setup ---
     venv_path = os.path.join(project_root, VENV_DIR)
     venv_python_executable = get_venv_python_executable(
         project_root, VENV_DIR

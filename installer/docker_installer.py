@@ -150,8 +150,6 @@ def install_docker_engine(
         app_settings,
     )
 
-    # Use AptManager to install packages
-    # Note: We set update_first=False because we already updated when adding the repository
     apt_manager.install(pkgs, update_first=False)
 
     user = getpass.getuser()
