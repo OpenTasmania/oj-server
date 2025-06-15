@@ -689,6 +689,25 @@ def install_unattended_upgrades(
         raise
 
 
+def check_and_install_prerequisites(
+    app_settings: AppSettings, logger: Optional[logging.Logger] = None
+) -> bool:
+    """
+    Checks and installs all core prerequisites for the application.
+
+    This function is a wrapper around core_prerequisites_group that provides
+    a consistent interface for the installer to use.
+
+    Args:
+        app_settings: The application settings.
+        logger: The logger instance.
+
+    Returns:
+        bool: True if all prerequisites were installed successfully, False otherwise.
+    """
+    return core_prerequisites_group(app_settings, logger)
+
+
 def core_prerequisites_group(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> bool:

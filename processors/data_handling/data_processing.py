@@ -14,8 +14,8 @@ from typing import (
 
 from common.command_utils import log_map_server
 from processors.data_handling.raster_processor import raster_tile_prerender
-from processors.plugins.importers.transit.gtfs.orchestrator import (
-    process_and_setup_gtfs,
+from processors.plugins.importers.transit.gtfs.gtfs_process import (
+    run_gtfs_setup,
 )
 from setup import (
     config as static_config,
@@ -38,7 +38,7 @@ RASTER_PREP_TAG = getattr(
     "RASTER_PREP",
 )
 
-StepFunctionType = Callable[[AppSettings, Optional[logging.Logger]], None]
+StepFunctionType = Callable[[AppSettings, Optional[logging.Logger]], bool]
 
 
 def data_prep_group(
@@ -77,16 +77,16 @@ def data_prep_group(
 
     def _run_gtfs_processing_step(
         ac: AppSettings, cl: Optional[logging.Logger]
-    ) -> None:  # Explicit return type
+    ) -> bool:  # Explicit return type
         """
         Groups and orchestrates data preparation steps for GTFS processing. This includes
         initiating necessary processes and ensuring proper setup is completed for GTFS
         application configuration.
 
         Parameters:
-        app_cfg (AppSettings): The application configuration required to set up
+        ac (AppSettings): The application configuration required to set up
             and process GTFS data.
-        current_logger (Optional[logging.Logger]): The logger instance to log
+        cl (Optional[logging.Logger]): The logger instance to log
             the process details or information during the GTFS preparation.
 
         Returns:
@@ -94,7 +94,7 @@ def data_prep_group(
             successfully.
 
         """
-        process_and_setup_gtfs(app_settings=ac, orchestrator_logger=cl)
+        return run_gtfs_setup(app_settings=ac, logger=cl)
 
     step_definitions: List[Tuple[str, str, StepFunctionType]] = [
         (

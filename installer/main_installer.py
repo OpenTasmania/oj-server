@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import sys
+from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import yaml
@@ -67,8 +68,8 @@ from processors.data_handling.osrm_data_processor import (
     extract_regional_pbfs_with_osmium,
 )
 from processors.data_handling.raster_processor import raster_tile_prerender
-from processors.plugins.importers.transit.gtfs.orchestrator import (
-    process_and_setup_gtfs,
+from processors.plugins.importers.transit.gtfs.gtfs_process import (
+    run_gtfs_setup,
 )
 from setup import config as static_config
 from setup.actions import deploy_test_website_content
@@ -138,8 +139,8 @@ from setup.configure.ufw_configurator import (
 )
 from setup.core_prerequisites import boot_verbosity as prereq_boot_verbosity
 from setup.core_prerequisites import (
+    check_and_install_prerequisites,
     core_conflict_removal,
-    core_prerequisites_group,
 )
 from setup.state_manager import (
     clear_state_file,
@@ -148,10 +149,19 @@ from setup.state_manager import (
 )
 from setup.step_executor import execute_step
 
+
+class PrerequisiteCheckFailed(Exception):
+    """Raised when a prerequisite check fails."""
+
+    pass
+
+
 logger = logging.getLogger(__name__)
 APP_CONFIG: Optional[AppSettings] = None
 
-StepExecutorFunc = Callable[[AppSettings, Optional[logging.Logger]], None]
+StepExecutorFunc = Callable[
+    [AppSettings, Optional[logging.Logger]], None | bool
+]
 pbf_path_holder: Dict[str, Optional[str]] = {"path": None}
 
 PREREQ_BOOT_VERBOSITY_TAG = "PREREQ_BOOT_VERBOSITY_TAG"
@@ -1124,10 +1134,19 @@ def osrm_full_setup_sequence(
 
 
 def _wrapped_core_prerequisites_group(
-    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
+    app_settings: AppSettings, logger: Logger | None = None
 ) -> None:
-    if not core_prerequisites_group(app_settings, logger_instance):
-        raise RuntimeError("Core prerequisites group failed overall.")
+    """
+    Wrapper for the core prerequisites group.
+    Args:
+        app_settings: The application settings.
+        logger: The logger instance.
+    """
+    all_prereqs_ok = check_and_install_prerequisites(
+        app_settings=app_settings, logger=logger
+    )
+    if not all_prereqs_ok:
+        raise PrerequisiteCheckFailed("Core prerequisite check failed")
 
 
 def _wrapped_systemd_reload_step_group(
@@ -1165,10 +1184,8 @@ def systemd_reload_step_group(
 
 def run_full_gtfs_module_wrapper(
     app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
-) -> None:
-    process_and_setup_gtfs(
-        app_settings=app_cfg, orchestrator_logger=calling_logger
-    )
+) -> bool:
+    return run_gtfs_setup(app_settings=app_cfg, logger=calling_logger)
 
 
 # Helper to map task flags/groups to relevant package lists from static_config

@@ -10,7 +10,7 @@ successful execution.
 """
 
 import logging
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 # log_map_server and state_manager functions now expect AppSettings
 from common.command_utils import log_map_server
@@ -25,7 +25,7 @@ module_logger = logging.getLogger(__name__)
 def execute_step(
     step_tag: str,
     step_description: str,
-    step_function: Callable[[AppSettings, Optional[logging.Logger]], None],
+    step_function: Callable[[AppSettings, Optional[logging.Logger]], Any],
     app_settings: AppSettings,  # Added app_settings parameter
     current_logger_instance: Optional[logging.Logger],
     prompt_user_for_rerun: Callable[
@@ -46,7 +46,9 @@ def execute_step(
         step_tag: A unique string identifier for the step.
         step_description: A human-readable description of the step.
         step_function: The function to call to execute the step.
-                       Expected signature: (app_settings: AppSettings, current_logger: Optional[logging.Logger]) -> None
+                       Expected signature: (app_settings: AppSettings, current_logger: Optional[logging.Logger]) -> Any
+                       Should return False to indicate failure. Any other return value (including None) or the absence
+                       of a return value is considered success. An exception will always be treated as a failure.
         app_settings: The application settings object.
         current_logger_instance: The logger instance to use.
         prompt_user_for_rerun: Callback for user prompts.
@@ -111,7 +113,16 @@ def execute_step(
                 app_settings,
             )
         try:
-            step_function(app_settings, logger_to_use)
+            step_result = step_function(app_settings, logger_to_use)
+
+            if step_result is False:
+                log_map_server(
+                    f"{symbols.get('error', '❌')} Step function returned False: {step_description} ({step_tag})",
+                    "error",
+                    logger_to_use,
+                    app_settings,
+                )
+                return False
 
             mark_step_completed(
                 step_tag,

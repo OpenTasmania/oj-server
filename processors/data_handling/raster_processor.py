@@ -27,7 +27,7 @@ class ZoomRangeTyped(TypedDict):
 
 def raster_tile_prerender(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
-) -> None:
+) -> bool:
     """
     Prepares and queues raster tiles for pre-rendering based on application settings
     and system service statuses. Logging is used to provide detailed information
@@ -38,6 +38,9 @@ def raster_tile_prerender(
             for rendering and system dependency paths.
         current_logger (Optional[logging.Logger]): A logger instance to log information.
             If not provided, the module-level logger is used.
+
+    Returns:
+        bool: True if the tile pre-rendering tasks were successfully queued, False otherwise.
 
     Raises:
         RuntimeError: When the required 'renderd' service is not active.
@@ -155,3 +158,5 @@ def raster_tile_prerender(
         logger_to_use,
         app_settings,
     )
+
+    return True

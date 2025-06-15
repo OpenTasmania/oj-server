@@ -33,22 +33,25 @@ if not _early_bootstrap_logger_install_py.handlers:
     _early_bootstrap_logger_install_py.setLevel(logging.INFO)
 
 try:
-    from bootstrap_installer.bs_orchestrator import (
-        ensure_all_bootstrap_prerequisites,
+    from bootstrap_installer.bootstrap_process import (
+        run_bootstrap_orchestration,
     )
 except ImportError as e_bootstrap_import:  # pragma: no cover
     _early_bootstrap_logger_install_py.critical(
-        f"Could not import the bs_orchestrator module: {e_bootstrap_import}"
+        f"Could not import the bootstrap_process module: {e_bootstrap_import}"
     )
     _early_bootstrap_logger_install_py.critical(
-        "Ensure 'bs_installer' directory with '__init__.py' and 'bs_orchestrator.py' exists at the project root (e.g., where install.py is) and is in Python path."
+        "Ensure 'bootstrap_installer' directory with '__init__.py' and 'bootstrap_process.py' exists at the project root (e.g., where install.py is) and is in Python path."
     )
     _early_bootstrap_logger_install_py.critical(
         f"Current sys.path: {str(sys.path)}"
     )
     sys.exit(1)
 
-if ensure_all_bootstrap_prerequisites():  # pragma: no cover
+success, context = run_bootstrap_orchestration(
+    None, _early_bootstrap_logger_install_py
+)
+if context.get("any_install_attempted", False):  # pragma: no cover
     _early_bootstrap_logger_install_py.info(
         f"Re-executing '{os.path.basename(sys.argv[0])}' due to bootstrap system package installations..."
     )
