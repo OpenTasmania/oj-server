@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from setup.config_models import SYMBOLS_DEFAULT
+
 module_logger = logging.getLogger(__name__)
 
 DEFAULT_DB_PARAMS: Dict[str, str] = {
@@ -26,12 +28,39 @@ DEFAULT_DB_PARAMS: Dict[str, str] = {
 }
 
 DETAILED_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(module)s.%(funcName)s:%(lineno)d - %(message)s"
-SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER = (
-    "{log_prefix}%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-)
+SIMPLE_LOG_FORMAT_WITH_PREFIX_PLACEHOLDER = "{log_prefix}%(asctime)s - %(levelname)s - %(symbol)s %(name)s - %(message)s"
 SIMPLE_LOG_FORMAT_NO_PREFIX = (
-    "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    "%(asctime)s - %(levelname)s - %(symbol)s %(name)s - %(message)s"
 )
+
+
+class SymbolFormatter(logging.Formatter):
+    """
+    A custom formatter that adds symbols to log messages based on the log level.
+    """
+
+    def __init__(
+        self, fmt=None, datefmt=None, style="%", validate=True, symbols=None
+    ):
+        super().__init__(fmt, datefmt, style, validate)
+        self.symbols = symbols or SYMBOLS_DEFAULT
+
+    def format(self, record):
+        # Add the appropriate symbol based on the log level
+        if record.levelno == logging.DEBUG:
+            record.symbol = self.symbols.get("debug", "🐛")
+        elif record.levelno == logging.INFO:
+            record.symbol = self.symbols.get("info", "ℹ️")
+        elif record.levelno == logging.WARNING:
+            record.symbol = self.symbols.get("warning", "⚠️")
+        elif record.levelno == logging.ERROR:
+            record.symbol = self.symbols.get("error", "❌")
+        elif record.levelno == logging.CRITICAL:
+            record.symbol = self.symbols.get("critical", "🔥")
+        else:
+            record.symbol = ""
+
+        return super().format(record)
 
 
 def setup_logging(
@@ -113,14 +142,27 @@ def setup_logging(
         else:
             final_format_str = SIMPLE_LOG_FORMAT_NO_PREFIX
 
-    logging.basicConfig(
-        level=log_level,
-        format=final_format_str,
+    # Create a formatter with symbols
+    formatter = SymbolFormatter(
+        fmt=final_format_str,
         datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=handlers,
-        force=True,
     )
-    logging.getLogger().setLevel(log_level)
+
+    # Apply the formatter to all handlers
+    for handler in handlers:
+        handler.setFormatter(formatter)
+
+    # Configure the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+
+    # Remove any existing handlers from the root logger
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+
+    # Add our handlers to the root logger
+    for handler in handlers:
+        root_logger.addHandler(handler)
 
     logger_for_this_message = logging.getLogger(__name__)
     if not logger_for_this_message.isEnabledFor(

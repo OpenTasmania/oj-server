@@ -1767,9 +1767,13 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
                 )
                 return 1
     except SystemExit as e:  # pragma: no cover
-        print(
-            f"CRITICAL: Failed to load or validate application configuration: {e}",
-            file=sys.stderr,
+        # Use log_map_server with the module-level logger before common_setup_logging is called
+        log_map_server(
+            f"Failed to load or validate application configuration: {e}",
+            "critical",
+            current_logger=logger,
+            app_settings=None,
+            exc_info=True,
         )
         return 1
 
@@ -1850,7 +1854,12 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
         )
         if completed:
             for i, s_item in enumerate(completed):
-                print(f"  {i + 1}. {s_item}")
+                log_map_server(
+                    message=f"  {i + 1}. {s_item}",
+                    level="info",
+                    current_logger=logger,
+                    app_settings=APP_CONFIG,
+                )
         else:
             log_map_server(
                 message=f"{APP_CONFIG.symbols.get('info', 'ℹ️')} No steps completed.",

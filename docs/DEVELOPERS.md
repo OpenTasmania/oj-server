@@ -99,6 +99,48 @@ apt_manager.add_repository("deb http://example.com/debian stable main")
 apt_manager.add_gpg_key_from_url("https://example.com/key.gpg", "/etc/apt/keyrings/example.gpg")
 ```
 
+### **Logging Guidelines**
+
+For consistent logging across the project, we use a centralized logging configuration approach.
+
+**Important:** All logging must be configured exclusively through the `setup_logging` function in `/common/core_utils.py`. This function is called once at the application's entry point in `main_map_server_entry` and sets up console and file logging for the entire application.
+
+Key principles:
+1. **Never** call `logging.basicConfig()` or other logging configuration functions in your modules.
+2. **Always** acquire a logger using the standard Python mechanism: `import logging; logger = logging.getLogger(__name__)`.
+3. For custom logging handlers (like `TuiLogHandler`), integrate them with the central logging system rather than creating separate configurations.
+4. **All logging automatically includes symbols** based on the log level (e.g., ℹ️ for info, ⚠️ for warning, ❌ for error). These symbols are defined in `SYMBOLS_DEFAULT` in `setup/config_models.py`.
+
+Example usage:
+```python
+import logging
+
+# Get a logger for the current module
+logger = logging.getLogger(__name__)
+
+# Use the logger - symbols are automatically added based on log level
+logger.info("This is an informational message")  # Will include ℹ️ symbol
+logger.warning("This is a warning message")      # Will include ⚠️ symbol
+logger.error("This is an error message")         # Will include ❌ symbol
+
+# For user-facing messages that require consistent formatting
+from common.command_utils import log_map_server
+log_map_server("Step completed successfully", "info", current_logger=logger, app_settings=app_settings)
+```
+
+Available symbols:
+- `info`: ℹ️ - For informational messages
+- `warning`: ⚠️ - For warning messages
+- `error`: ❌ - For error messages
+- `critical`: 🔥 - For critical error messages
+- `debug`: 🐛 - For debug messages
+- `success`: ✅ - For success messages
+- `step`: ➡️ - For step indicators
+- `gear`: ⚙️ - For configuration or processing operations
+- `package`: 📦 - For package-related operations
+- `rocket`: 🚀 - For deployment or startup operations
+- `sparkles`: ✨ - For cleanup or completion operations
+
 ### **Core Design Principle: Pluggable Processors**
 
 To handle a wide variety of transit data, we have adopted a modular, pluggable architecture.

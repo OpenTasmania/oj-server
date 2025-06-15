@@ -97,6 +97,7 @@ def initialize_state_system(
             "error",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
 
     if not state_file_exists_and_is_file:
@@ -181,6 +182,7 @@ def initialize_state_system(
                 "error",
                 logger_to_use,
                 app_settings,
+                exc_info=True,
             )
             clear_state_file(
                 app_settings,
@@ -248,6 +250,7 @@ def clear_state_file(
             "error",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
@@ -296,6 +299,7 @@ def mark_step_completed(
             "error",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
 
 
@@ -321,6 +325,7 @@ def is_step_completed(
             "error",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
         return False
 
@@ -368,5 +373,6 @@ def view_completed_steps(
             "error",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
         return []

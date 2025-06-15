@@ -137,6 +137,7 @@ def execute_step(
                 "error",
                 logger_to_use,
                 app_settings,
+                exc_info=True,
             )
             return False
 

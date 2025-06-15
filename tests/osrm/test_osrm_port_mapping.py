@@ -14,13 +14,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from common.core_utils import setup_logging
 from setup.config_loader import load_app_settings
 from setup.configure.osrm_configurator import get_next_available_port
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+setup_logging(
+    log_level=logging.INFO,
+    log_to_console=True,
+    log_format_str="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("test_osrm_port_mapping")
 

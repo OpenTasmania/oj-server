@@ -152,7 +152,7 @@ def view_configuration(
     log_map_server(
         "Displaying current configuration:", "info", logger_to_use, app_config
     )
-    print(f"\n{config_text}\n")
+    log_map_server(f"\n{config_text}\n", "info", logger_to_use, app_config)
 
 
 # manage_state_interactive and show_menu would also need app_settings

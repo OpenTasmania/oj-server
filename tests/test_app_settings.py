@@ -13,13 +13,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from common.core_utils import setup_logging
 from setup.config_loader import load_app_settings
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
+setup_logging(
+    log_level=logging.INFO,
+    log_to_console=True,
+    log_format_str="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("test_app_settings")
 

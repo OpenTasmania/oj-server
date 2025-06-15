@@ -691,13 +691,16 @@ def run_tui_installer(
 if __name__ == "__main__":  # pragma: no cover
     print("Running TUI in standalone test mode...", file=sys.stderr)
     if not logging.getLogger().handlers:
-        logging.basicConfig(
-            level=logging.DEBUG,
-            stream=sys.stderr,
-            format="[TUI-STANDALONE-TEST] %(asctime)s %(levelname)s %(name)s: %(message)s",
+        # Import and use the central logging setup function
+        from common.core_utils import setup_logging
+
+        setup_logging(
+            log_level=logging.DEBUG,
+            log_to_console=True,
+            log_format_str="[TUI-STANDALONE-TEST] %(asctime)s %(levelname)s %(name)s: %(message)s",
         )
         module_logger.info(
-            "TUI __main__: BasicConfig logging configured for standalone test."
+            "TUI __main__: Logging configured for standalone test using central setup_logging function."
         )
 
     class DummyAppSettings(AppSettings):

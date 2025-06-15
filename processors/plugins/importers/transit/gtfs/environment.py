@@ -131,6 +131,7 @@ def setup_gtfs_environment(
             "warning",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
 
     log_map_server(

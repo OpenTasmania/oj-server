@@ -139,4 +139,5 @@ def run_gtfs_etl_pipeline_and_verify(
             "warning",
             logger_to_use,
             app_settings,
+            exc_info=True,
         )
