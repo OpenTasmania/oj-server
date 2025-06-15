@@ -1,8 +1,35 @@
 import logging
 import os
+import sys
 
-import apt  # type: ignore
-from aptsources import sourceslist  # type: ignore
+try:
+    import apt  # type: ignore
+    from aptsources import sourceslist  # type: ignore
+
+    APT_AVAILABLE = True
+except ImportError:
+    APT_AVAILABLE = False
+    # Create mock classes for testing
+    if "pytest" in sys.modules:
+
+        class MockApt:
+            class Cache:
+                pass
+
+            class cache:
+                class LockingError(Exception):
+                    pass
+
+                class FetchFailedException(Exception):
+                    pass
+
+        apt = MockApt()
+
+        class MockSourcesList:
+            class SourcesList:
+                pass
+
+        sourceslist = MockSourcesList()
 
 from common.command_utils import run_command, run_elevated_command
 
@@ -25,6 +52,14 @@ class AptManager:
             logger: An optional logging object.
         """
         self.logger = logger or logging.getLogger(__name__)
+        self.cache = None
+
+        if not APT_AVAILABLE:
+            self.logger.warning(
+                "Python apt module not available. Some functionality will be limited."
+            )
+            return
+
         try:
             self.cache = apt.Cache()
         except apt.cache.LockingError as e:
@@ -40,6 +75,14 @@ class AptManager:
         Args:
             raise_error (bool): If True, will raise an exception on failure.
         """
+        if not APT_AVAILABLE:
+            self.logger.warning(
+                "Python apt module not available. Cannot update package lists."
+            )
+            if raise_error:
+                raise ImportError("Python apt module not available")
+            return
+
         self.logger.info("Updating apt package lists...")
         try:
             self.cache.update(raise_on_error=raise_error)
@@ -58,6 +101,12 @@ class AptManager:
             packages (list): A list of package names to install.
             update_first (bool): If True, updates the package list first.
         """
+        if not APT_AVAILABLE:
+            self.logger.warning(
+                "Python apt module not available. Cannot install packages."
+            )
+            raise ImportError("Python apt module not available")
+
         if not isinstance(packages, list):
             packages = [packages]
 
@@ -101,6 +150,12 @@ class AptManager:
             repo_string (str): The repository string (e.g., 'ppa:user/repo' or a deb line).
             update_after (bool): If True, updates the package list after adding.
         """
+        if not APT_AVAILABLE:
+            self.logger.warning(
+                "Python apt module not available. Cannot add repository."
+            )
+            raise ImportError("Python apt module not available")
+
         self.logger.info(f"Adding repository: {repo_string}")
         sources = sourceslist.SourcesList(backup=False)
         sources.add_source(repo_string)
@@ -138,12 +193,36 @@ class AptManager:
         if not isinstance(packages, list):
             packages = [packages]
 
-        if update_first:
+        if update_first and APT_AVAILABLE:
             self.update()
 
         self.logger.info(
             f"Preparing to remove packages: {', '.join(packages)}"
         )
+
+        # If apt is not available, go straight to the apt-get command fallback
+        if not APT_AVAILABLE:
+            self.logger.warning(
+                "Python apt module not available. Using apt-get command directly."
+            )
+            cmd = ["apt-get", "remove", "-yq"]
+            if purge:
+                cmd.append("--purge")
+            cmd.extend(packages)
+
+            try:
+                run_elevated_command(
+                    cmd, app_settings, current_logger=self.logger
+                )
+                self.logger.info(
+                    "Packages removed successfully using apt-get."
+                )
+                return
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to remove packages using apt-get: {e}"
+                )
+                raise
 
         try:
             # Using python-apt to mark packages for removal
@@ -218,10 +297,15 @@ class AptManager:
             purge (bool): If True, purges the packages (removes configuration files).
             app_settings: Optional application settings for run_elevated_command.
         """
+        if not APT_AVAILABLE:
+            self.logger.warning(
+                "Python apt module not available. Using apt-get command directly."
+            )
+
         self.logger.info("Running autoremove to clean up unused packages...")
 
         try:
-            # Fallback to apt-get command as python-apt doesn't have a direct autoremove method
+            # Use apt-get command as python-apt doesn't have a direct autoremove method
             cmd = ["apt-get", "autoremove", "-yq"]
             if purge:
                 cmd.append("--purge")

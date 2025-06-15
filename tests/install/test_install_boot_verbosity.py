@@ -8,7 +8,7 @@ from unittest import mock
 import pytest
 
 # Add project root to sys.path to allow for direct import of project modules
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Imports from your project
