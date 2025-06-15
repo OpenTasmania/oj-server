@@ -1,0 +1,90 @@
+# /common/constants.yaml
+# Central constants file for the OSM-OSRM Server project
+
+# Feature flags
+features:
+  pgadmin_enabled: false
+  pgagent_enabled: true
+
+# Default values
+defaults:
+  admin_group_ip: "192.168.128.0/22"
+  gtfs_feed_url: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
+  vm_ip_or_domain: "example.com"
+  pg_tileserv_binary_location: "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
+  log_prefix: "[MAP-SETUP]"
+  
+  # Database defaults
+  postgres:
+    host: "127.0.0.1"
+    port: 5432
+    database: "gis"
+    user: "osmuser"
+    password: "yourStrongPasswordHere"
+  
+  # Container defaults
+  container:
+    runtime_command: "docker"
+    osrm_image_tag: "osrm/osrm-backend:latest"
+  
+  # OSRM defaults
+  osrm:
+    data_base_dir: "/opt/osm_data"
+    processed_dir: "/opt/osrm_processed_data"
+    base_pbf_url: "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
+    base_pbf_filename: "australia-latest.osm.pbf"
+    car_profile_port: 5000
+    max_table_size_routed: 8000
+    profile_lua_in_container: "/opt/car.lua"
+  
+  # Web server defaults
+  apache:
+    listen_port: 8080
+  
+  # Package preseeding
+  package_preseeding:
+    tzdata:
+      areas: "select Australia"
+      zones_australia: "select Hobart"
+    unattended_upgrades:
+      enable_auto_updates: "true boolean"
+
+# Tasks and Steps definitions
+# Steps make up tasks, and tasks can contain steps, tasks, or both
+# Tasks cannot reference themselves (circular references)
+tasks:
+  # PostgreSQL Tools Task Group
+  postgresql_tools:
+    name: "PostgreSQL Tools"
+    description: "PostgreSQL administration and management tools"
+    enabled: false
+    steps:
+      - pgadmin
+      - pgagent
+  
+  # Individual Tasks
+  pgadmin:
+    name: "pgAdmin"
+    description: "Install pgAdmin web interface for PostgreSQL"
+    enabled: false
+    steps:
+      - install_pgadmin_packages
+  
+  pgagent:
+    name: "pgAgent"
+    description: "Install pgAgent job scheduler for PostgreSQL"
+    enabled: true
+    steps:
+      - install_pgagent_packages
+
+# Steps definitions
+steps:
+  install_pgadmin_packages:
+    name: "Install pgAdmin Packages"
+    description: "Install pgAdmin packages from apt repositories"
+    command: "sudo apt-get install -y pgadmin4"
+  
+  install_pgagent_packages:
+    name: "Install pgAgent Packages"
+    description: "Install pgAgent packages from apt repositories"
+    command: "sudo apt-get install -y pgagent"
