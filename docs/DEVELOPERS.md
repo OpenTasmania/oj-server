@@ -13,6 +13,7 @@ Before you begin, ensure you have the following tools installed on your system:
 
 * **Git**: For version control.
 * **Python 3.13**: The project's runtime.
+* **python3-apt**: Required for the AptManager module.
 * **uv**: An extremely fast Python package and project manager. We use it to manage our virtual environments and
   dependencies.
 
@@ -72,7 +73,31 @@ The project is organized into several key directories:
 * `configure/`: Holds the logic for configuring those services after installation.
 * `processors/`: This is where our core data processing logic lives. It's built on a new, modern architecture.
 * `common/`: Shared utilities and helper functions used across the project.
+  * `common/debian/`: Contains Debian-specific utilities, including the AptManager.
 * `docs/`: Project documentation, including the plans and strategies that guide our work.
+
+### **Package Management with AptManager**
+
+For Debian package management, we use the `AptManager` class located in `common/debian/apt_manager.py`. This provides a centralized, consistent interface for all apt operations.
+
+**Important:** All apt package operations must be handled exclusively through the `AptManager` module. Direct calls to `apt-get` or similar commands should be avoided.
+
+Example usage:
+```python
+from common.debian.apt_manager import AptManager
+
+# Initialize with an optional logger
+apt_manager = AptManager(logger=your_logger)
+
+# Install packages
+apt_manager.install(["package1", "package2"], update_first=True)
+
+# Add a repository
+apt_manager.add_repository("deb http://example.com/debian stable main")
+
+# Add a GPG key
+apt_manager.add_gpg_key_from_url("https://example.com/key.gpg", "/etc/apt/keyrings/example.gpg")
+```
 
 ### **Core Design Principle: Pluggable Processors**
 

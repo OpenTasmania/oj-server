@@ -69,6 +69,7 @@ The system is deployed on a GNU/Linux system with the following key components:
     * Update the system package lists.
     * Upgrade the system if required to ensure the latest packages are installed.
     * Tests to see if basic python3 capability is available, and if not install it.
+    * Install python3-apt, which is required for the AptManager module.
 
 ```bash
 sudo apt --yes update
@@ -78,6 +79,14 @@ if ! dpkg -s python3 > /dev/null 2>&1 || ! dpkg -s python3-dev > /dev/null 2>&1;
   sudo apt update && sudo apt --yes install python3 python3-dev
 else
    echo "python3 and python3-dev are already installed."
+fi
+
+# Install python3-apt which is required for the AptManager
+if ! dpkg -s python3-apt > /dev/null 2>&1; then
+  echo "python3-apt not found. Proceeding with installation..."
+  sudo apt --yes install python3-apt
+else
+  echo "python3-apt is already installed."
 fi
 ```
 

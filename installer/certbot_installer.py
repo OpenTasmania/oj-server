@@ -7,7 +7,8 @@ Handles installation of Certbot packages.
 import logging
 from typing import Optional  # Added Optional
 
-from common.command_utils import log_map_server, run_elevated_command
+from common.command_utils import log_map_server
+from common.debian.apt_manager import AptManager
 from setup.config_models import AppSettings  # For type hinting
 
 module_logger = logging.getLogger(__name__)
@@ -44,15 +45,13 @@ def install_certbot_packages(
         app_settings,
     )
     try:
-        # TODO: Consider
-        # Update apt cache before installing, though core_prerequisites might have done this.
-        # Consider if this update is always necessary here or should be ensured by a prior global step.
-        # run_elevated_command(["apt", "update"], app_settings, current_logger=logger_to_use)
+        # Use AptManager for package installation
+        apt_manager = AptManager(logger=logger_to_use)
 
-        run_elevated_command(
-            ["apt", "install", "-y", "certbot", "python3-certbot-nginx"],
-            app_settings,
-            current_logger=logger_to_use,
+        # Install certbot packages
+        apt_manager.install(
+            ["certbot", "python3-certbot-nginx"],
+            update_first=True,  # This handles the apt update automatically
         )
         log_map_server(
             f"{symbols.get('success', '✅')} Certbot packages installed.",

@@ -1,5 +1,6 @@
 # ot-osm-osrm-server/bs_installer/bs_orchestrator.py
 # -*- coding: utf-8 -*-
+from bootstrap_installer.bs_apt import ensure_python_apt_prerequisite
 from bootstrap_installer.bs_build_tools import ensure_build_tools
 from bootstrap_installer.bs_lsb import ensure_lsb_release
 from bootstrap_installer.bs_pydantic import ensure_pydantic_prerequisites
@@ -29,8 +30,16 @@ def ensure_all_bootstrap_prerequisites() -> bool:
     # to avoid running it multiple times.
     apt_updated_this_orchestration_run = False
 
+    # Python3-apt (required for AptManager)
+    logger.info("--- Stage 1: Python3-apt Prerequisite ---")
+    install_attempted_apt, apt_updated_this_orchestration_run = (
+        ensure_python_apt_prerequisite(apt_updated_this_orchestration_run)
+    )
+    if install_attempted_apt:
+        any_install_attempted_overall = True
+
     # Pydantic & Pydantic Settings
-    logger.info("--- Stage 1: Pydantic Prerequisites ---")
+    logger.info("--- Stage 2: Pydantic Prerequisites ---")
     install_attempted_pydantic, apt_updated_this_orchestration_run = (
         ensure_pydantic_prerequisites(apt_updated_this_orchestration_run)
     )
@@ -38,7 +47,7 @@ def ensure_all_bootstrap_prerequisites() -> bool:
         any_install_attempted_overall = True
 
     # LSB Release
-    logger.info("--- Stage 2: LSB Release Prerequisite ---")
+    logger.info("--- Stage 3: LSB Release Prerequisite ---")
     install_attempted_lsb, apt_updated_this_orchestration_run = (
         ensure_lsb_release(apt_updated_this_orchestration_run)
     )
@@ -46,15 +55,15 @@ def ensure_all_bootstrap_prerequisites() -> bool:
         any_install_attempted_overall = True
 
     # util-linux
-    logger.info("--- Stage 3: util-linux Release Prerequisite ---")
+    logger.info("--- Stage 4: util-linux Release Prerequisite ---")
     install_attempted_util_linux, apt_updated_this_orchestration_run = (
         ensure_util_linux(apt_updated_this_orchestration_run)
     )
-    if install_attempted_lsb:
+    if install_attempted_util_linux:
         any_install_attempted_overall = True
 
     # Build Tools (build-essential, python3-dev)
-    logger.info("--- Stage 4: Build Tools Prerequisites ---")
+    logger.info("--- Stage 5: Build Tools Prerequisites ---")
     install_attempted_build_tools, apt_updated_this_orchestration_run = (
         ensure_build_tools(apt_updated_this_orchestration_run)
     )

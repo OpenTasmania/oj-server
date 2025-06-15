@@ -3,8 +3,9 @@
 import logging
 from typing import Optional
 
-from common.command_utils import log_map_server, run_command
+from common.command_utils import log_map_server
 from common.constants_loader import is_feature_enabled
+from common.debian.apt_manager import AptManager
 from setup import config
 from setup.config_models import AppSettings
 
@@ -43,11 +44,11 @@ def install_pgagent(
     )
 
     try:
-        run_command(
-            "sudo apt-get install -y pgagent",
-            app_settings=app_settings,
-            current_logger=logger_to_use,
-        )
+        # Use AptManager for package installation
+        apt_manager = AptManager(logger=logger_to_use)
+
+        # Install pgAgent
+        apt_manager.install("pgagent", update_first=True)
 
         log_map_server(
             f"{config.SYMBOLS['success']} pgAgent installation completed successfully.",

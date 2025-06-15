@@ -22,6 +22,7 @@ from common.command_utils import (
     run_elevated_command,
 )
 from common.constants_loader import get_constant
+from common.debian.apt_manager import AptManager
 from common.file_utils import backup_file
 from installer.docker_installer import install_docker_engine
 from installer.nodejs_installer import install_nodejs_lts
@@ -128,11 +129,9 @@ def apply_preseed_and_install_package(
             logger_to_use,
             app_settings,
         )
-        run_elevated_command(
-            ["apt-get", "install", "-yq", package_name],
-            app_settings,
-            current_logger=logger_to_use,
-        )
+        # Use AptManager for package installation
+        apt_manager = AptManager(logger=logger_to_use)
+        apt_manager.install(package_name, update_first=False)
         log_map_server(
             f"{symbols.get('success', '✅')} Package '{package_name}' installed successfully.",
             "success",
@@ -345,16 +344,14 @@ def core_conflict_removal(
                 logger_to_use,
                 app_settings,
             )
-            run_elevated_command(
-                ["apt-get", "remove", "--purge", "-yq", "nodejs", "npm"],
-                app_settings,
-                current_logger=logger_to_use,
-            )
-            run_elevated_command(
-                ["apt-get", "--purge", "-yq", "autoremove"],
-                app_settings,
-                current_logger=logger_to_use,
-            )
+            # Use AptManager for package removal
+            apt_manager = AptManager(logger=logger_to_use)
+
+            # Use AptManager's purge method to remove nodejs and npm
+            apt_manager.purge(["nodejs", "npm"], app_settings=app_settings)
+
+            # Use AptManager's autoremove method to clean up unused packages
+            apt_manager.autoremove(purge=True, app_settings=app_settings)
             log_map_server(
                 f"{symbols.get('success', '✅')} System nodejs and npm removed.",
                 "success",
@@ -418,11 +415,15 @@ def install_essential_utilities(
     original_debian_frontend = os.environ.get("DEBIAN_FRONTEND")
     try:
         os.environ["DEBIAN_FRONTEND"] = "noninteractive"
-        run_elevated_command(
-            ["apt-get", "update", "-yq"],
-            app_settings,
-            current_logger=logger_to_use,
-        )
+
+        # Use AptManager for update and upgrade
+        apt_manager = AptManager(logger=logger_to_use)
+
+        # Update package lists
+        apt_manager.update(raise_error=True)
+
+        # Note: AptManager doesn't have a direct method for upgrade,
+        # so we still need to use run_elevated_command for this operation
         run_elevated_command(
             ["apt-get", "-yq", "upgrade"],
             app_settings,

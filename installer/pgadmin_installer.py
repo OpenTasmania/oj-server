@@ -3,8 +3,9 @@
 import logging
 from typing import Optional
 
-from common.command_utils import log_map_server, run_command
+from common.command_utils import log_map_server
 from common.constants_loader import is_feature_enabled
+from common.debian.apt_manager import AptManager
 from setup import config
 from setup.config_models import AppSettings
 
@@ -42,18 +43,12 @@ def install_pgadmin(
         logger_to_use,
     )
 
-    commands = [
-        "sudo apt-get install -y pgadmin4",
-    ]
-
     try:
-        for cmd in commands:
-            run_command(
-                cmd,
-                app_settings=app_settings,
-                current_logger=logger_to_use,
-                shell=True,
-            )
+        # Use AptManager for package installation
+        apt_manager = AptManager(logger=logger_to_use)
+
+        # Install pgAdmin4
+        apt_manager.install("pgadmin4", update_first=True)
 
         log_map_server(
             f"{config.SYMBOLS['success']} pgAdmin installation completed successfully.",

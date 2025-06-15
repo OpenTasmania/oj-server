@@ -6,8 +6,6 @@ Handles the installation of Docker Engine.
 
 import getpass
 import logging
-import os
-import tempfile
 from typing import Optional
 
 from common.command_utils import (
@@ -15,6 +13,7 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
+from common.debian.apt_manager import AptManager
 from common.system_utils import (
     get_debian_codename,
 )
@@ -68,33 +67,14 @@ def install_docker_engine(
 
     key_dest_final = "/etc/apt/keyrings/docker.asc"
     key_url = "https://download.docker.com/linux/debian/gpg"
-    key_dest_tmp = ""
+
+    # Initialize AptManager
+    apt_manager = AptManager(logger=logger_to_use)
 
     try:
-        run_elevated_command(
-            ["install", "-m", "0755", "-d", os.path.dirname(key_dest_final)],
-            app_settings,
-            current_logger=logger_to_use,
-        )
-        with tempfile.NamedTemporaryFile(
-            delete=False, prefix="dockerkey_", suffix=".asc"
-        ) as temp_f:
-            key_dest_tmp = temp_f.name
-        run_command(
-            ["curl", "-fsSL", key_url, "-o", key_dest_tmp],
-            app_settings,
-            current_logger=logger_to_use,
-        )
-        run_elevated_command(
-            ["cp", key_dest_tmp, key_dest_final],
-            app_settings,
-            current_logger=logger_to_use,
-        )
-        run_elevated_command(
-            ["chmod", "a+r", key_dest_final],
-            app_settings,
-            current_logger=logger_to_use,
-        )
+        # Use AptManager to add GPG key
+        apt_manager.add_gpg_key_from_url(key_url, key_dest_final)
+
         log_map_server(
             f"{symbols.get('success', '✅')} Docker GPG key installed.",
             "success",
@@ -109,12 +89,7 @@ def install_docker_engine(
             app_settings,
             exc_info=True,
         )
-        if key_dest_tmp and os.path.exists(key_dest_tmp):
-            os.unlink(key_dest_tmp)
         raise
-    finally:
-        if key_dest_tmp and os.path.exists(key_dest_tmp):
-            os.unlink(key_dest_tmp)
 
     try:
         arch_result = run_command(
@@ -141,33 +116,26 @@ def install_docker_engine(
         )
         raise
 
-    docker_source_list = f"deb [arch={arch} signed-by={key_dest_final}] https://download.docker.com/linux/debian {codename} stable\n"
-    docker_sources_file = "/etc/apt/sources.list.d/docker.list"
+    docker_source_list = f"deb [arch={arch} signed-by={key_dest_final}] https://download.docker.com/linux/debian {codename} stable"
     try:
-        run_elevated_command(
-            ["tee", docker_sources_file],
-            app_settings,
-            cmd_input=docker_source_list,
-            current_logger=logger_to_use,
-        )
+        # Use AptManager to add repository
+        apt_manager.add_repository(docker_source_list, update_after=True)
+
         log_map_server(
-            f"{symbols.get('success', '✅')} Docker apt source configured: {docker_sources_file}",
+            f"{symbols.get('success', '✅')} Docker apt source configured and updated",
             "success",
             logger_to_use,
             app_settings,
         )
     except Exception as e:
         log_map_server(
-            f"{symbols.get('error', '❌')} Failed to write Docker apt source: {e}",
+            f"{symbols.get('error', '❌')} Failed to configure Docker apt source: {e}",
             "error",
             logger_to_use,
             app_settings,
         )
         raise
 
-    run_elevated_command(
-        ["apt", "update"], app_settings, current_logger=logger_to_use
-    )
     pkgs = [
         "docker-ce",
         "docker-ce-cli",
@@ -181,11 +149,10 @@ def install_docker_engine(
         logger_to_use,
         app_settings,
     )
-    run_elevated_command(
-        ["apt", "--yes", "install"] + pkgs,
-        app_settings,
-        current_logger=logger_to_use,
-    )
+
+    # Use AptManager to install packages
+    # Note: We set update_first=False because we already updated when adding the repository
+    apt_manager.install(pkgs, update_first=False)
 
     user = getpass.getuser()
     log_map_server(
