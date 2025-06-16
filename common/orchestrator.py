@@ -5,6 +5,7 @@ Centralized orchestrator for managing and executing sequences of tasks.
 """
 
 import logging
+import sys
 from typing import Any, Callable, Dict, List, Optional
 
 
@@ -90,9 +91,9 @@ class Orchestrator:
                 )
                 if task.get("fatal", True):
                     self.logger.error(
-                        "A fatal error occurred. Halting orchestration."
+                        "A fatal error occurred. Halting orchestration and exiting application."
                     )
-                    return False
+                    sys.exit(1)
                 else:
                     self.logger.warning(
                         f"Task '{task_name}' was non-fatal. Continuing orchestration."
