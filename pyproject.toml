@@ -96,7 +96,7 @@ addopts = """
         --cov-report json:cover/coverage.json
         --cov-report xml:cover/coverage.xml
         """
-norecursedirs = ["tests/setup/configure",]
+norecursedirs = ["tests/setup/configure", "tests/installer"]
 
 [tool.coverage.report]
 show_missing = true
