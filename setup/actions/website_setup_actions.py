@@ -5,22 +5,20 @@ Handles deployment of the static test website page.
 """
 
 import logging
-import re  # For IP check
-from pathlib import Path  # For path handling
+import re
+from pathlib import Path
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
 from common.system_utils import get_current_script_hash
 from setup import (
-    config as static_config,  # For SCRIPT_VERSION if used in {script_version_short}
+    config as static_config,
 )
 from setup.config_models import VM_IP_OR_DOMAIN_DEFAULT, AppSettings
 
 module_logger = logging.getLogger(__name__)
 
-# WEBSITE_DEPLOY_DIR, WEBSITE_HTML_FILENAME are now from app_settings.webapp
-# WEB_USER, WEB_GROUP are system constants, can remain here or move to a shared constants if used elsewhere
-WEB_SERVER_USER = "www-data"  # Standard web server user
+WEB_SERVER_USER = "www-data"
 WEB_SERVER_GROUP = "www-data"
 
 
@@ -28,8 +26,14 @@ def deploy_test_website_content(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Creates the test website directory and deploys the index.html file
-    using templates and paths from app_settings.
+    Deploys the test website content to the specified directory, configures required permissions,
+    and logs the process. The function handles directory creation, populating an HTML template with
+    formatted variables, and setting permissions for web server access.
+
+    Arguments:
+        app_settings (AppSettings): The application configuration settings used during deployment.
+        current_logger (Optional[logging.Logger]): The logger instance to use for logging information.
+            If None, a default module-level logger is used.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

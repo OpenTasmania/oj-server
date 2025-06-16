@@ -87,6 +87,61 @@ class InstallerTUI:
         defined_tasks: List[Tuple[str, str, StepFunctionType]],
         app_settings_instance: AppSettings,
     ) -> None:
+        """
+        Initializes an instance of the class and sets up the main components of the TUI
+        (Task-based User Interface). Configures initial attributes, task handling, and
+        UI elements.
+
+        Attributes:
+            defined_tasks: List of predefined task tuples, each containing a name,
+                description, and a callable step function representing the task.
+            app_settings: Instance of AppSettings that manages application-specific
+                configurations.
+            tui_log_handler: An optional TuiLogHandler instance for logging within the
+                TUI.
+            task_queue: List that manages the queue of tasks awaiting execution,
+                initialized as empty.
+            is_task_running: A boolean indicating whether a task is currently being
+                executed, initialized to False.
+            current_task_info: Optional dictionary containing metadata about the
+                currently running task; initialized to None.
+            _active_worker_thread: Optional threading.Thread used for running tasks in
+                a background thread; initialized to None.
+            _dialog_event: Optional threading.Event used for synchronizing dialog-related
+                UI interactions; initialized to None.
+            _dialog_prompt_message: String that stores the current prompt message
+                displayed in dialog boxes, initialized as empty.
+            _dialog_result: Optional boolean representing the result of a dialog action,
+                if applicable; initialized to None.
+            _original_root_logger_level: Optional integer capturing the original logging
+                level for the root logger; initialized to None.
+            _root_logger_level_modified_by_tui: Boolean indicating whether the root
+                logger's level has been modified by the TUI; initialized to False.
+            _original_root_handlers: List of original logging.Handler instances
+                associated with the root logger before TUI modifications.
+            _removed_handlers_by_tui: List of logging.Handler instances removed or
+                replaced by the TUI.
+
+            header: An instance of urwid.AttrMap representing the header of the UI,
+                containing a title text widget.
+            footer_text: An instance of urwid.Text containing footer instructions for
+                user interaction.
+            footer: An instance of urwid.AttrMap wrapping the footer text for display
+                styling.
+            log_display: An instance of LogDisplay, managing the visual display of log
+                messages in the TUI.
+            main_menu_listbox: An instance of urwid.ListBox, built from a
+                SimpleFocusListWalker populated by the main menu items.
+            interactive_pane_placeholder: An instance of urwid.WidgetPlaceholder serving
+                as a placeholder for the interactive pane within the interface.
+            columns_view: An instance of urwid.Columns, laying out the interactive
+                pane and log display side-by-side.
+            frame: An instance of urwid.Frame, combining the body, header, and footer
+                to construct the full UI frame.
+            main_loop: An instance of urwid.MainLoop, serving as the application's
+                main event loop, configured with a specific palette and an unhandled
+                input handler.
+        """
         self.defined_tasks = defined_tasks
         self.app_settings: AppSettings = app_settings_instance
         self.tui_log_handler: Optional[TuiLogHandler] = None
@@ -135,6 +190,19 @@ class InstallerTUI:
         )
 
     def _build_main_menu(self) -> List[urwid.Widget]:
+        """
+        Builds and returns the main menu as a list of configured urwid Widgets.
+
+        This private method constructs the main menu for the application interface. It
+        creates menu options, assigns corresponding callback functions, and applies
+        styling for the buttons that represent each menu option. The generated widgets
+        are returned as a list to be further utilized in rendering the menu.
+
+        Returns:
+            List[urwid.Widget]: A list of urwid.Widget objects representing the main
+            menu options with applied styles and their respective callbacks.
+
+        """
         menu_options = [
             ("View Configuration", self.show_view_configuration),
             ("Manage State", self.show_manage_state),
@@ -154,6 +222,21 @@ class InstallerTUI:
         return buttons
 
     def _handle_global_keys(self, key: str) -> None:  # pragma: no cover
+        """
+        Handle global key events for the application.
+
+        This method processes key inputs that are intended to perform global actions,
+        such as exiting the application or returning to the main menu. It handles these
+        keys based on the current state of the application, ensuring certain operations
+        are restricted when a task is actively running.
+
+        Args:
+            key: str
+                The input key received from the user.
+
+        Returns:
+            None
+        """
         if key == "ctrl c":
             self.confirm_exit_dialog()
         elif key == "q":
@@ -176,12 +259,294 @@ class InstallerTUI:
     def _update_interactive_pane(
         self, widget: urwid.Widget, title: str = "Controls"
     ) -> None:
+        """
+        Updates the interactive pane with a new widget and title. The placeholder widget in
+        the interactive pane is replaced with a new LineBox widget that wraps the provided
+        widget. This method also redraws the screen to reflect the changes.
+
+        Parameters
+        ----------
+        widget : urwid.Widget
+            The widget to be displayed in the interactive pane.
+        title : str, optional
+            The title to be displayed on the LineBox containing the widget. Defaults to
+            "Controls".
+
+        Returns
+        -------
+        None
+        """
         self.interactive_pane_placeholder.original_widget = urwid.LineBox(
             widget, title=title
         )
         self.main_loop.draw_screen()
 
+    def _task_runner(
+        self, tag: str, desc: str, func: StepFunctionType
+    ) -> None:  # pragma: no cover
+        """
+        Executes a task within a threaded environment and handles its completion.
+
+        This method is responsible for running a task provided as a function in a
+        threaded setup, ensuring proper execution and logging of any exceptions
+        encountered during execution. Upon task completion, it triggers an alarm
+        to handle post-task processing asynchronously.
+
+        Arguments:
+            tag: str
+                A unique identifier or name for the task, used for logging and
+                tracking purposes.
+            desc: str
+                A descriptive string about the task, used for logging and
+                better understanding of the task's intent or context.
+            func: StepFunctionType
+                The function representing the task to be executed. This function
+                encapsulates the actual behavior or logic of the task.
+
+        Raises:
+            Exception
+                If an unhandled exception occurs during the execution of the
+                task, it is logged critically, providing information and context
+                of the failure.
+        """
+        success = False
+        try:
+            success = execute_step(
+                tag,
+                desc,
+                func,
+                self.app_settings,
+                current_logger_instance=module_logger,
+                prompt_user_for_rerun=self._threaded_prompt_for_rerun,
+            )
+        except Exception as e:
+            module_logger.critical(
+                f"Unhandled exception in threaded task {tag} ({desc}): {e}",
+                exc_info=True,
+            )
+            success = False
+        finally:
+            self.main_loop.alarm(
+                0,
+                lambda _l, _d: self._handle_task_completion(
+                    tag, desc, success
+                ),
+            )  # type: ignore[attr-defined]
+
+    def _handle_task_completion(
+        self, tag: str, desc: str, success: bool
+    ) -> None:  # pragma: no cover
+        """
+        Handles the completion of a task by updating the state, logging the result,
+        and processing the next task in the queue.
+
+        Parameters:
+        tag : str
+            The identifier for the completed task.
+        desc : str
+            A description of the completed task.
+        success : bool
+            Indicates whether the task was completed successfully.
+
+        """
+        self.is_task_running = False
+        self._active_worker_thread = None
+        log_level = "log_info" if success else "log_error"
+        status_text = "SUCCESS" if success else "FAILED/SKIPPED"
+        self.log_display.add_message(
+            f"--- THREAD {status_text}: {desc} ({tag}) ---", log_level
+        )
+        self._process_next_task_in_queue()
+
+    def _process_next_task_in_queue(self) -> None:  # pragma: no cover
+        """
+        Processes the next task in the task queue and manages task execution state.
+
+        This method checks the current state of task execution and decides whether
+        to process the next task, update the UI, or finish task execution. If there
+        are no tasks in the queue, it resets the state and updates the user
+        interface to indicate that all tasks are complete. If a task is available,
+        it updates the state, initializes the interactive pane, and begins the task
+        execution process using the provided function.
+
+        Attributes
+        ----------
+        is_task_running : bool
+            Indicates whether a task is currently running.
+        task_queue : list of tuple
+            A queue of tasks to be executed. Each task is a tuple containing
+            the tag (str), description (str), and the function to execute.
+        current_task_info : dict or None
+            Stores information about the currently running task. Contains 'tag'
+            (str) and 'desc' (str) keys.
+        footer_text : urwid.Text
+            UI component representing the footer text area.
+        log_display : object
+            UI component used to display log messages.
+        main_menu_listbox : urwid.ListBox
+            Listbox widget representing the main menu items.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        if self.is_task_running:
+            return
+        if not self.task_queue:
+            self.is_task_running = False
+            self.current_task_info = None
+            self.footer_text.set_text(
+                "All queued tasks finished. Press 'q' for main menu."
+            )
+            self.log_display.add_message(
+                "--- All queued tasks complete ---", "info"
+            )
+            self._update_interactive_pane(
+                self.main_menu_listbox, title="Main Menu"
+            )
+            return
+
+        tag, desc, func = self.task_queue.pop(0)
+        self.is_task_running = True
+        self.current_task_info = {"tag": tag, "desc": desc}
+        status_message = (
+            f"Running Task:\n\n{desc} ({tag})\n\nLogs appear on the right..."
+        )
+        self._update_interactive_pane(
+            urwid.Filler(
+                urwid.Text(status_message, align="center"), valign="middle"
+            ),
+            title="Task In Progress",
+        )
+        self.footer_text.set_text(
+            f"Running: {desc} ({tag})... Ctrl-C to attempt abort."
+        )
+        self.execute_installer_step(tag, desc, func)
+
+    def _show_rerun_dialog_from_worker(
+        self, _loop=None, _data=None
+    ) -> None:  # pragma: no cover
+        """
+        Handles the presentation and interaction of a confirmation dialog from a background
+        worker process. This function is responsible for bringing up a Yes/No dialog
+        to the interface, managing user response, and updating the state based on
+        the user's decision. It ensures that the dialog is shown only if a valid
+        prompt message exists, otherwise logs an error and handles fallback states.
+
+        Parameters:
+            _loop: optional
+                An event loop instance used for any asynchronous operations, if applicable.
+            _data: optional
+                Arbitrary data payload that may be processed during the function call.
+
+        Raises:
+            None
+
+        Returns:
+            None
+        """
+        if not self._dialog_prompt_message:
+            module_logger.error(
+                "No prompt message for rerun dialog from worker."
+            )
+            if self._dialog_event:
+                self._dialog_result = False
+                self._dialog_event.set()
+                return
+        dialog = YesNoDialog("Confirmation", self._dialog_prompt_message)
+        original_top_widget = self.main_loop.widget
+
+        def _handle_dialog_response(is_yes: bool):
+            self.main_loop.widget = original_top_widget
+            self._dialog_result = is_yes
+            if self._dialog_event:
+                self._dialog_event.set()
+            self.main_loop.draw_screen()
+
+        urwid.connect_signal(
+            dialog, "close_yes", lambda d: _handle_dialog_response(True)
+        )
+        urwid.connect_signal(
+            dialog, "close_no", lambda d: _handle_dialog_response(False)
+        )
+        self.main_loop.widget = urwid.Overlay(
+            dialog,
+            original_top_widget,
+            align="center",
+            width=("relative", 80),
+            valign="middle",
+            height=("pack", None),
+            min_width=40,
+            min_height=8,
+        )
+        self.main_loop.draw_screen()
+
+    def _threaded_prompt_for_rerun(
+        self,
+        prompt_message: str,
+        settings: AppSettings,
+        logger_instance: Optional[
+            logging.Logger
+        ],  # Renamed from 'logger' to avoid conflict with module_logger
+    ) -> bool:  # pragma: no cover
+        """
+        Handles the logic for prompting the user about a rerun operation in a threaded
+        context. If this method is called from the main thread, it directly triggers
+        a textual user interface (TUI) prompt for a rerun decision. However, when called
+        from a worker thread, it schedules a dialog event in the main thread for user
+        interaction and waits for the result.
+
+        Parameters:
+            prompt_message: str
+                The message to display as the prompt for the rerun decision.
+            settings: AppSettings
+                The application settings used to determine operational settings or
+                configurations.
+            logger_instance: Optional[logging.Logger]
+                A specific logger instance to record warnings or events. If no logger is
+                provided, a module-level logger will be used.
+
+        Returns:
+            bool
+                A boolean indicating whether the user has opted for a rerun operation
+                (True) or not (False).
+        """
+        if threading.current_thread() is threading.main_thread():
+            (logger_instance or module_logger).warning(
+                "_threaded_prompt_for_rerun called from main thread unexpectedly, using direct TUI prompt."
+            )
+            return self.tui_prompt_for_rerun(prompt_message)
+
+        self._dialog_event = threading.Event()
+        self._dialog_prompt_message = prompt_message
+        self._dialog_result = None
+        self.main_loop.alarm(0, self._show_rerun_dialog_from_worker)  # type: ignore[attr-defined]
+        self._dialog_event.wait()
+        self._dialog_event = None
+        self._dialog_prompt_message = ""
+        return (
+            self._dialog_result if self._dialog_result is not None else False
+        )
+
     def show_main_menu(self, button: Optional[urwid.Button] = None) -> None:
+        """
+        Displays the main menu of the application.
+
+        This method is responsible for rendering the main menu in the interactive
+        pane of the user interface. It checks if any task is running before attempting
+        to display the menu to avoid interruptions. If a task is in progress, a warning
+        message is added to the log display. When the menu is successfully displayed,
+        navigation instructions are provided in the footer.
+
+        Parameters
+        ----------
+        button : Optional[urwid.Button], optional
+            The button triggering this action, default is None.
+        """
         if self.is_task_running:  # pragma: no cover
             self.log_display.add_message(
                 "Task in progress. Cannot show main menu now.", "warning"
@@ -197,6 +562,22 @@ class InstallerTUI:
     def show_view_configuration(
         self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
+        """
+        Displays the application's current configuration in the log display.
+
+        This method allows the user to view the current configuration settings of the
+        application. If there is a task in progress, the configuration settings will not
+        be displayed, and a warning will be logged instead. Configuration details such as
+        the admin group IP, GTFS feed URL, and VM domain are displayed. In case of errors
+        or missing configuration attributes, appropriate error messages are logged.
+
+        Parameters:
+            button: urwid.Button, optional
+                A button object that triggers this method. Defaults to None.
+
+        Returns:
+            None
+        """
         if self.is_task_running:
             self.log_display.add_message(
                 "Task in progress. Cannot view configuration now.", "warning"
@@ -233,6 +614,24 @@ class InstallerTUI:
     def show_manage_state(
         self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
+        """
+        Displays and manages the current state information and logs. This function handles
+        displaying both completed steps along with associated messages or warnings. If a task
+        is in progress, it logs a corresponding warning and prevents further state management
+        to ensure data consistency. Additionally, errors during state inspection are caught,
+        logged, and displayed.
+
+        Parameters:
+            button (Optional[urwid.Button]): The button triggering the state management
+            display. This is optional and defaults to None.
+
+        Raises:
+            Exception: Logs an error message and exception details if there is an issue
+            while viewing the state information.
+
+        Returns:
+            None
+        """
         if self.is_task_running:
             self.log_display.add_message(
                 "Task in progress. Cannot manage state now.", "warning"
@@ -260,82 +659,24 @@ class InstallerTUI:
         )
         self.main_loop.draw_screen()
 
-    def _task_runner(
-        self, tag: str, desc: str, func: StepFunctionType
-    ) -> None:  # pragma: no cover
-        success = False
-        try:
-            success = execute_step(
-                tag,
-                desc,
-                func,
-                self.app_settings,
-                current_logger_instance=module_logger,
-                prompt_user_for_rerun=self._threaded_prompt_for_rerun,
-            )
-        except Exception as e:
-            module_logger.critical(
-                f"Unhandled exception in threaded task {tag} ({desc}): {e}",
-                exc_info=True,
-            )
-            success = False
-        finally:
-            self.main_loop.alarm(
-                0,
-                lambda _l, _d: self._handle_task_completion(
-                    tag, desc, success
-                ),
-            )  # type: ignore[attr-defined]
-
-    def _handle_task_completion(
-        self, tag: str, desc: str, success: bool
-    ) -> None:  # pragma: no cover
-        self.is_task_running = False
-        self._active_worker_thread = None
-        log_level = "log_info" if success else "log_error"
-        status_text = "SUCCESS" if success else "FAILED/SKIPPED"
-        self.log_display.add_message(
-            f"--- THREAD {status_text}: {desc} ({tag}) ---", log_level
-        )
-        self._process_next_task_in_queue()
-
-    def _process_next_task_in_queue(self) -> None:  # pragma: no cover
-        if self.is_task_running:
-            return
-        if not self.task_queue:
-            self.is_task_running = False
-            self.current_task_info = None
-            self.footer_text.set_text(
-                "All queued tasks finished. Press 'q' for main menu."
-            )
-            self.log_display.add_message(
-                "--- All queued tasks complete ---", "info"
-            )
-            self._update_interactive_pane(
-                self.main_menu_listbox, title="Main Menu"
-            )
-            return
-
-        tag, desc, func = self.task_queue.pop(0)
-        self.is_task_running = True
-        self.current_task_info = {"tag": tag, "desc": desc}
-        status_message = (
-            f"Running Task:\n\n{desc} ({tag})\n\nLogs appear on the right..."
-        )
-        self._update_interactive_pane(
-            urwid.Filler(
-                urwid.Text(status_message, align="center"), valign="middle"
-            ),
-            title="Task In Progress",
-        )
-        self.footer_text.set_text(
-            f"Running: {desc} ({tag})... Ctrl-C to attempt abort."
-        )
-        self.execute_installer_step(tag, desc, func)
-
     def run_full_installation(
         self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
+        """
+        Queues and executes a full installation sequence. The process is executed
+        through a sequence of tasks. If tasks are already in progress, a warning
+        is displayed, and no further actions are initiated. Before starting the
+        execution, this function clears any previously displayed logs and adds
+        a header indicating the initiation of the full installation. Also, if no
+        tasks are defined, it updates the interactive pane and logs a warning.
+
+        Parameters:
+            button (Optional[urwid.Button]): A button that may trigger the
+                installation process. Defaults to None.
+
+        Returns:
+            None
+        """
         if self.is_task_running:
             self.log_display.add_message(
                 "A task or sequence is already in progress.", "warning"
@@ -360,6 +701,26 @@ class InstallerTUI:
     def show_step_selection(
         self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
+        """
+        Handles the display and interaction for step selection in a user interface, allowing
+        users to select tasks or steps to be executed. If tasks are already in progress or
+        no tasks are defined, appropriate messages are displayed and options are limited.
+        Enables selection via a checklist UI and processes selected steps for execution.
+
+        Parameters
+        ----------
+        button : Optional[urwid.Button], optional
+            A button triggering the function, by default None
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        Does not explicitly raise any exceptions, but depends on error handling in
+        UI or callback functions.
+        """
         if self.is_task_running:
             self.log_display.add_message(
                 "Task in progress. Cannot select new steps now.", "warning"
@@ -450,73 +811,41 @@ class InstallerTUI:
             "Space to toggle, Enter on buttons. 'q' for main menu."
         )
 
-    def _show_rerun_dialog_from_worker(
-        self, _loop=None, _data=None
-    ) -> None:  # pragma: no cover
-        if not self._dialog_prompt_message:
-            module_logger.error(
-                "No prompt message for rerun dialog from worker."
-            )
-            if self._dialog_event:
-                self._dialog_result = False
-                self._dialog_event.set()
-                return
-        dialog = YesNoDialog("Confirmation", self._dialog_prompt_message)
-        original_top_widget = self.main_loop.widget
-
-        def _handle_dialog_response(is_yes: bool):
-            self.main_loop.widget = original_top_widget
-            self._dialog_result = is_yes
-            if self._dialog_event:
-                self._dialog_event.set()
-            self.main_loop.draw_screen()
-
-        urwid.connect_signal(
-            dialog, "close_yes", lambda d: _handle_dialog_response(True)
-        )
-        urwid.connect_signal(
-            dialog, "close_no", lambda d: _handle_dialog_response(False)
-        )
-        self.main_loop.widget = urwid.Overlay(
-            dialog,
-            original_top_widget,
-            align="center",
-            width=("relative", 80),
-            valign="middle",
-            height=("pack", None),
-            min_width=40,
-            min_height=8,
-        )
-        self.main_loop.draw_screen()
-
-    def _threaded_prompt_for_rerun(
-        self,
-        prompt_message: str,
-        settings: AppSettings,
-        logger_instance: Optional[
-            logging.Logger
-        ],  # Renamed from 'logger' to avoid conflict with module_logger
-    ) -> bool:  # pragma: no cover
-        if threading.current_thread() is threading.main_thread():
-            (logger_instance or module_logger).warning(
-                "_threaded_prompt_for_rerun called from main thread unexpectedly, using direct TUI prompt."
-            )
-            return self.tui_prompt_for_rerun(prompt_message)
-
-        self._dialog_event = threading.Event()
-        self._dialog_prompt_message = prompt_message
-        self._dialog_result = None
-        self.main_loop.alarm(0, self._show_rerun_dialog_from_worker)  # type: ignore[attr-defined]
-        self._dialog_event.wait()
-        self._dialog_event = None
-        self._dialog_prompt_message = ""
-        return (
-            self._dialog_result if self._dialog_result is not None else False
-        )
-
     def tui_prompt_for_rerun(
         self, prompt_message: str
     ) -> bool:  # pragma: no cover
+        """
+        Prompts the user with a confirmation dialog for rerunning an operation using a
+        text-based user interface (TUI).
+
+        This method creates a temporary main loop to display a confirmation dialog
+        and waits for the user's response. It ensures that the prompt operation is
+        performed on the main thread and logs an error if called from a non-main
+        thread.
+
+        Attributes
+        ----------
+        main_loop : urwid.MainLoop
+            The main event loop of the TUI application. The method temporarily replaces
+            the main widget for UI interaction.
+
+        Methods
+        -------
+        tui_prompt_for_rerun(self, prompt_message: str) -> bool
+            Displays a confirmation dialog with the provided prompt message and returns
+            the user's response as a boolean value.
+
+        Parameters
+        ----------
+        prompt_message : str
+            The prompt message shown within the confirmation dialog.
+
+        Returns
+        -------
+        bool
+            Returns True if the user confirms with "Yes"; False otherwise. If an error
+            occurs or the result is unavailable, it defaults to False.
+        """
         if threading.current_thread() is not threading.main_thread():
             module_logger.error(
                 "FATAL: tui_prompt_for_rerun (direct) called from non-main thread!"
@@ -567,6 +896,26 @@ class InstallerTUI:
     def execute_installer_step(
         self, tag: str, desc: str, func: StepFunctionType
     ) -> None:  # pragma: no cover
+        """
+        Executes a step in the installer process within a separate thread.
+
+        This method is used to initiate and execute a specific installer step by
+        creating a new thread. The step is identified by a tag and description,
+        and its execution logic is encapsulated within a function.
+
+        Parameters:
+            tag (str): A string representing the unique identifier of the installer step.
+            desc (str): A descriptive string providing information about the step's purpose.
+            func (StepFunctionType): The function containing the logic of the installer
+                step being executed.
+
+        Raises:
+            This method does not explicitly raise exceptions, but exceptions raised
+            within the specified step function should be handled appropriately.
+
+        Returns:
+            None
+        """
         self._active_worker_thread = threading.Thread(
             target=self._task_runner, args=(tag, desc, func), daemon=True
         )
@@ -575,6 +924,20 @@ class InstallerTUI:
     def confirm_exit_dialog(
         self, button: Optional[urwid.Button] = None
     ) -> None:  # pragma: no cover
+        """
+        Displays a confirmation dialog to the user, asking if they are sure they want
+        to quit the application. If a task is currently running, the dialog's message
+        will warn the user about the active task. Handles the user's response to the
+        dialog and either terminates the application or resumes it based on the input.
+
+        Parameters:
+            button (Optional[urwid.Button]): Optional button parameter that triggers
+                the dialog. Defaults to None.
+
+        Raises:
+            urwid.ExitMainLoop: Raised if the user confirms the exit action by
+                interacting with the dialog.
+        """
         message = "Are you sure you want to quit?" + (
             " (A task is running!)" if self.is_task_running else ""
         )
@@ -606,6 +969,24 @@ class InstallerTUI:
         self.main_loop.draw_screen()
 
     def run(self) -> None:
+        """
+        Runs the Text User Interface (TUI) main loop, initializing logging mechanisms
+        and ensuring proper setup and cleanup of the logging configuration to integrate
+        with the TUI interface. This method manages logging handlers and levels to properly
+        route log messages to the TUI display while preserving the original logging configuration.
+
+        Attributes:
+            tui_log_handler: An instance of TuiLogHandler to handle and display logs within the TUI.
+            _original_root_logger_level: The original logging level of the root logger prior to TUI setup.
+            _original_root_handlers: A list of the original handlers attached to the root logger.
+            _removed_handlers_by_tui: A list to store temporarily removed handlers during TUI execution.
+            _root_logger_level_modified_by_tui: A boolean indicating if the root logger's level was
+                modified during TUI execution.
+
+        Raises:
+            urwid.ExitMainLoop: Raised to indicate a normal exit of the TUI.
+            Exception: Any unhandled exceptions in the TUI main loop are logged and handled here.
+        """
         self.tui_log_handler = TuiLogHandler(self.log_display, self.main_loop)
         self.tui_log_handler.setLevel(logging.DEBUG)
         root_logger = logging.getLogger()
@@ -682,6 +1063,19 @@ def run_tui_installer(
     defined_tasks: List[Tuple[str, str, StepFunctionType]],
     app_settings: AppSettings,
 ) -> None:  # pragma: no cover
+    """
+    Run the Text User Interface (TUI) installer to execute a series of defined tasks for application installation or
+    configuration. This function creates and runs an instance of a TUI installer, which orchestrates the process of
+    executing a sequence of tasks defined by the user.
+
+    Parameters:
+        defined_tasks: List of tuples where each tuple contains a task label (str), a task description (str),
+                       and a callable of type StepFunctionType to execute the task.
+        app_settings: An instance of the AppSettings class containing configuration settings for the installer.
+
+    Returns:
+        None
+    """
     app = InstallerTUI(
         defined_tasks=defined_tasks, app_settings_instance=app_settings
     )

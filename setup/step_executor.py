@@ -26,7 +26,7 @@ def execute_step(
     step_tag: str,
     step_description: str,
     step_function: Callable[[AppSettings, Optional[logging.Logger]], Any],
-    app_settings: AppSettings,  # Added app_settings parameter
+    app_settings: AppSettings,
     current_logger_instance: Optional[logging.Logger],
     prompt_user_for_rerun: Callable[
         [str, AppSettings, Optional[logging.Logger]], bool

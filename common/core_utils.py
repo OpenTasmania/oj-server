@@ -46,7 +46,6 @@ class SymbolFormatter(logging.Formatter):
         self.symbols = symbols or SYMBOLS_DEFAULT
 
     def format(self, record):
-        # Add the appropriate symbol based on the log level
         if record.levelno == logging.DEBUG:
             record.symbol = self.symbols.get("debug", "🐛")
         elif record.levelno == logging.INFO:
@@ -142,25 +141,20 @@ def setup_logging(
         else:
             final_format_str = SIMPLE_LOG_FORMAT_NO_PREFIX
 
-    # Create a formatter with symbols
     formatter = SymbolFormatter(
         fmt=final_format_str,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Apply the formatter to all handlers
     for handler in handlers:
         handler.setFormatter(formatter)
 
-    # Configure the root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
 
-    # Remove any existing handlers from the root logger
     for handler in list(root_logger.handlers):
         root_logger.removeHandler(handler)
 
-    # Add our handlers to the root logger
     for handler in handlers:
         root_logger.addHandler(handler)
 

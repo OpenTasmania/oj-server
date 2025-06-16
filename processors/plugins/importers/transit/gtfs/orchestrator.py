@@ -18,6 +18,17 @@ module_logger = logging.getLogger(__name__)
 
 
 class GTFSConfigError(Exception):
+    """
+    Custom exception indicating a configuration error specific to GTFS handling.
+
+    This exception is raised when there is a problem with the configuration
+    used for GTFS (General Transit Feed Specification) processing. It can
+    be used to signal errors such as missing configuration values, improper
+    settings, or other related issues. This class is intended to encapsulate
+    errors specific to GTFS configuration, making them easier to identify and
+    handle in an application.
+    """
+
     pass
 
 

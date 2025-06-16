@@ -26,10 +26,6 @@ from setup.config_models import AppSettings  # For type hinting
 module_logger = logging.getLogger(__name__)
 
 
-# Removed global CURRENT_SCRIPT_HASH cache from here, it's in common.system_utils.py
-# Removed local calculate_project_hash and get_current_script_hash functions from here.
-
-
 def initialize_state_system(
     app_settings: AppSettings,  # Added app_settings
     current_logger: Optional[logging.Logger] = None,
@@ -40,14 +36,10 @@ def initialize_state_system(
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
-    state_dir = (
-        static_config.STATE_FILE_PATH.parent
-    )  # STATE_FILE_PATH from static_config
-
-    # Get current script hash using the common utility
+    state_dir = static_config.STATE_FILE_PATH.parent
     current_hash = common_get_current_script_hash(
-        project_root_dir=static_config.OSM_PROJECT_ROOT,  # Pass static project root
-        app_settings=app_settings,  # Pass app_settings for logging within
+        project_root_dir=static_config.OSM_PROJECT_ROOT,
+        app_settings=app_settings,
         logger_instance=logger_to_use,
     )
     if not current_hash:
@@ -58,7 +50,6 @@ def initialize_state_system(
             logger_to_use,
             app_settings,
         )
-        # Script might proceed with caution or exit depending on overall error handling strategy
 
     if not state_dir.is_dir():
         log_map_server(
@@ -78,8 +69,12 @@ def initialize_state_system(
             current_logger=logger_to_use,
         )
 
-    state_file_header = f"# SCRIPT_HASH: {current_hash or 'UNKNOWN_HASH_INIT'}\n"  # Use calculated hash
-    human_readable_version_line = f"# Human-readable Script Version: {static_config.SCRIPT_VERSION}\n"  # SCRIPT_VERSION from static_config
+    state_file_header = (
+        f"# SCRIPT_HASH: {current_hash or 'UNKNOWN_HASH_INIT'}\n"
+    )
+    human_readable_version_line = (
+        f"# Human-readable Script Version: {static_config.SCRIPT_VERSION}\n"
+    )
 
     state_file_exists_and_is_file = False
     try:
@@ -192,7 +187,7 @@ def initialize_state_system(
 
 
 def clear_state_file(
-    app_settings: AppSettings,  # Added app_settings
+    app_settings: AppSettings,
     script_hash_to_write: Optional[str] = None,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
@@ -259,7 +254,7 @@ def clear_state_file(
 
 def mark_step_completed(
     step_tag: str,
-    app_settings: AppSettings,  # Added app_settings
+    app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
     logger_to_use = current_logger if current_logger else module_logger
@@ -305,7 +300,7 @@ def mark_step_completed(
 
 def is_step_completed(
     step_tag: str,
-    app_settings: AppSettings,  # Added app_settings
+    app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> bool:
     logger_to_use = current_logger if current_logger else module_logger
@@ -331,7 +326,7 @@ def is_step_completed(
 
 
 def view_completed_steps(
-    app_settings: AppSettings,  # Added app_settings
+    app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> List[str]:
     logger_to_use = current_logger if current_logger else module_logger
@@ -351,8 +346,8 @@ def view_completed_steps(
                 if line.strip()
             ]
         elif result.returncode == 1:
-            return []  # No matching lines
-        else:  # Grep failed
+            return []
+        else:
             log_map_server(
                 f"{symbols.get('warning', '!')} `grep` command failed unexpectedly. Exit code: {result.returncode}",
                 "warning",

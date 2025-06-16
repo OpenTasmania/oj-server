@@ -400,14 +400,45 @@ group_order_lookup: Dict[str, int] = {
 def _download_pbf_wrapper(
     ac: AppSettings, cl: Optional[logging.Logger]
 ) -> None:
-    """Wrapper to download PBF and store its path."""
+    """
+    Downloads a PBF file and stores its path in a shared dictionary.
+
+    This function acts as a wrapper to download a PBF (Protocolbuffer Binary
+    Format) file using the provided application settings and optional logger.
+    The downloaded file path is saved in a global dictionary.
+
+    Args:
+        ac: AppSettings
+            The application settings necessary for downloading the PBF file.
+        cl: Optional[logging.Logger]
+            A logger instance for logging information or None if logging is
+            not required.
+
+    Returns:
+        None
+    """
     pbf_path_holder["path"] = download_base_pbf(ac, cl)
 
 
 def _import_pbf_to_postgis_wrapper(
     ac: AppSettings, cl: Optional[logging.Logger]
 ) -> None:
-    """Wrapper to import the downloaded PBF into PostGIS."""
+    """
+    Wraps the process of importing a PBF file into a PostGIS database using osm2pgsql.
+    Performs validation to ensure the PBF file path is available before invoking the
+    import function. Logs information if a logger is provided and raises an error
+    if the import process fails.
+
+    Args:
+        ac (AppSettings): Application settings required for database configuration.
+        cl (Optional[logging.Logger]): Logger instance for logging information. If None, logging is not performed.
+
+    Raises:
+        RuntimeError: If the PBF file path is unavailable or the import step fails.
+
+    Returns:
+        None
+    """
     pbf_path = pbf_path_holder["path"]
     if not pbf_path:
         raise RuntimeError("PBF file path not available for import step.")
@@ -415,7 +446,102 @@ def _import_pbf_to_postgis_wrapper(
         raise RuntimeError("PostGIS import step failed.")
 
 
+def _wrapped_core_prerequisites_group(
+    app_settings: AppSettings, logger: Logger | None = None
+) -> None:
+    """
+    Wraps the core prerequisite check and installation process, ensuring all prerequisite
+    conditions are met for the application. If any of the prerequisites cannot be verified
+    or installed, the function raises an exception to signify failure.
+
+    Parameters:
+        app_settings: AppSettings
+            The application settings object that contains configuration
+            information required for checking and installing prerequisites.
+
+        logger: Logger | None, optional
+            A logging instance for recording messages during the prerequisite
+            check and installation process. Defaults to None.
+
+    Raises:
+        PrerequisiteCheckFailed
+            Raised when the prerequisite check fails to verify or install
+            one or more core application prerequisites.
+    """
+    all_prereqs_ok = check_and_install_prerequisites(
+        app_settings=app_settings, logger=logger
+    )
+    if not all_prereqs_ok:
+        raise PrerequisiteCheckFailed("Core prerequisite check failed")
+
+
+def _wrapped_systemd_reload_step_group(
+    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
+) -> None:
+    """
+    Executes a systemd reload step group and raises a RuntimeError if it fails.
+
+    This function invokes the `systemd_reload_step_group` process with the
+    provided application settings and logger instance. If the process fails,
+    an exception is raised to indicate the failure.
+
+    Args:
+        app_settings: AppSettings
+            The application settings required by the systemd reload step group.
+        logger_instance: Optional[logging.Logger]
+            An optional logger instance for logging the process details.
+
+    Raises:
+        RuntimeError:
+            If the systemd reload step group fails to execute successfully.
+    """
+    if not systemd_reload_step_group(app_settings, logger_instance):
+        raise RuntimeError(
+            "Systemd reload step group failed."
+        )  # pragma: no cover
+
+
+def _wrapped_data_prep_group(
+    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
+) -> None:
+    """
+    A wrapper function that invokes the data preparation group process and raises an
+    exception if the process fails.
+
+    Args:
+        app_settings: An instance of AppSettings containing the necessary configuration
+            for the data preparation process.
+        logger_instance: An optional logging.Logger instance to log information during
+            the execution of the data preparation process.
+
+    Raises:
+        RuntimeError: If the data preparation group process indicates overall failure.
+    """
+    if not data_prep_group(app_settings, logger_instance):
+        raise RuntimeError("Data preparation group failed overall.")
+
+
 def get_dynamic_help(base_help: str, task_tag: str) -> str:
+    """
+    Generates a detailed help description dynamically based on task execution context.
+
+    This function leverages a lookup table to determine the nature and grouping of a task
+    based on its tag. Depending on the lookup results, it appends additional contextual
+    details to the base help message, such as grouping information or whether the task serves
+    an orchestration role. If no details are found, the base help message is returned with
+    minimal clarification.
+
+    Parameters:
+    base_help: str
+        The base help message or description for the task.
+    task_tag: str
+        The identifier or tag associated with the task that provides context for execution.
+
+    Returns:
+    str
+        An augmented help string that incorporates details about the specific task or
+        its grouping context, if available.
+    """
     details = task_execution_details_lookup.get(task_tag)
     if details and details[1] > 0:
         return f"{base_help} (Part of Group: '{details[0]}', Sub-step: {details[1]})"
@@ -428,18 +554,20 @@ def ufw_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Executes the complete UFW (Uncomplicated Firewall) setup sequence.
+    Executes a full setup sequence for configuring and activating UFW (Uncomplicated
+    Firewall) using specified steps. The process involves checking for UFW package
+    installation, applying firewall rules, and activating the UFW service, logging
+    the progress throughout the execution.
 
-    This function orchestrates the installation and configuration of UFW,
-    including package installation, rule application, and service activation.
-    UFW provides a simplified interface for managing iptables firewall rules.
-
-    Args:
-        app_cfg: The application settings object containing configuration parameters.
-        current_logger: Optional logger instance. If None, the module logger will be used.
+    Arguments:
+        app_cfg (AppSettings): Configuration settings for the application, encapsulating
+            symbols, rules, and related UFW configuration parameters.
+        current_logger (Optional[logging.Logger]): Optional logger instance for custom
+            logging. If not provided, a default logger will be used.
 
     Raises:
-        RuntimeError: If any UFW setup step fails.
+        RuntimeError: If any step in the sequence fails to complete successfully. The
+            exception message will include the name of the failed step.
     """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -478,18 +606,27 @@ def postgres_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Executes the complete PostgreSQL setup sequence.
+    Executes a full setup sequence for PostgreSQL, including configuration, permissions, and
+    server restarts. This function handles the installation and proper configuration of a
+    PostgreSQL server, ensuring that required steps are executed sequentially and logs
+    relevant messages during the process. Each task is executed with a defined step executor
+    function, and the process halts on failure to ensure proper setup integrity.
 
-    This function orchestrates the installation and configuration of PostgreSQL,
-    including package installation, database creation, extension enablement,
-    permission setting, and service configuration.
+    Arguments:
+        app_cfg (AppSettings): The application settings configuration, which contains details
+            required for executing the PostgreSQL setup steps, such as symbols and other
+            application-defined parameters.
+        current_logger (Optional[logging.Logger]): An optional logger instance to use for
+            recording the steps of the PostgreSQL setup sequence. If not provided, a default
+            logger is used.
 
-    Args:
-        app_cfg: The application settings object containing configuration parameters.
-        current_logger: Optional logger instance. If None, the module logger will be used.
+    Returns:
+        None
 
     Raises:
-        RuntimeError: If any PostgreSQL setup step fails.
+        RuntimeError: If any of the setup steps fail during the execution, this exception is
+            raised to indicate that the PostgreSQL setup sequence has not been completed
+            successfully.
     """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -548,11 +685,24 @@ def postgres_tools_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Setup sequence for PostgreSQL-related tools (pgAdmin, pgAgent).
+    Executes the setup sequence for PostgreSQL tools, such as pgAdmin and pgAgent,
+    based on the given application configuration and feature flags. Logs progress
+    and status messages during the setup process.
 
-    Args:
-        app_cfg: The application settings object containing the necessary configuration.
-        current_logger: An optional logger instance to be used for logging messages.
+    Parameters:
+        app_cfg (AppSettings):
+            The application configuration containing settings for PostgreSQL
+            tools and related features.
+        current_logger (Optional[logging.Logger]):
+            An optional logger to use for logging messages. If not provided,
+            a default logger will be used.
+
+    Raises:
+        RuntimeError:
+            If any of the PostgreSQL tools setup steps fail.
+
+    Returns:
+        None
     """
     logger_to_use = current_logger if current_logger else logger
 
@@ -622,6 +772,27 @@ def postgres_tools_setup_sequence(
 def carto_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the full setup sequence for Carto, involving multiple steps like installing
+    dependencies, preparing directories, compiling stylesheets, and deploying them
+    for use. Each step is executed in sequence, ensuring proper logging and error
+    handling throughout the process.
+
+    Parameters:
+        app_cfg (AppSettings): The application settings object containing configuration
+            details for the Carto setup.
+        current_logger (Optional[logging.Logger]): An optional logger to use for logging
+            messages. If not provided, a default logger is used.
+
+    Raises:
+        RuntimeError: Raised if any step in the setup sequence fails, or if any key task
+            such as stylesheet compilation or deployment encounters an invalid state.
+
+    Note:
+        This function makes use of nested internal functions for specific tasks like
+        compiling the stylesheet and deploying it. It also employs a structured approach
+        to execute the sequences of tasks while keeping track of their outcomes.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Carto Full Setup ---",
@@ -707,6 +878,19 @@ def carto_full_setup_sequence(
 def renderd_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the full setup sequence for Renderd, incorporating multiple configuration
+    and activation steps. It ensures the necessary packages, directories, configuration
+    files, and services for Renderd are properly prepared and activated.
+
+    Parameters:
+        app_cfg (AppSettings): The application settings used to configure the setup process.
+        current_logger (Optional[logging.Logger]): Optional logger to use for logging
+            the setup process. If not provided, a default logger will be used.
+
+    Raises:
+        RuntimeError: If any step in the setup process fails.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Renderd Full Setup ---",
@@ -757,6 +941,25 @@ def renderd_full_setup_sequence(
 def apache_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Sets up the Apache server by executing a predefined sequence of configuration and setup steps.
+
+    Each step in the sequence performs specific actions required to fully configure and activate
+    an Apache server for use. The function utilizes a provided logger for logging progress and
+    contextual messages. If any step in the sequence fails, the execution halts and raises an
+    exception. The steps performed include checking Apache packages, configuring ports, creating
+    configuration files, and activating modules, sites, and the service itself.
+
+    Args:
+        app_cfg (AppSettings): The application settings object containing configuration details
+            and options used throughout the setup process.
+        current_logger (Optional[logging.Logger]): A logger to use for logging setup progress
+            and messages. If not provided, a default logger is used.
+
+    Raises:
+        RuntimeError: If any of the setup steps fail, an error is raised indicating the step
+            that encountered the failure.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Apache Full Setup ---",
@@ -812,6 +1015,24 @@ def apache_full_setup_sequence(
 def nginx_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Performs the full setup sequence for Nginx, involving configuration, testing,
+    and activation. Executes a series of predefined steps that ensure proper setup
+    of the Nginx service. Provides logging at each step and raises an error if
+    a step fails.
+
+    Parameters:
+    app_cfg: AppSettings
+        An instance of AppSettings containing application-wide configurations
+        and symbols required for the setup process.
+    current_logger: Optional[logging.Logger], default: None
+        A custom logger instance to use for logging messages during the
+        setup process. If not provided, a default logger is used.
+
+    Raises:
+    RuntimeError
+        If any of the setup steps fail during execution.
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Nginx Full Setup ---",
@@ -858,6 +1079,28 @@ def nginx_full_setup_sequence(
 def certbot_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the full setup process for Certbot, including the installation of
+    packages and running Certbot for nginx integration. Each step in the sequence
+    is logged with the current application's logging configuration.
+
+    The process includes a sequence of steps that are individually executed. If
+    any step fails or is skipped, the process halts further execution.
+
+    Parameters
+    ----------
+    app_cfg : AppSettings
+        The application configuration settings containing necessary metadata,
+        symbols, and utility functions for the setup process.
+
+    current_logger : Optional[logging.Logger], optional
+        A logger instance for logging the execution flow. If not provided,
+        the default logger is used.
+
+    Raises
+    ------
+    None
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} Certbot Full Setup ---",
@@ -895,6 +1138,25 @@ def certbot_full_setup_sequence(
 def pg_tileserv_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Executes the full setup sequence for pg_tileserv, including binary download, configuring permissions, creating a
+    system user, generating a systemd service file, creating the configuration file, and activating the service.
+
+    The function performs a sequential execution of predefined steps to ensure pg_tileserv is set up correctly. Each
+    step is logged for visibility. If any step fails, the process halts, and a runtime error is raised. This ensures
+    a controlled setup environment for pg_tileserv.
+
+    Arguments:
+        app_cfg (AppSettings): An instance of application configuration settings used during the setup.
+        current_logger (Optional[logging.Logger]): An optional logger instance for customized logging. If not
+            provided, a default logger is used.
+
+    Raises:
+        RuntimeError: Raised if any step in the setup sequence fails to execute successfully.
+
+    Returns:
+        None
+    """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
         f"--- {app_cfg.symbols.get('step', '➡️')} pg_tileserv Full Setup ---",
@@ -951,8 +1213,19 @@ def rendering_data_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Orchestrates the setup of data for map rendering.
-    This sequence handles downloading the PBF file and importing it to PostGIS.
+    Sets up rendering data by orchestrating a sequence of steps, including downloading
+    PBF data and importing it into PostGIS. This function ensures all necessary operations
+    are conducted to prepare the rendering data environment. It uses a structured approach
+    to validate existing data, perform required downloads, and import processes.
+
+    Parameters:
+        app_cfg (AppSettings): Configuration settings for the application.
+        current_logger (Optional[logging.Logger]): Optional. Logger instance to be used.
+            Defaults to the module-level logger if not provided.
+
+    Raises:
+        RuntimeError: If a required step fails during execution, such as downloading PBF data
+            or importing it into PostGIS.
     """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -1022,18 +1295,19 @@ def osrm_full_setup_sequence(
     app_cfg: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Executes the complete OSRM (Open Source Routing Machine) setup sequence.
+    Performs a complete setup and data processing sequence for OSRM (Open Source Routing Machine).
+    This includes downloading or reusing a base PBF file, extracting regions, setting up directories,
+    configuring dependencies, building graphs for extracted regions, and creating system services
+    for each region. It logs progress, success, or failure at each step, and raises exceptions if
+    critical steps fail.
 
-    This function orchestrates the installation and configuration of OSRM,
-    including dependency installation, data directory setup, PBF download,
-    region boundary preparation, regional PBF extraction, and graph building.
+    Parameters:
+        app_cfg (AppSettings): The application settings required for the setup sequence.
+        current_logger (Optional[logging.Logger]): A logger instance to use for logging messages.
+            If not provided, a default logger will be utilized.
 
-    Args:
-        app_cfg: The application settings object containing configuration parameters.
-        current_logger: Optional logger instance. If None, the module logger will be used.
-
-    Raises:
-        RuntimeError: If any OSRM setup step fails.
+    Returns:
+        None
     """
     logger_to_use = current_logger if current_logger else logger
     log_map_server(
@@ -1194,42 +1468,27 @@ def osrm_full_setup_sequence(
         )
 
 
-def _wrapped_core_prerequisites_group(
-    app_settings: AppSettings, logger: Logger | None = None
-) -> None:
-    """
-    Wrapper for the core prerequisites group.
-    Args:
-        app_settings: The application settings.
-        logger: The logger instance.
-    """
-    all_prereqs_ok = check_and_install_prerequisites(
-        app_settings=app_settings, logger=logger
-    )
-    if not all_prereqs_ok:
-        raise PrerequisiteCheckFailed("Core prerequisite check failed")
-
-
-def _wrapped_systemd_reload_step_group(
-    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
-) -> None:
-    if not systemd_reload_step_group(app_settings, logger_instance):
-        raise RuntimeError(
-            "Systemd reload step group failed."
-        )  # pragma: no cover
-
-
-def _wrapped_data_prep_group(
-    app_settings: AppSettings, logger_instance: Optional[logging.Logger]
-) -> None:
-    if not data_prep_group(app_settings, logger_instance):
-        raise RuntimeError("Data preparation group failed overall.")
-
-
 def systemd_reload_step_group(
     app_cfg: AppSettings,
     current_logger_instance: Optional[logging.Logger] = None,
 ) -> bool:
+    """
+    Reloads the Systemd daemon for the given application configuration. This function
+    utilizes an existing logger or creates a default one if not provided. It executes
+    a predefined step for reloading the Systemd daemon and returns the result of the
+    execution.
+
+    Parameters:
+        app_cfg: AppSettings
+            The configuration object containing necessary application settings.
+        current_logger_instance: Optional[logging.Logger], optional
+            An optional logger instance to use for logging. If not provided, a default
+            logger will be used.
+
+    Returns:
+        bool
+            The success status of the executed Systemd daemon reload step.
+    """
     logger_to_use = (
         current_logger_instance if current_logger_instance else logger
     )
@@ -1246,15 +1505,45 @@ def systemd_reload_step_group(
 def run_full_gtfs_module_wrapper(
     app_cfg: AppSettings, calling_logger: Optional[logging.Logger]
 ) -> bool:
+    """
+    Wraps the execution of the GTFS setup module.
+
+    This function serves as a wrapper to invoke the GTFS setup module with the
+    application settings and an optional logger. It facilitates the smooth
+    execution of the GTFS setup by passing the required context and parameters.
+
+    Args:
+        app_cfg: The application settings instance containing configuration data.
+        calling_logger: An optional logger instance for logging purposes.
+
+    Returns:
+        A boolean indicating the success or failure of the GTFS setup execution.
+    """
     return run_gtfs_setup(app_settings=app_cfg, logger=calling_logger)
 
 
-# Helper to map task flags/groups to relevant package lists from static_config
 def get_packages_for_tasks(
     requested_cli_args: argparse.Namespace, app_settings: AppSettings
 ) -> Set[str]:
     """
-    Determines the set of relevant Debian packages based on active CLI flags.
+    Gather and return a set of package names required for tasks specified in the CLI arguments or settings.
+
+    This function determines the relevant packages to install or manage based on the requested CLI flags
+    and the application's settings. It maps high-level group flags and individual flags to corresponding
+    package lists, supporting modular installation and configuration based on the needs of the application.
+
+    The function ensures completeness by including all related packages, even when certain granular flags
+    or combinations are used.
+
+    Parameters:
+    requested_cli_args (argparse.Namespace): Parsed command-line arguments that indicate which tasks
+    or services are requested to be managed. Flags within this object drive the decision-making for
+    gathering relevant packages.
+    app_settings (AppSettings): User or application-provided settings that may include service installation
+    preferences, such as additional software components (e.g., pgadmin, pgagent installation).
+
+    Returns:
+    Set[str]: A unique set of package names required to fulfill the requested CLI flags and settings.
     """
     relevant_pkgs: Set[str] = set()
 
@@ -1381,8 +1670,22 @@ def generate_preseed_yaml_for_tasks(
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
-    Generates and prints preseed YAML data relevant to the tasks specified
-    in parsed_args, or all known preseed data if no specific tasks are implied.
+    Generates preseed YAML configurations based on specified tasks and application settings.
+
+    This function processes predefined values for software packages based on the tasks
+    requested via command-line arguments or default configurations in the application
+    settings. It generates output in YAML format that can be included in the application's
+    configuration file to automate package seeding during installation or configuration.
+
+    Arguments:
+        app_cfg: The application's configuration object containing preseed values and other settings.
+        parsed_args: Parsed command-line arguments indicating the tasks for which preseed data
+                     should be generated.
+        current_logger: Optional logger to use for outputting log messages. If not provided, a
+                        default logger will be used.
+
+    Returns:
+        None. This function generates YAML output and writes to standard output or standard error.
     """
     logger_to_use = current_logger if current_logger else logger
     symbols = app_cfg.symbols
@@ -1546,18 +1849,13 @@ def generate_preseed_yaml_for_tasks(
 
 def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     """
-    Main entry point for the Map Server installation process.
+    Main entry point for the Map Server Installer script. Parses command-line arguments and configures global settings for execution.
 
-    This function parses command-line arguments, loads configuration settings,
-    and orchestrates the execution of various installation tasks based on the
-    requested actions.
-
-    Args:
-        cli_args_list: Optional list of command-line arguments. If None,
-                      sys.argv[1:] will be used.
+    Parameters:
+        cli_args_list (Optional[List[str]]): A list of command-line arguments. Defaults to None.
 
     Returns:
-        An integer exit code: 0 for success, non-zero for failure.
+        int: Exit code of the program. A value of 0 indicates success, while non-zero indicates an error condition.
     """
     global APP_CONFIG
     parser = argparse.ArgumentParser(

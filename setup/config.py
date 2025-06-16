@@ -13,23 +13,13 @@ is now handled by 'setup/config_models.py' and 'setup/config_loader.py'.
 
 from pathlib import Path
 
-# Removed 'from os import environ' as we are no longer setting environment variables here.
+SCRIPT_VERSION: str = "1.4"
 
-# --- Static Project Definitions ---
-# Represents the version of the setup script logic (used in comments, state file).
-SCRIPT_VERSION: str = (
-    "1.4"  # Or a new version number reflecting these changes
-)
-
-# Define the root directory of the 'osm' project.
-# This assumes config.py is in setup/
 OSM_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-# --- State File Configuration (Static Paths) ---
 STATE_FILE_DIR: str = "/var/lib/map-server-setup-script"
 STATE_FILE_PATH: Path = Path(STATE_FILE_DIR) / "progress_state.txt"
 
-# --- Symbols for Logging (Static) ---
 SYMBOLS: dict[str, str] = {
     "success": "✅",
     "error": "❌",
@@ -44,7 +34,6 @@ SYMBOLS: dict[str, str] = {
     "debug": "🐛",
 }
 
-# --- Package Lists (Static - for apt installation by core_prerequisites.py) ---
 CORE_PREREQ_PACKAGES: list[str] = [
     "git",
     "unzip",
@@ -129,14 +118,3 @@ MAPPING_PACKAGES: list[str] = [
     "osmium-tool",
     "osmcoastline",
 ]
-
-# --- REMOVED Mutable Configuration Variables and their _DEFAULT counterparts ---
-# ADMIN_GROUP_IP_DEFAULT, GTFS_FEED_URL_DEFAULT, etc. are now in config_models.py
-# Mutable ADMIN_GROUP_IP, GTFS_FEED_URL, etc. are now accessed via the APP_CONFIG object
-# loaded from config_models.py and config_loader.py.
-
-# --- REMOVED Environment Variable Settings at end of file ---
-# environ["PGHOST"] = PGHOST etc. are no longer set here.
-# Database connection parameters will be sourced from the APP_CONFIG.pg object.
-# External tools needing environment variables (like psql CLI if used directly by user)
-# would rely on a .pgpass file (created by common.pgpass_utils) or manual ENV setup.

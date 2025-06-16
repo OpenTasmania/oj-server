@@ -98,103 +98,26 @@ SYMBOLS_OUTER = {
 }
 
 
-def ensure_pip_installed_prereq(logger_instance: logging.Logger) -> bool:
-    """
-    Ensures that pip (Python package installer) is installed on the system.
-
-    This function checks if pip is available, and if not, attempts to install it
-    using apt. It first checks for pip3, then falls back to pip if pip3 is not found.
-
-    Args:
-        logger_instance: Logger instance for logging messages.
-
-    Returns:
-        bool: True if pip is available or was successfully installed, False otherwise.
-    """
-    log_map_server(
-        f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python', '🐍')} Checking for 'pip' command...",
-        "info",
-        current_logger=logger_instance,
-        app_settings=None,
-    )
-    if command_exists("pip3") or command_exists("pip"):
-        pip_cmd = "pip3" if command_exists("pip3") else "pip"
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('success', 'OK')} '{pip_cmd}' command is already available.",
-            "info",
-            current_logger=logger_instance,
-            app_settings=None,
-        )
-        return True
-    log_map_server(
-        f"{SYMBOLS_OUTER.get('warning', '!!')} 'pip' command not found. Attempting to install 'python3-pip'...",
-        "warning",
-        current_logger=logger_instance,
-        app_settings=None,
-    )
-    if not command_exists("apt"):  # pragma: no cover
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command not found. Please install pip manually.",
-            "error",
-            current_logger=logger_instance,
-            app_settings=None,
-        )
-        return False
-    try:
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('gear', '>>')} Updating apt cache...",
-            "info",
-            current_logger=logger_instance,
-            app_settings=None,
-        )
-        run_elevated_command(
-            ["apt", "update"],
-            app_settings=None,
-            capture_output=True,
-            current_logger=logger_instance,
-        )
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('package', '>>')} Attempting to install 'python3-pip' using apt...",
-            "info",
-            current_logger=logger_instance,
-            app_settings=None,
-        )
-        run_elevated_command(
-            ["apt", "install", "-y", "python3-pip"],
-            app_settings=None,
-            capture_output=True,
-            current_logger=logger_instance,
-        )
-
-        if command_exists("pip3") or command_exists("pip"):
-            log_map_server(
-                f"{SYMBOLS_OUTER.get('success', 'OK')} 'pip' (or 'pip3') command is now available.",
-                "info",
-                current_logger=logger_instance,
-                app_settings=None,
-            )
-            return True
-        else:  # pragma: no cover
-            log_map_server(
-                f"{SYMBOLS_OUTER.get('warning', '!!')} 'python3-pip' installed, but 'pip'/'pip3' not immediately in PATH.",
-                "warning",
-                current_logger=logger_instance,
-                app_settings=None,
-            )
-            return True
-    except Exception as e:  # pragma: no cover
-        log_map_server(
-            f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install 'python3-pip' via apt: {e}",
-            "error",
-            current_logger=logger_instance,
-            app_settings=None,
-        )
-        return False
-
-
 def _install_uv_with_pipx_prereq(
     logger_instance: logging.Logger,
 ) -> bool:  # pragma: no cover
+    """
+    Attempts to install and/or upgrade the 'uv' package using the pipx utility. If pipx is
+    not available on the system, an attempt will be made to install pipx either via the
+    apt package manager or pip, depending on the system configuration and available tools.
+    Adjustments to the system PATH environment variable are handled automatically for the
+    current session if needed.
+
+    Parameters:
+        logger_instance (logging.Logger): An instance of a logger to record informational
+        logs, warnings, and errors during the installation process.
+
+    Returns:
+        bool: True if the installation of 'uv' was successful, False otherwise.
+
+    Raises:
+        Exception: If installation steps encounter failures that the function cannot recover.
+    """
     log_map_server(
         f"{SYMBOLS_OUTER.get('info', '>>')} Attempting uv installation using pipx...",
         "info",
@@ -334,19 +257,120 @@ def _install_uv_with_pipx_prereq(
         return False
 
 
-def install_uv_prereq(logger_instance: logging.Logger) -> bool:
+def ensure_pip_installed_prereq(logger_instance: logging.Logger) -> bool:
     """
-    Ensures that uv (Python package manager and virtual environment tool) is installed.
+    Checks and ensures the 'pip' command is available on the system, attempting installation
+    via the package manager if not found. It first checks the availability of 'pip' or 'pip3'
+    and logs the corresponding state. If unavailable, it tries to install 'python3-pip'
+    using 'apt'. If 'apt' is not present or the installation fails, the process logs an error
+    and returns a failure state.
 
-    This function checks if uv is available, and if not, attempts to install it
-    using apt (for supported Debian versions) or pipx as a fallback. It detects
-    the Debian codename to determine the appropriate installation method.
-
-    Args:
-        logger_instance: Logger instance for logging messages.
+    Parameters:
+        logger_instance (logging.Logger): The logger instance used for logging
+        operational details.
 
     Returns:
-        bool: True if uv is available or was successfully installed, False otherwise.
+        bool: True if the 'pip' command exists or gets successfully installed;
+        False otherwise.
+    """
+    log_map_server(
+        f"{SYMBOLS_OUTER.get('step', '->')} {SYMBOLS_OUTER.get('python', '🐍')} Checking for 'pip' command...",
+        "info",
+        current_logger=logger_instance,
+        app_settings=None,
+    )
+    if command_exists("pip3") or command_exists("pip"):
+        pip_cmd = "pip3" if command_exists("pip3") else "pip"
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('success', 'OK')} '{pip_cmd}' command is already available.",
+            "info",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+        return True
+    log_map_server(
+        f"{SYMBOLS_OUTER.get('warning', '!!')} 'pip' command not found. Attempting to install 'python3-pip'...",
+        "warning",
+        current_logger=logger_instance,
+        app_settings=None,
+    )
+    if not command_exists("apt"):  # pragma: no cover
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('error', '!!')} 'apt' command not found. Please install pip manually.",
+            "error",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+        return False
+    try:
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('gear', '>>')} Updating apt cache...",
+            "info",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+        run_elevated_command(
+            ["apt", "update"],
+            app_settings=None,
+            capture_output=True,
+            current_logger=logger_instance,
+        )
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('package', '>>')} Attempting to install 'python3-pip' using apt...",
+            "info",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+        run_elevated_command(
+            ["apt", "install", "-y", "python3-pip"],
+            app_settings=None,
+            capture_output=True,
+            current_logger=logger_instance,
+        )
+
+        if command_exists("pip3") or command_exists("pip"):
+            log_map_server(
+                f"{SYMBOLS_OUTER.get('success', 'OK')} 'pip' (or 'pip3') command is now available.",
+                "info",
+                current_logger=logger_instance,
+                app_settings=None,
+            )
+            return True
+        else:  # pragma: no cover
+            log_map_server(
+                f"{SYMBOLS_OUTER.get('warning', '!!')} 'python3-pip' installed, but 'pip'/'pip3' not immediately in PATH.",
+                "warning",
+                current_logger=logger_instance,
+                app_settings=None,
+            )
+            return True
+    except Exception as e:  # pragma: no cover
+        log_map_server(
+            f"{SYMBOLS_OUTER.get('error', '!!')} Failed to install 'python3-pip' via apt: {e}",
+            "error",
+            current_logger=logger_instance,
+            app_settings=None,
+        )
+        return False
+
+
+def install_uv_prereq(logger_instance: logging.Logger) -> bool:
+    """
+    Checks for the installation of 'uv' in the system and installs it if not present.
+
+    This function attempts to detect if the 'uv' executable is available in the system's PATH.
+    If found, it verifies the installation by fetching its version. If not found, the function
+    proceeds to install 'uv' using an appropriate installation method depending on the detected
+    system configuration. For Debian distributions with specific codenames ('trixie', 'forky',
+    'sid'), it attempts installation through `apt`. For other operating systems or in case of
+    installation failure via `apt`, it falls back to using `pipx` for installation.
+
+    Parameters:
+        logger_instance (logging.Logger): Logger instance for logging messages and errors.
+
+    Returns:
+        bool: Returns True if 'uv' is installed successfully or is already present,
+        otherwise False.
     """
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'uv' installation...",
@@ -429,17 +453,20 @@ def ensure_pg_config_or_libpq_dev_installed_prereq(
     logger_instance: logging.Logger,
 ) -> bool:
     """
-    Ensures that pg_config (required for psycopg compilation) is available.
+    Checks for the presence of the 'pg_config' command, which is required for psycopg
+    compilation. If 'pg_config' is not found, attempts to install the 'libpq-dev'
+    library using the APT package manager. This function aims to ensure that the
+    prerequisites for psycopg installation are available on the system.
 
-    This function checks if pg_config is available, and if not, attempts to install
-    the libpq-dev package using apt, which provides pg_config. This is necessary
-    for compiling Python database drivers like psycopg.
+    The process involves logging the check results, attempting an installation if
+    necessary, and reporting success or failure through the logger instance provided.
 
-    Args:
-        logger_instance: Logger instance for logging messages.
+    Arguments:
+        logger_instance (logging.Logger): The logger to use for recording messages
+            during the execution of the function.
 
     Returns:
-        bool: True if pg_config is available or was successfully installed, False otherwise.
+        bool: True if 'pg_config' is available or successfully installed; False otherwise.
     """
     log_map_server(
         f"{SYMBOLS_OUTER.get('step', '->')} Checking for 'pg_config' (for psycopg compilation)...",
@@ -510,14 +537,23 @@ def ensure_pg_config_or_libpq_dev_installed_prereq(
 
 def get_venv_python_executable(project_root: str, venv_dir_name: str) -> str:
     """
-    Returns the path to the Python executable in a virtual environment.
+    Constructs the path to the Python executable within a virtual environment.
+
+    This function generates the full path to the Python executable inside a
+    specified virtual environment. It assumes the virtual environment uses
+    the standard directory structure. The path is constructed by combining
+    the given project root directory with the virtual environment directory
+    name and the expected 'bin/python3' structure.
 
     Args:
-        project_root: The root directory of the project.
-        venv_dir_name: The name of the virtual environment directory.
+        project_root (str): The root directory of the project where the virtual
+            environment is located.
+        venv_dir_name (str): The name of the directory containing the virtual
+            environment.
 
     Returns:
-        str: The full path to the Python executable in the virtual environment.
+        str: The full path to the Python executable within the specified virtual
+        environment.
     """
     return os.path.join(project_root, venv_dir_name, "bin", "python3")
 
@@ -528,7 +564,20 @@ def generate_preseed_yaml_output(
     logger_instance: logging.Logger,
 ) -> None:
     """
-    Uses the venv Python to import config_models and print preseed data as YAML.
+    Generates the default preseed data YAML to stdout using a specified Python executable within a virtual
+    environment. The function composes and runs a Python script dynamically to handle the generation of YAML output
+    from predefined configuration attributes in the project.
+
+    The function ensures compatibility by managing imports dynamically based on project directory
+    structure and modifies `sys.path` temporarily for module access. Logs relevant messages and handles
+    failures gracefully.
+
+    Arguments:
+        venv_python_exe (str): The path to the Python executable in a virtual environment that will execute the script.
+        project_root_dir (str): The root directory of the project, used to locate and import necessary modules for
+            processing.
+        logger_instance (logging.Logger): Logger instance used to log the progress, success, or errors during
+            execution.
     """
     log_map_server(
         f"{SYMBOLS_OUTER.get('yaml', '📜')} Generating default preseed data YAML using venv Python: {venv_python_exe}",
@@ -637,9 +686,14 @@ def main() -> int:
 
     def get_install_py_help_text():
         """
-        Returns the help text for the install.py script.
+        Main script for managing Python virtual environments, ensuring required system dependencies,
+        and facilitating installation of project dependencies. This script also provides help text
+        for understanding its usage and supported actions.
 
-        The help text generation is deferred until we know if the user wants help.
+        Returns
+        -------
+        int
+            Return code indicating the success or failure state of the script.
         """
         return f"""
 Usage: {script_name} <action_flag_or_help> [arguments_for_main_map_server_entry]

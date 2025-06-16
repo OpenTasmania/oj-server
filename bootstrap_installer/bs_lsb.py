@@ -1,5 +1,15 @@
-# ot-osm-osrm-server/bootstrap_installer/bs_lsb.py
+# bootstrap_installer/bs_lsb.py
 # -*- coding: utf-8 -*-
+"""
+Ensures the 'lsb_release' command is available on the system.
+
+The 'lsb_release' utility is used to reliably determine Linux Standard Base
+(LSB) information about the current distribution, such as the codename (e.g.,
+'bookworm'). This module's 'ensure_lsb_release' function checks for the
+command's existence and installs the 'lsb-release' package if it is missing,
+a common step in the bootstrap process.
+"""
+
 import sys
 
 from bootstrap_installer.bs_utils import (

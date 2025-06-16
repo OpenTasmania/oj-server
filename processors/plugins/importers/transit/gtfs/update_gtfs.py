@@ -132,7 +132,28 @@ def setup_update_gtfs_logging(
 
 
 def main_cli() -> None:  # pragma: no cover
-    """Main command-line interface entry point for this script."""
+    """
+    Parse command-line arguments and execute the GTFS ETL pipeline via the core processing module.
+
+    This function sets up the command-line interface (CLI) for configuring and running
+    the GTFS processing pipeline. It allows for specifying the GTFS feed URL, logging
+    parameters, and controls whether logs are redirected to the console. The function
+    handles setting up the logging configuration and initiates the GTFS processing logic.
+
+    Raises
+    ------
+    SystemExit
+        Raised to exit the program with status code 0 for success or 1 for failure, based
+        on the outcome of the GTFS processing.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
     parser = argparse.ArgumentParser(
         description="Run the GTFS ETL pipeline using the core processing module."
     )

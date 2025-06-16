@@ -20,6 +20,18 @@ def setup_pgpass(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
+    """
+    Configure or update the .pgpass file based on provided PostgreSQL settings. This function
+    creates, updates, or validates user-specific PostgreSQL authentication file (.pgpass)
+    depending on the given application settings. It ensures appropriate content entries
+    for the database connection are added if the credentials and conditions meet required criteria.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing database connection
+            and general application settings.
+        current_logger (Optional[logging.Logger]): Optional specific logger instance;
+            if not provided, module-level logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
@@ -27,14 +39,11 @@ def setup_pgpass(
     pg_port = str(app_settings.pg.port)
     pg_database = app_settings.pg.database
     pg_user = app_settings.pg.user
-    pg_password = (
-        app_settings.pg.password
-    )  # This is the actual password to write
+    pg_password = app_settings.pg.password
 
     allow_default_for_dev = app_settings.dev_override_unsafe_password
 
     can_create_pgpass = False
-    # PGPASSWORD_DEFAULT is imported from config_models
     if pg_password and pg_password != PGPASSWORD_DEFAULT:
         can_create_pgpass = True
     elif (
@@ -71,7 +80,6 @@ def setup_pgpass(
 
     try:
         current_user_name = getpass.getuser()
-        # Prefer user-specific home directory, fallback for robustness (e.g. in some CI/container contexts)
         home_dir_user_specific = os.path.expanduser(f"~{current_user_name}")
         if not os.path.isdir(home_dir_user_specific):
             home_dir = os.path.expanduser("~")
@@ -89,7 +97,7 @@ def setup_pgpass(
                     logger_to_use,
                     app_settings,
                 )
-                return  # Cannot proceed
+                return
         else:
             home_dir = home_dir_user_specific
 
@@ -105,9 +113,7 @@ def setup_pgpass(
                     current_pgpass_lines = [
                         line.strip() for line in f_read if line.strip()
                     ]
-            except (
-                Exception
-            ) as e_read:  # Catch more general errors during read
+            except Exception as e_read:
                 log_map_server(
                     f"{symbols.get('warning', '!')} Could not read existing .pgpass file at {pgpass_file_path}: {e_read}",
                     "warning",
@@ -115,7 +121,6 @@ def setup_pgpass(
                     app_settings,
                 )
 
-        # Filter out existing entries for the same host:port:database:user combination
         prefix_to_filter = f"{pg_host}:{pg_port}:{pg_database}:{pg_user}:"
         updated_pgpass_content_lines = [
             line
@@ -128,14 +133,14 @@ def setup_pgpass(
             with open(pgpass_file_path, "w", encoding="utf-8") as f_write:
                 for line in updated_pgpass_content_lines:
                     f_write.write(line + "\n")
-            os.chmod(pgpass_file_path, 0o600)  # Set permissions
+            os.chmod(pgpass_file_path, 0o600)
             log_map_server(
                 f"{symbols.get('success', '✅')} .pgpass file configured/updated at {pgpass_file_path} for user {current_user_name}.",
                 "success",
                 logger_to_use,
                 app_settings,
             )
-        except IOError as e_write:  # Specific to file write issues
+        except IOError as e_write:
             log_map_server(
                 f"{symbols.get('error', '❌')} Failed to write to .pgpass file {pgpass_file_path}: {e_write}",
                 "error",
@@ -148,7 +153,7 @@ def setup_pgpass(
                 logger_to_use,
                 app_settings,
             )
-    except Exception as e:  # Catch-all for other unexpected issues
+    except Exception as e:
         log_map_server(
             f"{symbols.get('error', '❌')} Failed to set up .pgpass file: {e}",
             "error",

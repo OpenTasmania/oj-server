@@ -1,5 +1,16 @@
-# ot-osm-osrm-server/bs_installer/bs_apt.py
+# bs_installer/bs_apt.py
 # -*- coding: utf-8 -*-
+"""
+Ensures the presence of the 'python3-apt' package, a critical prerequisite
+for the application's package management capabilities.
+
+This module contains the function 'ensure_python_apt_prerequisite', which is
+designed to be executed as a task within the bootstrap orchestration process.
+It checks if the necessary 'apt' Python module is available and, if not,
+attempts to install the 'python3-apt' system package to satisfy the
+dependency.
+"""
+
 import sys
 
 from bootstrap_installer.bs_utils import (

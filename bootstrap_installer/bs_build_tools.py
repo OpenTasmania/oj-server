@@ -1,5 +1,16 @@
-# ot-osm-osrm-server/bootstrap_installer/bs_build_tools.py
+# bootstrap_installer/bs_build_tools.py
 # -*- coding: utf-8 -*-
+"""
+Ensures that essential build tools are installed on the system.
+
+This module provides the 'ensure_build_tools' function, which verifies the
+presence of 'build-essential' (providing gcc, make, etc.) and 'python3-dev'
+(providing Python header files). These packages are fundamental for compiling
+Python C-extensions and other native code required by the application's
+dependencies. This check is intended to be run as part of the bootstrap
+orchestration sequence.
+"""
+
 import sys
 
 from bootstrap_installer.bs_utils import (
