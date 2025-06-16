@@ -115,8 +115,6 @@ def apt_install_packages(
             )
             subprocess.check_call(
                 sudo_prefix + ["apt", "update", "-y"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
             )
             current_apt_update_status = True
         else:
@@ -129,8 +127,6 @@ def apt_install_packages(
         )
         subprocess.check_call(
             sudo_prefix + ["apt", "install", "-y"] + packages,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
         )
         logger.info(
             f"{BS_SYMBOLS['success']} Successfully processed apt packages: {', '.join(packages)}."
