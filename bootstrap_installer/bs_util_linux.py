@@ -10,18 +10,9 @@ from bootstrap_installer.bs_utils import (
 logger = get_bs_logger("LSB")
 
 
-def ensure_util_linux(
-    apt_updated_already: bool, context=None, app_settings=None, **kwargs
-) -> tuple[bool, bool]:
+def ensure_util_linux(apt_updated_already: bool) -> tuple[bool, bool]:
     """
     Checks for the lsb_release command and installs the 'util-linux' package if missing.
-
-    Args:
-        apt_updated_already: Whether apt has been updated already in this run.
-        context: The shared orchestrator context.
-        app_settings: The application settings.
-        **kwargs: Additional keyword arguments.
-
     Returns:
         Tuple (install_attempted_for_this_package: bool,
                apt_updated_in_this_call_or_before: bool)
@@ -40,11 +31,10 @@ def ensure_util_linux(
             [apt_package_name], logger, apt_updated_already
         )
         install_attempted_this_pkg = True
-        if not bootstrap_cmd_exists(command_name):  # Re-check
+        if not bootstrap_cmd_exists(command_name):
             logger.warning(
                 f"{BS_SYMBOLS['warning']} Command '{command_name}' still not available after attempting to install '{apt_package_name}'. Main installer might use fallbacks."
             )
-            # Not exiting, as the main installer (install.py) has fallbacks for uv installation.
         else:
             logger.info(
                 f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') now available."
@@ -53,11 +43,5 @@ def ensure_util_linux(
         logger.info(
             f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') already available."
         )
-
-    # Update context if provided
-    if context is not None:
-        context["apt_updated_this_run"] = apt_update_status_after_call
-        if install_attempted_this_pkg:
-            context["any_install_attempted"] = True
 
     return install_attempted_this_pkg, apt_update_status_after_call

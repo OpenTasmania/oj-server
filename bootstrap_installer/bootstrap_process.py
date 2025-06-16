@@ -34,61 +34,21 @@ def run_bootstrap_orchestration(app_settings, logger=None):
 
     orchestrator = Orchestrator(app_settings, effective_logger)
 
-    # Initialize state in the context
     orchestrator.context["apt_updated_this_run"] = False
     orchestrator.context["any_install_attempted"] = False
 
-    # Define the tasks
     orchestrator.add_task(
-        "Python3-apt Prerequisite",
-        ensure_python_apt_prerequisite,
-        kwargs={
-            "apt_updated_already": orchestrator.context[
-                "apt_updated_this_run"
-            ]
-        },
+        "Python3-apt Prerequisite", ensure_python_apt_prerequisite
     )
     orchestrator.add_task(
-        "Pydantic Prerequisites",
-        ensure_pydantic_prerequisites,
-        kwargs={
-            "apt_updated_already": orchestrator.context[
-                "apt_updated_this_run"
-            ]
-        },
+        "Pydantic Prerequisites", ensure_pydantic_prerequisites
     )
-    orchestrator.add_task(
-        "LSB Release Prerequisite",
-        ensure_lsb_release,
-        kwargs={
-            "apt_updated_already": orchestrator.context[
-                "apt_updated_this_run"
-            ]
-        },
-    )
-    orchestrator.add_task(
-        "util-linux Prerequisite",
-        ensure_util_linux,
-        kwargs={
-            "apt_updated_already": orchestrator.context[
-                "apt_updated_this_run"
-            ]
-        },
-    )
-    orchestrator.add_task(
-        "Build Tools Prerequisites",
-        ensure_build_tools,
-        kwargs={
-            "apt_updated_already": orchestrator.context[
-                "apt_updated_this_run"
-            ]
-        },
-    )
+    orchestrator.add_task("LSB Release Prerequisite", ensure_lsb_release)
+    orchestrator.add_task("util-linux Prerequisite", ensure_util_linux)
+    orchestrator.add_task("Build Tools Prerequisites", ensure_build_tools)
 
-    # Run the orchestration
     success = orchestrator.run()
 
-    # Check if any installations were attempted
     any_install_attempted_overall = orchestrator.context.get(
         "any_install_attempted", False
     )
@@ -102,5 +62,4 @@ def run_bootstrap_orchestration(app_settings, logger=None):
             f"{BS_SYMBOLS['success']} All checked bootstrap prerequisites were already met. No new installations were attempted in this run."
         )
 
-    # The calling script (install.py) can inspect the final context
     return success, orchestrator.context

@@ -13,17 +13,11 @@ logger = get_bs_logger("Pydantic")
 
 
 def ensure_pydantic_prerequisites(
-    apt_updated_already: bool, context=None, app_settings=None, **kwargs
+    apt_updated_already: bool,
 ) -> tuple[bool, bool]:
     """
     Checks for pydantic and pydantic_settings Python modules.
     Attempts to install them via apt if missing.
-
-    Args:
-        apt_updated_already: Whether apt has been updated already in this run.
-        context: The shared orchestrator context.
-        app_settings: The application settings.
-        **kwargs: Additional keyword arguments.
 
     Returns:
         Tuple (install_attempted_for_this_group: bool,
@@ -58,9 +52,8 @@ def ensure_pydantic_prerequisites(
         apt_update_status_after_call = apt_install_packages(
             missing_apt_packages_for_modules, logger, apt_updated_already
         )
-        # Re-verify crucial modules after install attempt
         for module_name in modules_to_ensure.keys():
-            if not check_python_module(module_name, logger):  # Check again
+            if not check_python_module(module_name, logger):
                 logger.error(
                     f"{BS_SYMBOLS['error']} CRITICAL: Module '{module_name}' still not available after apt install attempt. Exiting."
                 )
@@ -68,11 +61,5 @@ def ensure_pydantic_prerequisites(
         logger.info(
             f"{BS_SYMBOLS['success']} Pydantic-related modules ensured."
         )
-
-    # Update context if provided
-    if context is not None:
-        context["apt_updated_this_run"] = apt_update_status_after_call
-        if install_attempted_this_group:
-            context["any_install_attempted"] = True
 
     return install_attempted_this_group, apt_update_status_after_call
