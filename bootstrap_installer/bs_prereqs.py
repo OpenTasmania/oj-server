@@ -54,8 +54,6 @@ def _is_apt_pkg_likely_present(package_name: str) -> bool:
         return _bootstrap_cmd_exists("lsb_release")
     if package_name == "build-essential":
         return _bootstrap_cmd_exists("gcc") and _bootstrap_cmd_exists("make")
-    # For python3-dev, it's harder to check without dpkg-query. Assume not present to be safe.
-    # For python3-pydantic and python3-pydantic-settings, module import check is better.
     return False
 
 
@@ -71,24 +69,20 @@ def run_initial_bootstrap_checks() -> bool:
     """
     _bs_logger.info("Running initial bootstrap prerequisite checks...")
 
-    # Python modules and their corresponding preferred apt packages
     py_modules_to_apt = {
         "pydantic": "python3-pydantic",
         "pydantic_settings": "python3-pydantic-settings",
     }
 
-    # Other essential command-line tools/meta-packages and their apt packages
-    # python3-dev is often python3.X-dev, but python3-dev usually works as a meta-package.
     other_apt_packages_to_ensure = {
         "lsb-release": "lsb-release",
-        "build-essential": "build-essential",  # For gcc, make, etc.
-        "python3-dev": "python3-dev",  # For Python C extension builds
+        "build-essential": "build-essential",
+        "python3-dev": "python3-dev",
     }
 
     apt_packages_to_install_list = []
     install_attempt_needed = False
 
-    # Check Python modules
     for module_name, apt_pkg_name in py_modules_to_apt.items():
         if not _check_python_module(module_name):
             _bs_logger.info(
@@ -97,17 +91,12 @@ def run_initial_bootstrap_checks() -> bool:
             apt_packages_to_install_list.append(apt_pkg_name)
             install_attempt_needed = True
 
-    # Check other essential tools/meta-packages
     for tool_feature, apt_pkg_name in other_apt_packages_to_ensure.items():
-        if not _is_apt_pkg_likely_present(
-            apt_pkg_name
-        ):  # Use heuristic check
+        if not _is_apt_pkg_likely_present(apt_pkg_name):
             _bs_logger.info(
                 f"Essential tool/package '{tool_feature}' (apt package '{apt_pkg_name}') will be ensured via apt."
             )
-            if (
-                apt_pkg_name not in apt_packages_to_install_list
-            ):  # Avoid duplicates
+            if apt_pkg_name not in apt_packages_to_install_list:
                 apt_packages_to_install_list.append(apt_pkg_name)
             install_attempt_needed = True
         else:
@@ -119,7 +108,7 @@ def run_initial_bootstrap_checks() -> bool:
         _bs_logger.info(
             f"{_BS_SYMBOLS['success']} All checked initial bootstrap prerequisites appear to be met."
         )
-        return False  # No installations were needed in this run.
+        return False
 
     _bs_logger.info(
         f"The following system packages will be installed/ensured: {', '.join(apt_packages_to_install_list)}"
@@ -140,8 +129,6 @@ def run_initial_bootstrap_checks() -> bool:
         _bs_logger.info("Updating apt package list (may require password)...")
         subprocess.check_call(
             sudo_prefix + ["apt", "update", "-y"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
         )
 
         _bs_logger.info(
@@ -151,16 +138,11 @@ def run_initial_bootstrap_checks() -> bool:
             sudo_prefix
             + ["apt", "install", "-y"]
             + apt_packages_to_install_list,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
         )
 
-        # Verify Python modules again specifically after installation attempt
         all_py_modules_verified = True
         for py_module in py_modules_to_apt.keys():
-            if not _check_python_module(
-                py_module
-            ):  # Re-check after install attempt
+            if not _check_python_module(py_module):
                 _bs_logger.error(
                     f"CRITICAL: Python module '{py_module}' still not importable after 'apt install' attempt."
                 )
@@ -173,7 +155,7 @@ def run_initial_bootstrap_checks() -> bool:
             _bs_logger.info(
                 "It's recommended the main script re-executes to use any newly installed Python modules."
             )
-            return True  # Signal that installations were made and re-execution is advised.
+            return True
         else:
             _bs_logger.error(
                 "One or more critical Python modules for the installer failed to become available."
@@ -202,7 +184,6 @@ def run_initial_bootstrap_checks() -> bool:
 
 
 if __name__ == "__main__":
-    # This allows testing bootstrap_prereqs.py directly if needed
     _bs_logger.info("Running bootstrap_prereqs.py directly for testing...")
     needs_rerun = run_initial_bootstrap_checks()
     if needs_rerun:
