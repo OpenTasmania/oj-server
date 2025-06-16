@@ -1,4 +1,4 @@
-# ot-osm-osrm-server/bs_installer/bs_util_linux.py
+# ot-osm-osrm-server/bootstrap_installer/bs_util_linux.py
 # -*- coding: utf-8 -*-
 from bootstrap_installer.bs_utils import (
     BS_SYMBOLS,
@@ -7,41 +7,43 @@ from bootstrap_installer.bs_utils import (
     get_bs_logger,
 )
 
-logger = get_bs_logger("LSB")
+logger = get_bs_logger("UtilLinux")
 
 
-def ensure_util_linux(apt_updated_already: bool) -> tuple[bool, bool]:
+def ensure_util_linux(context: dict, **kwargs) -> None:
     """
-    Checks for the lsb_release command and installs the 'util-linux' package if missing.
-    Returns:
-        Tuple (install_attempted_for_this_package: bool,
-               apt_updated_in_this_call_or_before: bool)
-    """
-    logger.info(f"{BS_SYMBOLS['info']} Checking for 'util-linux' command...")
-    apt_package_name = "util-linux"
-    command_name = "util_linux"
-    install_attempted_this_pkg = False
+    Ensures 'util-linux' is installed, which provides 'dmesg'.
 
-    apt_update_status_after_call = apt_updated_already
-    if not bootstrap_cmd_exists(command_name):
+    This function interacts with the orchestrator context to manage state:
+    - Reads 'apt_updated_this_run' to see if 'apt update' is needed.
+    - Sets 'any_install_attempted' to True if an installation is performed.
+    - Updates 'apt_updated_this_run' with the status after any installation.
+
+    Args:
+        context (dict): The orchestrator's shared context dictionary.
+        **kwargs: Catches any other arguments the orchestrator might pass.
+    """
+    logger.info(
+        f"{BS_SYMBOLS['info']} Checking for 'dmesg' (from 'util-linux')..."
+    )
+    if bootstrap_cmd_exists("dmesg"):
         logger.info(
-            f"Command '{command_name}' (from package '{apt_package_name}') not found, marked for installation."
+            f"{BS_SYMBOLS['success']} 'dmesg' command already available."
         )
-        apt_update_status_after_call = apt_install_packages(
-            [apt_package_name], logger, apt_updated_already
+        return
+
+    logger.warning("'dmesg' not found. Ensuring 'util-linux' is installed...")
+    context["any_install_attempted"] = True
+    apt_updated_already = context.get("apt_updated_this_run", False)
+
+    apt_update_status = apt_install_packages(
+        ["util-linux"], logger, apt_updated_already
+    )
+    context["apt_updated_this_run"] = apt_update_status
+
+    if not bootstrap_cmd_exists("dmesg"):
+        logger.warning(
+            f"{BS_SYMBOLS['warning']} Could not confirm 'dmesg' after install. This may be okay on some minimal systems."
         )
-        install_attempted_this_pkg = True
-        if not bootstrap_cmd_exists(command_name):
-            logger.warning(
-                f"{BS_SYMBOLS['warning']} Command '{command_name}' still not available after attempting to install '{apt_package_name}'. Main installer might use fallbacks."
-            )
-        else:
-            logger.info(
-                f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') now available."
-            )
     else:
-        logger.info(
-            f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') already available."
-        )
-
-    return install_attempted_this_pkg, apt_update_status_after_call
+        logger.info(f"{BS_SYMBOLS['success']} 'dmesg' is now available.")

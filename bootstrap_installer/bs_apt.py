@@ -12,17 +12,21 @@ from bootstrap_installer.bs_utils import (
 logger = get_bs_logger("Apt")
 
 
-def ensure_python_apt_prerequisite(
-    apt_updated_already: bool,
-) -> tuple[bool, bool]:
+def ensure_python_apt_prerequisite(context: dict, **kwargs) -> None:
     """
-    Checks for the python3-apt module which is required for AptManager.
-    Attempts to install it via apt if missing.
+    Checks for the python3-apt module which is required for AptManager,
+    and installs it via apt if it's missing.
 
-    Returns:
-        Tuple (install_attempted_for_this_group: bool,
-               apt_updated_in_this_call_or_before: bool)
-    Exits on critical failure to make module available.
+    This function interacts with the orchestrator context to manage state:
+    - Reads 'apt_updated_this_run' to see if 'apt update' is needed.
+    - Sets 'any_install_attempted' to True if an installation is performed.
+    - Updates 'apt_updated_this_run' with the status after any installation.
+
+    Args:
+        context (dict): The orchestrator's shared context dictionary.
+        **kwargs: Catches any other arguments the orchestrator might pass.
+
+    Exits on critical failure to make the python3-apt module available.
     """
     logger.info(
         f"{BS_SYMBOLS['info']} Checking for python3-apt module (required for AptManager)..."
@@ -30,17 +34,20 @@ def ensure_python_apt_prerequisite(
 
     module_name = "apt"
     apt_pkg_name = "python3-apt"
-    install_attempted = False
+
+    apt_updated_already = context.get("apt_updated_this_run", False)
 
     if not check_python_module(module_name, logger):
         logger.info(
             f"Python module '{module_name}' (apt: {apt_pkg_name}) marked for installation."
         )
-        install_attempted = True
+        context["any_install_attempted"] = True
 
         apt_update_status_after_call = apt_install_packages(
             [apt_pkg_name], logger, apt_updated_already
         )
+
+        context["apt_updated_this_run"] = apt_update_status_after_call
 
         if not check_python_module(module_name, logger):
             logger.error(
@@ -48,9 +55,7 @@ def ensure_python_apt_prerequisite(
             )
             sys.exit(1)
         logger.info(f"{BS_SYMBOLS['success']} python3-apt module ensured.")
-        return install_attempted, apt_update_status_after_call
     else:
         logger.info(
             f"{BS_SYMBOLS['success']} Python module '{module_name}' already available."
         )
-        return install_attempted, apt_updated_already

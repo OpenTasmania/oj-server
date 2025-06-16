@@ -1,5 +1,7 @@
-# ot-osm-osrm-server/bs_installer/bs_lsb.py
+# ot-osm-osrm-server/bootstrap_installer/bs_lsb.py
 # -*- coding: utf-8 -*-
+import sys
+
 from bootstrap_installer.bs_utils import (
     BS_SYMBOLS,
     apt_install_packages,
@@ -7,41 +9,47 @@ from bootstrap_installer.bs_utils import (
     get_bs_logger,
 )
 
-logger = get_bs_logger("LSB")
+logger = get_bs_logger("LsbRelease")
 
 
-def ensure_lsb_release(apt_updated_already: bool) -> tuple[bool, bool]:
+def ensure_lsb_release(context: dict, **kwargs) -> None:
     """
-    Checks for the lsb_release command and installs the 'lsb-release' package if missing.
-    Returns:
-        Tuple (install_attempted_for_this_package: bool,
-               apt_updated_in_this_call_or_before: bool)
-    """
-    logger.info(f"{BS_SYMBOLS['info']} Checking for 'lsb-release' command...")
-    apt_package_name = "lsb-release"
-    command_name = "lsb_release"
-    install_attempted_this_pkg = False
+    Checks for the lsb_release command and installs the 'lsb-release'
+    package if it is missing.
 
-    apt_update_status_after_call = apt_updated_already
-    if not bootstrap_cmd_exists(command_name):
+    This function interacts with the orchestrator context to manage state:
+    - Reads 'apt_updated_this_run' to see if 'apt update' is needed.
+    - Sets 'any_install_attempted' to True if an installation is performed.
+    - Updates 'apt_updated_this_run' with the status after any installation.
+
+    Args:
+        context (dict): The orchestrator's shared context dictionary.
+        **kwargs: Catches any other arguments the orchestrator might pass.
+    """
+    logger.info(f"{BS_SYMBOLS['info']} Checking for 'lsb_release' command...")
+    if bootstrap_cmd_exists("lsb_release"):
         logger.info(
-            f"Command '{command_name}' (from package '{apt_package_name}') not found, marked for installation."
+            f"{BS_SYMBOLS['success']} 'lsb_release' command already available."
         )
-        apt_update_status_after_call = apt_install_packages(
-            [apt_package_name], logger, apt_updated_already
+        return
+
+    logger.warning(
+        "'lsb_release' not found. Installing 'lsb-release' package..."
+    )
+    context["any_install_attempted"] = True
+    apt_updated_already = context.get("apt_updated_this_run", False)
+
+    apt_update_status = apt_install_packages(
+        ["lsb-release"], logger, apt_updated_already
+    )
+    context["apt_updated_this_run"] = apt_update_status
+
+    if not bootstrap_cmd_exists("lsb_release"):
+        logger.critical(
+            f"{BS_SYMBOLS['error']} Failed to make 'lsb_release' available. The installer cannot continue."
         )
-        install_attempted_this_pkg = True
-        if not bootstrap_cmd_exists(command_name):
-            logger.warning(
-                f"{BS_SYMBOLS['warning']} Command '{command_name}' still not available after attempting to install '{apt_package_name}'. Main installer might use fallbacks."
-            )
-        else:
-            logger.info(
-                f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') now available."
-            )
+        sys.exit(1)
     else:
         logger.info(
-            f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') already available."
+            f"{BS_SYMBOLS['success']} 'lsb_release' is now available."
         )
-
-    return install_attempted_this_pkg, apt_update_status_after_call

@@ -1,79 +1,79 @@
-# ot-osm-osrm-server/bs_installer/bs_build_tools.py
+# ot-osm-osrm-server/bootstrap_installer/bs_build_tools.py
 # -*- coding: utf-8 -*-
+import sys
 
-from .bs_utils import (  # Import new util
+from bootstrap_installer.bs_utils import (
     BS_SYMBOLS,
     apt_install_packages,
+    bootstrap_cmd_exists,
     get_bs_logger,
-    is_apt_package_installed_dpkg,
 )
 
 logger = get_bs_logger("BuildTools")
 
 
-def ensure_build_tools(apt_updated_already: bool) -> tuple[bool, bool]:
+def ensure_build_tools(context: dict, **kwargs) -> None:
     """
-    Ensures 'build-essential' and 'python3-dev' are installed via apt,
-    only if they are not already detected.
-    Returns:
-        Tuple (install_attempted_for_these_packages: bool,
-               apt_updated_in_this_call_or_before: bool)
+    Ensures 'build-essential' and 'python3-dev' are installed for compiling
+    Python extensions and other software.
+
+    This function interacts with the orchestrator context to manage state:
+    - Reads 'apt_updated_this_run' to see if 'apt update' is needed.
+    - Sets 'any_install_attempted' to True if an installation is performed.
+    - Updates 'apt_updated_this_run' with the status after any installation.
+
+    Args:
+        context (dict): The orchestrator's shared context dictionary.
+        **kwargs: Catches any other arguments the orchestrator might pass.
     """
     logger.info(
-        f"{BS_SYMBOLS['info']} Checking for essential build tools (build-essential, python3-dev)..."
+        f"{BS_SYMBOLS['info']} Checking for build tools ('build-essential', 'python3-dev')..."
     )
 
-    apt_packages_to_target = []
-    install_attempted_this_group = False
+    build_essential_present = bootstrap_cmd_exists(
+        "gcc"
+    ) and bootstrap_cmd_exists("make")
 
-    if not is_apt_package_installed_dpkg("build-essential", logger):
+    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+    python_dev_present = bootstrap_cmd_exists(f"python{py_ver}-config")
+
+    packages_to_install = []
+    if not build_essential_present:
+        packages_to_install.append("build-essential")
+    if not python_dev_present:
+        packages_to_install.append("python3-dev")
+
+    if not packages_to_install:
         logger.info(
-            "'build-essential' (provides gcc, make, etc.) not found or not fully installed, marked for installation."
+            f"{BS_SYMBOLS['success']} Build tools appear to be installed."
         )
-        apt_packages_to_target.append("build-essential")
+        return
+
+    if "build-essential" in packages_to_install:
+        logger.warning(
+            "'gcc' or 'make' not found. Will install 'build-essential'."
+        )
+    if "python3-dev" in packages_to_install:
+        logger.warning(
+            f"Python dev headers (e.g., 'python{py_ver}-config') not found. Will install 'python3-dev'."
+        )
+
+    logger.info(f"Installing build tools: {', '.join(packages_to_install)}")
+    context["any_install_attempted"] = True
+    apt_updated_already = context.get("apt_updated_this_run", False)
+
+    apt_update_status = apt_install_packages(
+        packages_to_install, logger, apt_updated_already
+    )
+    context["apt_updated_this_run"] = apt_update_status
+
+    final_gcc_ok = bootstrap_cmd_exists("gcc")
+    final_py_dev_ok = bootstrap_cmd_exists(f"python{py_ver}-config")
+
+    if not final_gcc_ok or not final_py_dev_ok:
+        logger.critical(
+            f"{BS_SYMBOLS['error']} CRITICAL: Failed to verify build tools after installation. Check apt logs. The installer cannot continue."
+        )
+        sys.exit(1)
     else:
-        logger.info(
-            f"{BS_SYMBOLS['success']} 'build-essential' is already installed."
-        )
-
-    if not is_apt_package_installed_dpkg("python3-dev", logger):
-        logger.info(
-            "'python3-dev' not found or not fully installed, marked for installation."
-        )
-        apt_packages_to_target.append("python3-dev")
-    else:
-        logger.info(
-            f"{BS_SYMBOLS['success']} 'python3-dev' is already installed."
-        )
-
-    apt_update_status_after_call = apt_updated_already
-    if apt_packages_to_target:
-        install_attempted_this_group = True
-        apt_update_status_after_call = apt_install_packages(
-            apt_packages_to_target, logger, apt_updated_already
-        )
-
-        if (
-            "build-essential" in apt_packages_to_target
-            and not is_apt_package_installed_dpkg("build-essential", logger)
-        ):
-            logger.warning(
-                f"{BS_SYMBOLS['warning']} 'build-essential' might not have installed correctly or is still not detected by dpkg-query."
-            )
-        if (
-            "python3-dev" in apt_packages_to_target
-            and not is_apt_package_installed_dpkg("python3-dev", logger)
-        ):
-            logger.warning(
-                f"{BS_SYMBOLS['warning']} 'python3-dev' might not have installed correctly or is still not detected by dpkg-query."
-            )
-
-        logger.info(
-            f"{BS_SYMBOLS['success']} Build tools packages ('{', '.join(apt_packages_to_target)}') processed via apt."
-        )
-    else:
-        logger.info(
-            f"{BS_SYMBOLS['info']} No new build tool installations were required by apt."
-        )
-
-    return install_attempted_this_group, apt_update_status_after_call
+        logger.info(f"{BS_SYMBOLS['success']} Build tools are now available.")
