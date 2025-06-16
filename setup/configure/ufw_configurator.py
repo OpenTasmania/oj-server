@@ -20,24 +20,38 @@ def apply_ufw_rules(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Applies the defined UFW rules (default policies and allows).
-    Uses app_settings for admin_group_ip and logging symbols.
+    Applies the defined UFW (Uncomplicated Firewall) rules to secure the server.
+
+    This function configures default policies for incoming and outgoing traffic,
+    and sets up specific allow rules for administrative access and public services.
+    It validates the admin group IP address format before applying rules, and logs
+    the progress and results of each operation.
+
+    Parameters:
+        app_settings (AppSettings): Application settings containing configuration
+            details such as admin_group_ip, PostgreSQL port, and logging symbols.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging.
+            If not provided, a module-level logger is used.
+
+    Raises:
+        ValueError: If the admin_group_ip is not in a valid CIDR format.
+        subprocess.CalledProcessError: If any UFW command fails during execution.
+        Exception: For any other unexpected errors during rule application.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     admin_group_ip = app_settings.admin_group_ip
 
     log_map_server(
-        f"{symbols.get('step', '➡️')} Applying UFW rules...",  # Corrected: Added emoji from symbols
+        f"{symbols.get('step', '➡️')} Applying UFW rules...",
         "info",
         logger_to_use,
-        app_settings,  # Pass app_settings
+        app_settings,
     )
 
-    # Corrected call to validate_cidr
     if not validate_cidr(
         admin_group_ip,
-        app_settings,  # Pass app_settings as second positional argument
+        app_settings,
         current_logger=logger_to_use,
     ):
         msg = (
@@ -48,7 +62,7 @@ def apply_ufw_rules(
             f"{symbols.get('error', '❌')} {msg}",
             "error",
             logger_to_use,
-            app_settings,  # Corrected: Added emoji, Pass app_settings
+            app_settings,
         )
         raise ValueError(msg)
 
@@ -172,14 +186,31 @@ def apply_ufw_rules(
 def activate_ufw_service(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
+    """
+    Activates the UFW (Uncomplicated Firewall) service if it is not already active.
+
+    This function checks the current status of the UFW service and enables it if
+    it is inactive. It also displays the final status of the firewall with verbose
+    output. The function logs each step of the process and handles potential errors.
+
+    Parameters:
+        app_settings (AppSettings): Application settings containing configuration
+            details and logging symbols.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging.
+            If not provided, a module-level logger is used.
+
+    Raises:
+        subprocess.CalledProcessError: If any UFW command fails during execution.
+        Exception: For any other unexpected errors during service activation.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
     log_map_server(
-        f"{symbols.get('step', '➡️')} Activating UFW service (enabling if inactive)...",  # Corrected: Added emoji
+        f"{symbols.get('step', '➡️')} Activating UFW service (enabling if inactive)...",
         "info",
         logger_to_use,
-        app_settings,  # Pass app_settings
+        app_settings,
     )
 
     try:

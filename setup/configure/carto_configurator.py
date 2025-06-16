@@ -34,7 +34,29 @@ PRIMARY_DATASOURCE_ANCHOR_LINE_START_CONFIG = "osm2pgsql: &osm2pgsql"
 
 def compile_osm_carto_stylesheet(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
-) -> str:  # Return type is str (path to compiled xml)
+) -> str:
+    """
+    Compiles the OpenStreetMap CartoCSS stylesheet to a Mapnik XML file.
+
+    This function processes the project.mml file in the OSM Carto directory,
+    updates database connection parameters, and compiles it to a Mapnik XML file
+    using the CartoCSS compiler. It handles file backups, error logging, and
+    validation of database credentials.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including PostgreSQL connection details and symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Returns:
+        str: Path to the compiled Mapnik XML file.
+
+    Raises:
+        ValueError: If default PostgreSQL password is used without override.
+        FileNotFoundError: If Carto base directory or project.mml file is not found.
+        Exception: For any other errors encountered during compilation.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -359,7 +381,25 @@ def deploy_mapnik_stylesheet(
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
-    """Deploys the compiled Mapnik XML stylesheet."""
+    """
+    Deploys the compiled Mapnik XML stylesheet to the target directory.
+
+    This function copies the compiled Mapnik XML file to the standard location
+    where rendering services expect to find it. It verifies the source file exists
+    and is not empty before copying, and sets appropriate file permissions on the
+    deployed file.
+
+    Args:
+        compiled_xml_path_str (str): Path to the compiled Mapnik XML file to deploy.
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        ValueError: If the compiled XML path is not provided.
+        FileNotFoundError: If the compiled XML file is missing or empty.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -422,7 +462,20 @@ def deploy_mapnik_stylesheet(
 def finalize_carto_directory_processing(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Reverts ownership of the Carto directory to root:root."""
+    """
+    Reverts ownership of the Carto directory to root:root after processing.
+
+    This function is typically called after all processing operations on the Carto
+    directory are complete. It changes the ownership of the directory and all its
+    contents back to the root user and group, which is the standard ownership for
+    system-level configuration directories.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging and the Carto directory path.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -447,7 +500,24 @@ def finalize_carto_directory_processing(
 def update_font_cache(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Updates the system font cache using fc-cache."""
+    """
+    Updates the system font cache using the fc-cache command.
+
+    This function runs the fc-cache command with elevated privileges to refresh
+    the system's font cache. This is necessary after installing or modifying fonts
+    to ensure they are properly recognized by applications that use them, including
+    the map rendering system.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Note:
+        Failures in updating the font cache are logged but do not cause the function
+        to raise exceptions, as this operation is not critical for all setups.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(

@@ -36,7 +36,26 @@ NGINX_SITES_ENABLED_DIR = "/etc/nginx/sites-enabled"
 def create_nginx_proxy_site_config(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates the Nginx site configuration file for reverse proxying using template from app_settings."""
+    """
+    Creates the Nginx site configuration file for reverse proxying services.
+
+    This function generates an Nginx site configuration file based on a template
+    provided in app_settings. It determines the appropriate server name based on
+    the vm_ip_or_domain setting, formats the template with various configuration
+    values (ports, paths, etc.), and writes the result to the Nginx sites-available
+    directory.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the Nginx template, server name, and port configurations for
+            various services.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        KeyError: If a required placeholder key is missing in the Nginx template.
+        Exception: For any other errors encountered during file creation or writing.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
@@ -118,7 +137,25 @@ def create_nginx_proxy_site_config(
 def manage_nginx_sites(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Enables the new Nginx proxy site and disables the default site."""
+    """
+    Enables the new Nginx proxy site and disables the default site.
+
+    This function creates a symbolic link from the sites-available directory to the
+    sites-enabled directory for the proxy configuration file, effectively enabling
+    the site in Nginx. It also checks for and removes the default site configuration
+    if it exists, to prevent conflicts.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the Nginx proxy configuration filename.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        FileNotFoundError: If the source Nginx site configuration file does not exist.
+        Exception: For any other errors encountered during the symbolic link creation
+            or default site removal process.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     proxy_conf_filename = (
@@ -214,7 +251,23 @@ def manage_nginx_sites(
 def test_nginx_configuration(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Tests the Nginx configuration for syntax errors."""
+    """
+    Tests the Nginx configuration for syntax errors.
+
+    This function runs the 'nginx -t' command to validate the Nginx configuration
+    files for syntax errors. It is typically called after creating or modifying
+    Nginx configuration files and before restarting the Nginx service.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        subprocess.CalledProcessError: If the Nginx configuration test fails, indicating
+            syntax errors or other configuration issues.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -247,7 +300,20 @@ def test_nginx_configuration(
 def activate_nginx_service(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Reloads systemd, restarts and enables the Nginx service."""
+    """
+    Reloads systemd, restarts and enables the Nginx service.
+
+    This function ensures that the Nginx service is properly activated by reloading
+    the systemd daemon, restarting the Nginx service, and enabling it to start
+    automatically on system boot. It also displays and logs the current status of
+    the service.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(

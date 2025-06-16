@@ -38,34 +38,29 @@ def _run_osrm_container_command_internal(
     execution and handles potential exceptions. It also supports mounting host directories
     to the container for data processing.
 
-    Arguments:
-        command_args: List[str]
-            Command line arguments to pass to the container.
-        app_settings: AppSettings
-            Application settings object containing container runtime configuration and other settings.
-        region_osrm_data_dir_host: str
-            Host directory path containing OSRM data to be mounted into the container.
-        pbf_host_path_for_mount: Optional[str]
-            Host directory path containing PBF data to be mounted into the container.
-        pbf_filename_in_container_mount: Optional[str]
-            Filename of the PBF file in the container mount directory.
-        current_logger: Optional[logging.Logger]
-            Logger object to be used for logging. Defaults to module-level logger if None.
-        step_name: str
-            Name of the process step for logging purposes.
-        region_name_log: str
-            Name of the region being processed, used for logging.
+    Args:
+        command_args (List[str]): Command line arguments to pass to the container.
+        app_settings (AppSettings): Application settings object containing container runtime
+            configuration and other settings.
+        region_osrm_data_dir_host (str): Host directory path containing OSRM data to be
+            mounted into the container.
+        pbf_host_path_for_mount (Optional[str]): Host directory path containing PBF data
+            to be mounted into the container.
+        pbf_filename_in_container_mount (Optional[str]): Filename of the PBF file in the
+            container mount directory.
+        current_logger (Optional[logging.Logger]): Logger object to be used for logging.
+            Defaults to module-level logger if None.
+        step_name (str): Name of the process step for logging purposes.
+        region_name_log (str): Name of the region being processed, used for logging.
 
     Returns:
-        bool
-            Returns True if the OSRM container command is executed successfully without errors;
+        bool: Returns True if the OSRM container command is executed successfully without errors;
             otherwise, returns False.
 
     Raises:
-        subprocess.CalledProcessError
-            If the container command execution fails with a non-zero exit code.
-        Exception
-            For any other unforeseen runtime exceptions during the command execution.
+        subprocess.CalledProcessError: If the container command execution fails with a
+            non-zero exit code.
+        Exception: For any other unforeseen runtime exceptions during the command execution.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -163,17 +158,16 @@ def extract_regional_pbfs_with_osmium(
     the corresponding GeoJSON file. The function also logs various stages of the process
     and handles scenarios where the required files or directories are missing.
 
-    Arguments:
-        base_pbf_full_path: str
-            The filesystem path to the base PBF file to extract regions from.
-        app_settings: AppSettings
-            Application settings object containing configurations like symbols and directory paths.
-        current_logger: Optional[logging.Logger], optional
-            Logger instance to use for logging messages. Defaults to a module-level logger.
+    Args:
+        base_pbf_full_path (str): The filesystem path to the base PBF file to extract regions from.
+        app_settings (AppSettings): Application settings object containing configurations
+            like symbols and directory paths.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging messages.
+            Defaults to a module-level logger.
 
     Returns:
-        Dict[str, str]
-            A dictionary mapping unique region keys to the filesystem paths of the extracted PBF files.
+        Dict[str, str]: A dictionary mapping unique region keys to the filesystem paths
+            of the extracted PBF files.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols

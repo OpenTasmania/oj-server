@@ -39,7 +39,22 @@ APACHE_TILES_SITE_CONF_AVAILABLE_PATH = (
 def configure_apache_ports(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Modifies Apache's listening port using app_settings.apache.listen_port."""
+    """
+    Modifies Apache's listening port configuration to use the port specified in app_settings.
+
+    This function updates the Apache ports.conf file to change the default listening port
+    from 80 to the port specified in app_settings.apache.listen_port. It backs up the
+    original file before making changes and handles both IPv4 and IPv6 listening directives.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the Apache listen port and symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        FileNotFoundError: If the Apache ports configuration file cannot be found.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     target_listen_port = app_settings.apache.listen_port
@@ -109,7 +124,23 @@ def configure_apache_ports(
 def create_mod_tile_config(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates /etc/apache2/conf-available/mod_tile.conf using template from app_settings."""
+    """
+    Creates the mod_tile Apache configuration file using a template from app_settings.
+
+    This function generates the /etc/apache2/conf-available/mod_tile.conf file using
+    a template provided in app_settings. It formats the template with values from
+    app_settings including request timeouts and load parameters for the mod_tile module.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the mod_tile configuration template and parameters.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        KeyError: If a required placeholder key is missing in the mod_tile.conf template.
+        Exception: For any other errors encountered during file creation or writing.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
@@ -172,7 +203,24 @@ def create_mod_tile_config(
 def create_apache_tile_site_config(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates the Apache site configuration for serving tiles using template from app_settings."""
+    """
+    Creates the Apache site configuration file for serving map tiles.
+
+    This function generates an Apache site configuration file for serving map tiles
+    using a template from app_settings. It determines appropriate ServerName and
+    ServerAdmin values based on the vm_ip_or_domain setting, and formats the template
+    with these and other configuration values.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the Apache tile site template and server configuration parameters.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        KeyError: If a required placeholder key is missing in the Apache tile site template.
+        Exception: For any other errors encountered during file creation or writing.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
@@ -250,7 +298,19 @@ def create_apache_tile_site_config(
 def manage_apache_modules_and_sites(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Enables necessary Apache configurations, modules, and sites."""
+    """
+    Enables necessary Apache configurations, modules, and sites for tile serving.
+
+    This function enables the mod_tile configuration, required Apache modules (expires, headers),
+    and the tile site configuration. It also disables the default Apache site if it exists.
+    All operations are logged with appropriate status messages.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -313,7 +373,19 @@ def manage_apache_modules_and_sites(
 def activate_apache_service(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Reloads systemd, restarts and enables the Apache service."""
+    """
+    Reloads systemd, restarts and enables the Apache service.
+
+    This function ensures that the Apache service is properly activated by reloading
+    systemd daemon, restarting the Apache service, and enabling it to start on boot.
+    It also displays and logs the current status of the service.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(

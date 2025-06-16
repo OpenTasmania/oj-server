@@ -42,7 +42,6 @@ def get_next_available_port(
     Returns:
         int: The next available port number starting from the default host port.
     """
-    # TODO: Use logger
     osrm_service_cfg = app_settings.osrm_service
     base_port = osrm_service_cfg.car_profile_default_host_port
 
@@ -56,7 +55,7 @@ def get_next_available_port(
 
 
 def create_osrm_routed_service_file(
-    region_name_key: str,  # Unique key for the region, e.g., "Australia_Tasmania_Hobart"
+    region_name_key: str,
     app_settings: AppSettings,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
@@ -450,7 +449,7 @@ def configure_osrm_services(
     errors encountered during the process. It verifies the presence of required
     directories and files, then activates corresponding OSRM routed services.
 
-    Arguments:
+    Parameters:
         app_settings (AppSettings): Application settings containing information
             about OSRM service configuration, including paths and symbols used
             for logging.

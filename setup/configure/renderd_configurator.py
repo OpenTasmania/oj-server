@@ -35,8 +35,28 @@ RENDERD_SYSTEM_GROUP = (
 
 def get_mapnik_plugin_dir(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
-) -> str:  # Return type is str
-    """Determines the Mapnik plugins directory. Uses override from app_settings if provided."""
+) -> str:
+    """
+    Determines the Mapnik plugins directory path.
+
+    This function attempts to find the correct Mapnik plugins directory using
+    several methods in order of preference:
+    1. Use an override path from app_settings if provided and valid
+    2. Query the mapnik-config tool if available
+    3. Use a default Debian path if it exists
+    4. Fall back to a common path as a last resort
+
+    The function logs each attempt and its result for debugging purposes.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including a possible Mapnik plugins directory override.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Returns:
+        str: The path to the Mapnik plugins directory.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
 
@@ -137,7 +157,24 @@ def get_mapnik_plugin_dir(
 def create_renderd_conf_file(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates the /etc/renderd.conf file using template from app_settings."""
+    """
+    Creates the renderd configuration file from a template.
+
+    This function generates the /etc/renderd.conf file using a template from app_settings.
+    It calculates appropriate values for configuration parameters such as the number of
+    threads based on CPU count, determines the Mapnik plugins directory, and sets
+    appropriate ownership and permissions on the created file.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the renderd template and configuration parameters.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        KeyError: If a required placeholder key is missing in the renderd template.
+        Exception: For any other errors encountered during file creation or permission setting.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (

@@ -510,7 +510,7 @@ def customize_pg_hba_conf(
     content based on provided settings. Logging is performed at various steps of the process
     to aid in debugging and feedback.
 
-    Arguments:
+    Parameters:
         app_settings (AppSettings): The application settings object containing the configuration
             required for updating pg_hba.conf. This includes database credentials, template
             definitions, IP address configurations, and other relevant parameters.

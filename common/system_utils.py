@@ -177,7 +177,20 @@ def get_current_script_hash(
 ) -> Optional[str]:
     """
     Get the current script hash, calculating it if not already cached.
-    Uses app_settings for logging symbols via calculate_project_hash.
+
+    This function retrieves the cached script hash or calculates a new one if none exists.
+    It uses the project root directory to calculate a hash of all Python files in the project.
+
+    Args:
+        project_root_dir (Path): The root directory of the project.
+        app_settings (AppSettings): Configuration object containing application settings
+            needed for logging and hash calculation.
+        logger_instance (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Returns:
+        Optional[str]: The hex digest of the SHA256 hash as a string, or None if an error
+            occurs during hash calculation.
     """
     global CACHED_SCRIPT_HASH
     if CACHED_SCRIPT_HASH is None:
@@ -200,7 +213,18 @@ def systemd_reload(
 ) -> None:
     """
     Reload the systemd daemon.
-    Uses app_settings for logging symbols.
+
+    This function executes the systemctl daemon-reload command with elevated privileges
+    to refresh the systemd configuration. It logs the process and any errors that occur.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        Exception: The function catches and logs any exceptions but does not re-raise them.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
@@ -237,7 +261,21 @@ def get_debian_codename(
 ) -> Optional[str]:
     """
     Get the Debian codename (e.g., 'bookworm', 'bullseye').
-    Uses app_settings for logging symbols.
+
+    This function executes the lsb_release command to determine the Debian distribution
+    codename of the current system. It handles various error conditions and logs
+    appropriate messages.
+
+    Args:
+        app_settings (Optional[AppSettings]): Configuration object containing application
+            settings including symbols for logging. Can be None, in which case default
+            symbols are used.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Returns:
+        Optional[str]: The Debian codename as a string, or None if it cannot be determined
+            due to errors or missing commands.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols_to_use = SYMBOLS_DEFAULT

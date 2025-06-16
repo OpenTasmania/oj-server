@@ -26,11 +26,15 @@ def get_pg_tileserv_settings(app_settings: AppSettings):
     """
     Common function to retrieve pg_tileserv settings from app_settings.
 
+    This function extracts the pg_tileserv configuration section from the
+    application settings object for easier access in other functions.
+
     Args:
-        app_settings: The application settings object
+        app_settings (AppSettings): The application settings object containing
+            the pg_tileserv configuration.
 
     Returns:
-        The pg_tileserv settings from app_settings
+        Any: The pg_tileserv settings section from app_settings.
     """
     return app_settings.pg_tileserv
 
@@ -38,7 +42,24 @@ def get_pg_tileserv_settings(app_settings: AppSettings):
 def create_pg_tileserv_config_file(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates the pg_tileserv config.toml file using template from app_settings and sets its permissions."""
+    """
+    Creates the pg_tileserv config.toml file and sets appropriate permissions.
+
+    This function generates a configuration file for pg_tileserv using a template
+    from app_settings. It formats the template with various configuration values
+    (host, port, database URL, etc.), writes the result to the specified location,
+    and sets appropriate ownership and permissions on the file.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the pg_tileserv template and configuration parameters.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        KeyError: If a required placeholder key is missing in the pg_tileserv template.
+        Exception: For any other errors encountered during file creation or permission setting.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (
@@ -165,7 +186,20 @@ def create_pg_tileserv_config_file(
 def activate_pg_tileserv_service(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Reloads systemd, enables and restarts the pg_tileserv service."""
+    """
+    Reloads systemd, enables and restarts the pg_tileserv service.
+
+    This function ensures that the pg_tileserv service is properly activated by
+    reloading the systemd daemon, enabling the service to start automatically on
+    system boot, and restarting it to apply any configuration changes. It also
+    displays and logs the current status of the service.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including symbols for logging.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     log_map_server(
@@ -209,7 +243,24 @@ def activate_pg_tileserv_service(
 def create_pg_tileserv_systemd_service_file(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
-    """Creates the systemd service file for pg_tileserv using template from app_settings."""
+    """
+    Creates the systemd service file for pg_tileserv.
+
+    This function generates a systemd service file for pg_tileserv using a template
+    from app_settings. It formats the template with various configuration values
+    (user, group, binary path, config file path, etc.) and writes the result to
+    the standard systemd service directory.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the pg_tileserv systemd template and configuration parameters.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        KeyError: If a required placeholder key is missing in the systemd template.
+        Exception: For any other errors encountered during file creation or writing.
+    """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
     script_hash = (

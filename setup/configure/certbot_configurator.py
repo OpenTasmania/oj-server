@@ -24,8 +24,28 @@ def run_certbot_nginx(
     app_settings: AppSettings, current_logger: Optional[logging.Logger] = None
 ) -> None:
     """
-    Runs Certbot to obtain and install SSL certificate for the configured domain,
-    and configures Nginx. Uses settings from app_settings.
+    Runs Certbot to obtain and install SSL certificate for the configured domain.
+
+    This function uses the Certbot tool with the Nginx plugin to obtain and install
+    an SSL certificate for the domain specified in app_settings. It performs validation
+    checks on the domain to ensure it's suitable for SSL certification (must be a valid
+    FQDN, not an IP address or localhost). If the domain is valid, it runs Certbot with
+    appropriate options based on the certbot configuration in app_settings.
+
+    Args:
+        app_settings (AppSettings): Configuration object containing application settings
+            including the domain to certify and Certbot configuration options.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages. If None, a module-wide default logger is used.
+
+    Raises:
+        RuntimeError: If the Certbot command fails during execution.
+        Exception: For any other unexpected errors during Certbot execution.
+
+    Note:
+        If the domain is not valid for SSL certification (e.g., it's an IP address or
+        localhost), the function will log a warning and return without attempting to
+        obtain a certificate, as this is often intentional for local development.
     """
     logger_to_use = current_logger if current_logger else module_logger
     symbols = app_settings.symbols
