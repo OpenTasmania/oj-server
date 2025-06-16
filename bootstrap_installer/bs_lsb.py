@@ -10,9 +10,18 @@ from bootstrap_installer.bs_utils import (
 logger = get_bs_logger("LSB")
 
 
-def ensure_lsb_release(apt_updated_already: bool) -> tuple[bool, bool]:
+def ensure_lsb_release(
+    apt_updated_already: bool, context=None, app_settings=None, **kwargs
+) -> tuple[bool, bool]:
     """
     Checks for the lsb_release command and installs the 'lsb-release' package if missing.
+
+    Args:
+        apt_updated_already: Whether apt has been updated already in this run.
+        context: The shared orchestrator context.
+        app_settings: The application settings.
+        **kwargs: Additional keyword arguments.
+
     Returns:
         Tuple (install_attempted_for_this_package: bool,
                apt_updated_in_this_call_or_before: bool)
@@ -44,5 +53,11 @@ def ensure_lsb_release(apt_updated_already: bool) -> tuple[bool, bool]:
         logger.info(
             f"{BS_SYMBOLS['success']} Command '{command_name}' (package '{apt_package_name}') already available."
         )
+
+    # Update context if provided
+    if context is not None:
+        context["apt_updated_this_run"] = apt_update_status_after_call
+        if install_attempted_this_pkg:
+            context["any_install_attempted"] = True
 
     return install_attempted_this_pkg, apt_update_status_after_call

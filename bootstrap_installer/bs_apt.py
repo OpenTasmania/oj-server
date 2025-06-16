@@ -13,11 +13,17 @@ logger = get_bs_logger("Apt")
 
 
 def ensure_python_apt_prerequisite(
-    apt_updated_already: bool,
+    apt_updated_already: bool, context=None, app_settings=None, **kwargs
 ) -> tuple[bool, bool]:
     """
     Checks for the python3-apt module which is required for AptManager.
     Attempts to install it via apt if missing.
+
+    Args:
+        apt_updated_already: Whether apt has been updated already in this run.
+        context: The shared orchestrator context.
+        app_settings: The application settings.
+        **kwargs: Additional keyword arguments.
 
     Returns:
         Tuple (install_attempted_for_this_group: bool,
@@ -50,9 +56,17 @@ def ensure_python_apt_prerequisite(
             )
             sys.exit(1)
         logger.info(f"{BS_SYMBOLS['success']} python3-apt module ensured.")
+        # Update context if provided
+        if context is not None:
+            context["apt_updated_this_run"] = apt_update_status_after_call
+            if install_attempted:
+                context["any_install_attempted"] = True
         return install_attempted, apt_update_status_after_call
     else:
         logger.info(
             f"{BS_SYMBOLS['success']} Python module '{module_name}' already available."
         )
+        # Update context if provided
+        if context is not None:
+            context["apt_updated_this_run"] = apt_updated_already
         return install_attempted, apt_updated_already

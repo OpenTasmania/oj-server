@@ -11,10 +11,19 @@ from .bs_utils import (  # Import new util
 logger = get_bs_logger("BuildTools")
 
 
-def ensure_build_tools(apt_updated_already: bool) -> tuple[bool, bool]:
+def ensure_build_tools(
+    apt_updated_already: bool, context=None, app_settings=None, **kwargs
+) -> tuple[bool, bool]:
     """
     Ensures 'build-essential' and 'python3-dev' are installed via apt,
     only if they are not already detected.
+
+    Args:
+        apt_updated_already: Whether apt has been updated already in this run.
+        context: The shared orchestrator context.
+        app_settings: The application settings.
+        **kwargs: Additional keyword arguments.
+
     Returns:
         Tuple (install_attempted_for_these_packages: bool,
                apt_updated_in_this_call_or_before: bool)
@@ -84,5 +93,11 @@ def ensure_build_tools(apt_updated_already: bool) -> tuple[bool, bool]:
             f"{BS_SYMBOLS['info']} No new build tool installations were required by apt."
         )
         # install_attempted_this_group remains False
+
+    # Update context if provided
+    if context is not None:
+        context["apt_updated_this_run"] = apt_update_status_after_call
+        if install_attempted_this_group:
+            context["any_install_attempted"] = True
 
     return install_attempted_this_group, apt_update_status_after_call

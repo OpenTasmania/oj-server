@@ -40,14 +40,50 @@ def run_bootstrap_orchestration(app_settings, logger=None):
 
     # Define the tasks
     orchestrator.add_task(
-        "Python3-apt Prerequisite", ensure_python_apt_prerequisite
+        "Python3-apt Prerequisite",
+        ensure_python_apt_prerequisite,
+        kwargs={
+            "apt_updated_already": orchestrator.context[
+                "apt_updated_this_run"
+            ]
+        },
     )
     orchestrator.add_task(
-        "Pydantic Prerequisites", ensure_pydantic_prerequisites
+        "Pydantic Prerequisites",
+        ensure_pydantic_prerequisites,
+        kwargs={
+            "apt_updated_already": orchestrator.context[
+                "apt_updated_this_run"
+            ]
+        },
     )
-    orchestrator.add_task("LSB Release Prerequisite", ensure_lsb_release)
-    orchestrator.add_task("util-linux Prerequisite", ensure_util_linux)
-    orchestrator.add_task("Build Tools Prerequisites", ensure_build_tools)
+    orchestrator.add_task(
+        "LSB Release Prerequisite",
+        ensure_lsb_release,
+        kwargs={
+            "apt_updated_already": orchestrator.context[
+                "apt_updated_this_run"
+            ]
+        },
+    )
+    orchestrator.add_task(
+        "util-linux Prerequisite",
+        ensure_util_linux,
+        kwargs={
+            "apt_updated_already": orchestrator.context[
+                "apt_updated_this_run"
+            ]
+        },
+    )
+    orchestrator.add_task(
+        "Build Tools Prerequisites",
+        ensure_build_tools,
+        kwargs={
+            "apt_updated_already": orchestrator.context[
+                "apt_updated_this_run"
+            ]
+        },
+    )
 
     # Run the orchestration
     success = orchestrator.run()
