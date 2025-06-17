@@ -53,7 +53,7 @@ from installer.carto_installer import (
     prepare_carto_directory_for_processing,
     setup_osm_carto_repository,
 )
-from installer.certbot_installer import install_certbot_packages
+from installer.certbot_installer import install_certbot
 from installer.docker_installer import install_docker_engine
 from installer.nginx_installer import ensure_nginx_package_installed
 from installer.nodejs_installer import install_nodejs_lts
@@ -250,7 +250,7 @@ CONFIG_NGINX_MANAGE_SITES = "CONFIG_NGINX_MANAGE_SITES"
 CONFIG_NGINX_TEST_CONFIG = "CONFIG_NGINX_TEST_CONFIG"
 SERVICE_NGINX_ACTIVATE = "SERVICE_NGINX_ACTIVATE"
 NGINX_FULL_SETUP = "NGINX_FULL_SETUP"
-SETUP_CERTBOT_PACKAGES = "SETUP_CERTBOT_PACKAGES"
+SETUP_CERTBOT = "SETUP_CERTBOT"
 CONFIG_CERTBOT_RUN = "CONFIG_CERTBOT_RUN"
 CERTBOT_FULL_SETUP = "CERTBOT_FULL_SETUP"
 GTFS_PROCESS_AND_SETUP_TAG = "GTFS_PROCESS_AND_SETUP"
@@ -364,7 +364,7 @@ INSTALLATION_GROUPS_ORDER: List[Dict[str, Any]] = [
     },
     {
         "name": "Certbot Service",
-        "steps": [SETUP_CERTBOT_PACKAGES, CONFIG_CERTBOT_RUN],
+        "steps": [SETUP_CERTBOT, CONFIG_CERTBOT_RUN],
     },
     {"name": "Application Content", "steps": [WEBSITE_CONTENT_DEPLOY_TAG]},
     {"name": "PostgreSQL Tools", "steps": [PGADMIN_TOOLS_SETUP]},
@@ -1108,11 +1108,20 @@ def certbot_full_setup_sequence(
         current_logger=logger_to_use,
         app_settings=app_cfg,
     )
+    # Wrapper function to match StepExecutorFunc signature
+
+    def install_certbot_wrapper(
+        app_settings: AppSettings, logger: Optional[logging.Logger] = None
+    ) -> None:
+        return install_certbot(
+            app_settings, plugins=["nginx"], current_logger=logger
+        )
+
     steps: List[Tuple[str, str, StepExecutorFunc]] = [
         (
-            SETUP_CERTBOT_PACKAGES,
-            "Install Certbot Packages",
-            install_certbot_packages,
+            SETUP_CERTBOT,
+            "Install Certbot",
+            install_certbot_wrapper,
         ),
         (CONFIG_CERTBOT_RUN, "Run Certbot for Nginx", run_certbot_nginx),
     ]
@@ -1598,7 +1607,7 @@ def get_packages_for_tasks(
         "apache_pkg_check": ["apache2", "libapache2-mod-tile"],
         "nginx_pkg_check": ["nginx"],
         "certbot_pkg_install": ["certbot", "python3-certbot-nginx"],
-        # Assuming SETUP_CERTBOT_PACKAGES flag is certbot_pkg_install
+        # Assuming SETUP_CERTBOT flag is certbot_pkg_install
         # Individual core prereq tasks also map to their respective package lists
         # This ensures if run_all_core_prerequisites isn't set, but individual core steps are,
         # their packages are considered.

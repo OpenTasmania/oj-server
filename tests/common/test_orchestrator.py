@@ -6,6 +6,8 @@ Tests for the centralized orchestrator module.
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from common.orchestrator import Orchestrator
 
 
@@ -73,20 +75,27 @@ class TestOrchestrator:
         """Test running the orchestrator with a fatal task failure."""
         app_settings = MagicMock()
         logger = MagicMock()
-
         orchestrator = Orchestrator(app_settings, logger)
-
         task1 = MagicMock(side_effect=Exception("Task 1 failed"))
         task2 = MagicMock()
-
         orchestrator.add_task("Task 1", task1)
         orchestrator.add_task("Task 2", task2)
 
-        result = orchestrator.run()
+        with pytest.raises(SystemExit) as excinfo:
+            orchestrator.run()
 
-        assert result is False
+        assert excinfo.value.code == 1
+
         task1.assert_called_once()
+
         task2.assert_not_called()
+
+        logger.critical.assert_called_once_with(
+            "🔥 Task 'Task 1' failed: Task 1 failed", exc_info=True
+        )
+        logger.error.assert_called_once_with(
+            "A fatal error occurred. Halting orchestration and exiting application."
+        )
 
     def test_run_failure_non_fatal(self):
         """Test running the orchestrator with a non-fatal task failure."""

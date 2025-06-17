@@ -1,70 +1,52 @@
 # installer/certbot_installer.py
 # -*- coding: utf-8 -*-
 """
-Handles installation of Certbot packages.
+This module handles the installation of Certbot and its plugins for Nginx and Apache.
 """
 
 import logging
-from typing import Optional  # Added Optional
+from typing import List, Optional
 
-from common.command_utils import log_map_server
 from common.debian.apt_manager import AptManager
-from setup.config_models import AppSettings  # For type hinting
+from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
 
 
-def install_certbot_packages(
+def install_certbot(
     app_settings: AppSettings,
+    plugins: Optional[List[str]] = None,
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
-    Installs Certbot and its Nginx plugin through apt package manager.
-
-    This function attempts to install Certbot and its Nginx plugin using elevated permissions. It uses a
-    logger to output structured status messages. Should an error occur during the installation, it logs
-    the error and raises the encountered exception to propagate the issue further up the call stack.
-    Considerations include whether or not the apt cache update should always be performed here.
+    Installs Certbot and specified plugins using the system's package manager.
 
     Args:
-        app_settings (AppSettings): Configuration settings that include operational parameters, such as
-            symbols and additional environment variables.
-        current_logger (Optional[logging.Logger]): Logger instance for capturing logs. If not provided,
-            the default module logger is used.
-
-    Raises:
-        Exception: Propagates any exception that occurs during the installation process.
+        app_settings (AppSettings): The application settings object.
+        plugins (Optional[List[str]]): A list of plugins to install (e.g., ['nginx', 'apache']).
+        current_logger (Optional[logging.Logger]): A logger instance for logging messages.
     """
-    logger_to_use = current_logger if current_logger else module_logger
+    logger_to_use = current_logger or module_logger
     symbols = app_settings.symbols
 
-    log_map_server(
-        f"{symbols.get('package', '📦')} Installing Certbot and Nginx plugin...",
-        "info",
-        logger_to_use,
-        app_settings,
-    )
-    try:
-        # Use AptManager for package installation
-        apt_manager = AptManager(logger=logger_to_use)
+    logger_to_use.info(f"{symbols.get('gear', '⚙️')} Installing Certbot...")
 
-        # Install certbot packages
-        apt_manager.install(
-            ["certbot", "python3-certbot-nginx"],
-            update_first=True,  # This handles the apt update automatically
+    packages_to_install = ["certbot"]
+    if plugins:
+        for plugin in plugins:
+            packages_to_install.append(f"python3-certbot-{plugin}")
+
+    try:
+        apt = AptManager(logger=logger_to_use)
+        apt.install(packages_to_install, app_settings, update_first=True)
+
+        logger_to_use.info(
+            f"{symbols.get('success', '✅')} Certbot and plugins installed successfully."
         )
-        log_map_server(
-            f"{symbols.get('success', '✅')} Certbot packages installed.",
-            "success",
-            logger_to_use,
-            app_settings,
-        )
+
     except Exception as e:
-        log_map_server(
-            f"{symbols.get('error', '❌')} Failed to install Certbot packages: {e}",
-            "error",
-            logger_to_use,
-            app_settings,
+        logger_to_use.error(
+            f"{symbols.get('error', '❌')} Failed to install Certbot: {e}",
             exc_info=True,
         )
         raise

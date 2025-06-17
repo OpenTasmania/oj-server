@@ -48,7 +48,7 @@ def install_pgadmin(
         apt_manager = AptManager(logger=logger_to_use)
 
         # Install pgAdmin4
-        apt_manager.install("pgadmin4", update_first=True)
+        apt_manager.install("pgadmin4", app_settings, update_first=True)
 
         log_map_server(
             f"{config.SYMBOLS['success']} pgAdmin installation completed successfully.",

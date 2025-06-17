@@ -70,7 +70,17 @@ def _get_elevated_command_prefix() -> List[str]:
         List[str]: A list containing the prefix ["sudo"] if elevated privileges are
         needed, or an empty list if the process already has root privileges.
     """
-    return [] if os.geteuid() == 0 else ["sudo"]
+    if os.geteuid() == 0:
+        return []
+
+    if not command_exists("sudo"):
+        module_logger.critical(
+            "Running as non-root and 'sudo' command not found. Cannot elevate privileges."
+        )
+        raise FileNotFoundError(
+            "Running as non-root and 'sudo' command not found. Please install 'sudo' or run as root."
+        )
+    return ["sudo"]
 
 
 def run_command(
@@ -84,6 +94,7 @@ def run_command(
     current_logger: Optional[logging.Logger] = None,
     cwd: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
+    stdin=None,
 ) -> subprocess.CompletedProcess:
     """
     Executes a system command and logs the process details and results, including both
@@ -109,6 +120,7 @@ def run_command(
             provided, it inherits the current working directory of the parent process.
         env (Optional[Dict[str, str]]): A dictionary defining the environment variables for the command
             execution. Defaults to the inherited environment of the current process.
+        stdin: Optional stream for command input.
 
     Returns:
         subprocess.CompletedProcess: The completed process instance, containing information about the
@@ -176,6 +188,7 @@ def run_command(
             input=cmd_input,
             cwd=cwd,
             env=env,
+            stdin=stdin,
         )
         if capture_output:
             if result.stdout and result.stdout.strip():
@@ -263,6 +276,7 @@ def run_elevated_command(
     current_logger: Optional[logging.Logger] = None,
     cwd: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
+    stdin=None,
 ) -> subprocess.CompletedProcess:
     """
     Executes a command with elevated permissions. This function constructs the necessary
@@ -287,6 +301,7 @@ def run_elevated_command(
             The working directory for the command execution. Defaults to None.
         env: Optional[Dict[str, str]]
             Additional environment variables to use during command execution. Defaults to None.
+        stdin: Optional stream for command input.
 
     Returns:
         subprocess.CompletedProcess
@@ -310,6 +325,7 @@ def run_elevated_command(
         current_logger=current_logger,
         cwd=cwd,
         env=env,
+        stdin=stdin,
     )
 
 

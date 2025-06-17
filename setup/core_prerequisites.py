@@ -131,7 +131,7 @@ def apply_preseed_and_install_package(
         )
         # Use AptManager for package installation
         apt_manager = AptManager(logger=logger_to_use)
-        apt_manager.install(package_name, update_first=False)
+        apt_manager.install(package_name, app_settings, update_first=False)
         log_map_server(
             f"{symbols.get('success', '✅')} Package '{package_name}' installed successfully.",
             "success",
@@ -420,7 +420,7 @@ def install_essential_utilities(
         apt_manager = AptManager(logger=logger_to_use)
 
         # Update package lists
-        apt_manager.update(raise_error=True)
+        apt_manager.update(app_settings, raise_error=True)
 
         # Note: AptManager doesn't have a direct method for upgrade,
         # so we still need to use run_elevated_command for this operation

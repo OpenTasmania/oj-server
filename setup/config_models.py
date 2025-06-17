@@ -1,4 +1,4 @@
-# setup/config_models.py
+# ot-osm-osrm-server/setup/config_models.py
 # -*- coding: utf-8 -*-
 """
 Pydantic models for application configuration.
@@ -9,7 +9,7 @@ It utilizes Pydantic for data validation and settings management.
 """
 
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from pydantic import (
     Field,
@@ -51,6 +51,19 @@ OSRM_PROFILE_LUA_IN_CONTAINER_DEFAULT: str = (
 APACHE_LISTEN_PORT_DEFAULT: int = 8080
 POSTGRES_VERSION_DEFAULT: str = "17"
 
+# --- Docker Defaults ---
+DOCKER_KEYRING_PATH_DEFAULT: str = "/etc/apt/keyrings/docker.gpg"
+DOCKER_KEY_URL_DEFAULT: str = "https://download.docker.com/linux/debian/gpg"
+DOCKER_REPO_URL_DEFAULT: str = "https://download.docker.com/linux/debian"
+DOCKER_PACKAGES_DEFAULT: List[str] = [
+    "docker-ce",
+    "docker-ce-cli",
+    "containerd.io",
+    "docker-buildx-plugin",
+    "docker-compose-plugin",
+]
+
+
 # --- Default Preseed Values ---
 DEFAULT_PACKAGE_PRESEEDING_VALUES: Dict[str, Dict[str, str]] = {
     "tzdata": {
@@ -59,14 +72,7 @@ DEFAULT_PACKAGE_PRESEEDING_VALUES: Dict[str, Dict[str, str]] = {
     },
     "unattended-upgrades": {
         "unattended-upgrades/enable_auto_updates": "true boolean",
-        # Add other unattended-upgrades preseed keys if needed
-        # e.g., "unattended-upgrades/origins_pattern": "string o=Debian,n=${distro_codename},l=Debian-Security; o=Debian,n=${distro_codename}-updates;",
     },
-    # Add other packages and their preseed data here
-    # "some-other-package": {
-    #     "package/question1": "type value1",
-    #     "package/question2": "type value2",
-    # }
 }
 
 # --- Default Templates for Configuration Files ---
@@ -645,6 +651,28 @@ class WebAppSettings(BaseSettings):
     )
 
 
+class DockerSettings(BaseSettings):
+    """Docker installation settings."""
+
+    model_config = SettingsConfigDict(env_prefix="DOCKER_", extra="ignore")
+    keyring_path: Path = Field(
+        default=Path(DOCKER_KEYRING_PATH_DEFAULT),
+        description="Path to store the Docker GPG keyring.",
+    )
+    key_url: str = Field(
+        default=DOCKER_KEY_URL_DEFAULT,
+        description="URL for the Docker GPG key.",
+    )
+    repo_url: str = Field(
+        default=DOCKER_REPO_URL_DEFAULT,
+        description="URL for the Docker APT repository.",
+    )
+    packages: List[str] = Field(
+        default_factory=lambda: DOCKER_PACKAGES_DEFAULT.copy(),
+        description="List of Docker packages to install.",
+    )
+
+
 # New Model for Package Preseeding
 class PackagePreseedingSettings(BaseSettings):
     """Holds preseed configurations for Debian packages.
@@ -652,26 +680,7 @@ class PackagePreseedingSettings(BaseSettings):
     Example: {"tzdata": {"tzdata/Areas": "select Australia"}}
     """
 
-    model_config = SettingsConfigDict(
-        extra="ignore"
-    )  # Allows arbitrary package names as keys
-    # TODO: Look at all this
-    # This field will effectively be Dict[str, Dict[str, str]]
-    # Pydantic handles this by allowing additional fields in the model if extra='allow'
-    # or by dynamically creating fields if we were to define them explicitly.
-    # For a truly dynamic Dict[str, Dict[str, str]] that still gets ENV var loading,
-    # a custom root model or a more complex setup might be needed.
-    # However, for loading from YAML, this structure is fine.
-    # The default_factory ensures it initializes as an empty dict if not in YAML/ENV.
-    # We will rely on the YAML loader to populate this correctly.
-    # For default values, we'll use the constant defined at the top of the file.
-
-    # This specific structure is a bit tricky for Pydantic's direct ENV mapping for nested dicts
-    # like PACKAGE_PRESEEDING_VALUES_TZDATA_AREAS='select Australia'.
-    # It's more straightforward if loaded from a YAML file or if individual packages
-    # had their own sub-model, e.g., tzdata_preseed: Optional[Dict[str,str]] = Field(...)
-    # For now, we'll initialize with a default dictionary.
-    # The _deep_update in config_loader.py will handle merging from YAML.
+    model_config = SettingsConfigDict(extra="ignore")
 
 
 class AppSettings(BaseSettings):
@@ -709,6 +718,7 @@ class AppSettings(BaseSettings):
     webapp: WebAppSettings = Field(default_factory=WebAppSettings)
     pgadmin: PgAdminSettings = Field(default_factory=PgAdminSettings)
     pgagent: PgAgentSettings = Field(default_factory=PgAgentSettings)
+    docker: DockerSettings = Field(default_factory=DockerSettings)
 
     # Centralized package preseeding configurations
     package_preseeding_values: Dict[str, Dict[str, str]] = Field(

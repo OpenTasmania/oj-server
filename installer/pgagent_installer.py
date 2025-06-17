@@ -1,12 +1,13 @@
-# opentasmania-osm-osrm-server/installer/pgagent_installer.py
+# installer/pgagent_installer.py
 # -*- coding: utf-8 -*-
+"""
+This module handles the installation of pgAgent, a job scheduler for PostgreSQL.
+"""
+
 import logging
 from typing import Optional
 
-from common.command_utils import log_map_server
-from common.constants_loader import is_feature_enabled
 from common.debian.apt_manager import AptManager
-from setup import config
 from setup.config_models import AppSettings
 
 module_logger = logging.getLogger(__name__)
@@ -17,48 +18,31 @@ def install_pgagent(
     current_logger: Optional[logging.Logger] = None,
 ) -> None:
     """
-    Installs pgAgent if enabled in the configuration.
+    Installs the pgAgent package using the system's package manager.
 
     Args:
-        app_settings: The application settings object containing the necessary configuration.
-        current_logger: An optional logger instance to be used for logging messages. If not
-            provided, the module-level logger is used instead.
+        app_settings (AppSettings): The application settings object.
+        current_logger (Optional[logging.Logger]): A logger instance for logging messages.
     """
-    logger_to_use = current_logger if current_logger else module_logger
+    logger_to_use = current_logger or module_logger
+    symbols = app_settings.symbols
+    package_name = "pgagent"
 
-    # Check both the constant and the config setting
-    pgagent_enabled = is_feature_enabled("pgagent_enabled", False)
-
-    if not pgagent_enabled or not app_settings.pgagent.install:
-        log_map_server(
-            f"{config.SYMBOLS['info']} pgAgent installation is disabled. Skipping.",
-            "info",
-            logger_to_use,
-        )
-        return
-
-    log_map_server(
-        f"{config.SYMBOLS['info']} Installing pgAgent...",
-        "info",
-        logger_to_use,
+    logger_to_use.info(
+        f"{symbols.get('gear', '⚙️')} Installing {package_name}..."
     )
 
     try:
-        # Use AptManager for package installation
-        apt_manager = AptManager(logger=logger_to_use)
+        apt = AptManager(logger=logger_to_use)
+        apt.install(package_name, app_settings, update_first=True)
 
-        # Install pgAgent
-        apt_manager.install("pgagent", update_first=True)
-
-        log_map_server(
-            f"{config.SYMBOLS['success']} pgAgent installation completed successfully.",
-            "success",
-            logger_to_use,
+        logger_to_use.info(
+            f"{symbols.get('success', '✅')} {package_name} installed successfully."
         )
+
     except Exception as e:
-        log_map_server(
-            f"{config.SYMBOLS['error']} pgAgent installation failed: {str(e)}",
-            "error",
-            logger_to_use,
+        logger_to_use.error(
+            f"{symbols.get('error', '❌')} Failed to install {package_name}: {e}",
+            exc_info=True,
         )
         raise
