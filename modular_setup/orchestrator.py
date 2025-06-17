@@ -110,13 +110,16 @@ class SetupOrchestrator:
                         f"Error importing configurator module {module_name}: {str(e)}"
                     )
 
-    def configure(self, configurators: Optional[List[str]] = None) -> bool:
+    def configure(
+        self, configurators: Optional[List[str]] = None, force: bool = False
+    ) -> bool:
         """
         Configure the system using the specified configurators.
 
         Args:
             configurators: List of configurator names to use. If None, all configurators
                            specified in the configuration file will be used.
+            force: If True, force reconfiguration even if already configured.
 
         Returns:
             True if the configuration was successful, False otherwise.
@@ -165,6 +168,14 @@ class SetupOrchestrator:
                     context: Dict[str, Any],
                 ) -> bool:
                     configurator = configurator_class(app_settings)
+
+                    # Check if the component is already configured and skip it if not forced
+                    if not force and configurator.is_configured():
+                        self.logger.info(
+                            f"{configurator_class.__name__} is already configured, skipping"
+                        )
+                        return True
+
                     return configurator.configure()
 
                 # Add the task to the orchestrator

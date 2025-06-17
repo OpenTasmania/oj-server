@@ -117,6 +117,100 @@ The bootstrap process is automatically executed when running the `setup_modular.
 
 For more details, see the [README.md](/modular_bootstrap/README.md) in the `/modular_bootstrap` directory.
 
+### **Setup Command**
+
+The `install.py` script provides a `setup` command that allows you to configure components of the system after they have been installed. This command uses the `SetupOrchestrator` class to manage the configuration process.
+
+**Usage:**
+```bash
+# Configure all components
+./install.py setup
+
+# Configure a specific component
+./install.py setup postgres
+
+# Check if components are already configured
+./install.py setup --status
+
+# Force reconfiguration even if already configured
+./install.py setup --force
+
+# Show what would be configured without actually doing it
+./install.py setup --dry-run
+```
+
+### **Install and Setup Command**
+
+The `install.py` script also provides an `install setup` command that allows you to install a component or group and then immediately run the setup process for it. This is a convenient way to perform both steps in a single command.
+
+**Usage:**
+```bash
+# Install and then configure a component
+./install.py install setup postgres
+
+# Install and then configure a group
+./install.py install setup web_server
+```
+
+This command will:
+1. Install the specified component or group using the `InstallerOrchestrator`
+2. If installation is successful, run the setup process for the component or group using the `SetupOrchestrator`
+
+### **Status Command**
+
+The `install.py` script provides a `status` command that allows you to check the installation and configuration status of components. The command can display the status as a flat list or as a dependency tree.
+
+**Usage:**
+```bash
+# Check status of all components
+./install.py status
+
+# Check status of specific components
+./install.py status postgres apache
+
+# Display status as a dependency tree
+./install.py status --tree
+
+# Display status of specific components as a dependency tree
+./install.py status postgres apache --tree
+```
+
+The tree view shows the interdependencies between components and provides both installation and setup status for each component. Components are organized based on their dependencies, with root components (those that don't depend on any other components) at the top level.
+
+Example output:
+```
+Component dependency tree:
+└── postgres: installed, configured
+    ├── postgis: installed, configured
+    └── osm_db: installed, not configured
+        └── osrm: not installed
+```
+
+This visualization makes it easy to understand the relationships between components and identify any issues in the installation or configuration process.
+
+The `setup` command will:
+1. Load the configuration from `config.yaml`
+2. Import all configurator modules from the `modular_setup/configurators` directory
+3. Resolve dependencies between configurators to determine the order of execution
+4. Execute each configurator in the correct order
+
+Each configurator is responsible for configuring a specific component of the system, such as PostgreSQL, Apache, or Docker. Configurators are registered with the `ConfiguratorRegistry` using a decorator, similar to how installers are registered with the `InstallerRegistry`.
+
+**Example configurator registration:**
+```python
+@ConfiguratorRegistry.register(
+    name="postgres",
+    metadata={
+        "dependencies": [],
+        "description": "Configures PostgreSQL for the OSM-OSRM server.",
+    },
+)
+class PostgresConfigurator(BaseConfigurator):
+    # Implementation details...
+```
+
+To add a new configurator, create a new Python module in the `modular_setup/configurators` directory and register it with the `ConfiguratorRegistry` using the `@ConfiguratorRegistry.register` decorator.
+
 ### **Logging Guidelines**
 
 For consistent logging across the project, we use a centralized logging configuration approach.

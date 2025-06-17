@@ -123,22 +123,15 @@ class PostgresConfigurator(BaseConfigurator):
 
             # Check if the database exists
             pg_database = self.app_settings.pg.database
+
+            # Use shell=True to properly handle the pipe
             result = run_command(
-                [
-                    "sudo",
-                    "-u",
-                    "postgres",
-                    "psql",
-                    "-lqt",
-                    "|",
-                    "grep",
-                    "-w",
-                    pg_database,
-                ],
+                f"sudo -u postgres psql -lqt | grep -w {pg_database}",
                 self.app_settings,
                 capture_output=True,
                 current_logger=self.logger,
                 check=False,
+                shell=True,
             )
 
             return result.returncode == 0
