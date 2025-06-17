@@ -73,33 +73,33 @@ class ComponentOrchestrator:
                 f"Error importing installer modules: {str(e)}"
             )
 
-        # Import configurator modules
-        try:
-            configurators_dir = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "modular_setup",
-                "configurators",
-            )
-
-            # Import all Python modules in the configurators directory
-            for filename in os.listdir(configurators_dir):
-                if filename.endswith(".py") and not filename.startswith("__"):
-                    module_name = filename[:-3]  # Remove the .py extension
-                    try:
-                        importlib.import_module(
-                            f"modular_setup.configurators.{module_name}"
-                        )
-                        self.logger.debug(
-                            f"Imported configurator module: {module_name}"
-                        )
-                    except ImportError as e:
-                        self.logger.warning(
-                            f"Error importing configurator module {module_name}: {str(e)}"
-                        )
-        except (ImportError, FileNotFoundError) as e:
-            self.logger.warning(
-                f"Error importing configurator modules: {str(e)}"
-            )
+        # Import configurator modules (Legacy - Commented out to prevent duplicates)
+        # try:
+        #     configurators_dir = os.path.join(
+        #         os.path.dirname(os.path.dirname(__file__)),
+        #         "modular_setup",
+        #         "configurators",
+        #     )
+        #
+        #     # Import all Python modules in the configurators directory
+        #     for filename in os.listdir(configurators_dir):
+        #         if filename.endswith(".py") and not filename.startswith("__"):
+        #             module_name = filename[:-3]  # Remove the .py extension
+        #             try:
+        #                 importlib.import_module(
+        #                     f"modular_setup.configurators.{module_name}"
+        #                 )
+        #                 self.logger.debug(
+        #                     f"Imported configurator module: {module_name}"
+        #                 )
+        #             except ImportError as e:
+        #                 self.logger.warning(
+        #                     f"Error importing configurator module {module_name}: {str(e)}"
+        #                 )
+        # except (ImportError, FileNotFoundError) as e:
+        #     self.logger.warning(
+        #         f"Error importing configurator modules: {str(e)}"
+        #     )
 
     def get_available_components(self) -> Dict[str, Type[BaseComponent]]:
         """

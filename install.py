@@ -170,6 +170,12 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )
 
+    parser.add_argument(
+        "--generate-preseed-yaml",
+        action="store_true",
+        help="Generate package preseeding data as YAML and exit. Shows all default preseed values.",
+    )
+
     subparsers = parser.add_subparsers(
         dest="command", help="Command to execute"
     )
@@ -283,6 +289,51 @@ def main(args: Optional[List[str]] = None) -> int:
 
     try:
         app_settings = load_app_settings()
+
+        # Handle preseed YAML generation
+        if parsed_args.generate_preseed_yaml:
+            import sys
+
+            import yaml
+
+            logger.info("Generating preseed YAML configuration")
+
+            # Get the preseed values from app_settings
+            preseed_data = app_settings.package_preseeding_values
+
+            if not preseed_data:
+                logger.warning("No preseed data available in configuration")
+                return 1
+
+            # Format the output
+            output_data = {"package_preseeding_values": preseed_data}
+
+            # Print the YAML to stdout
+            print("\n--- Start of Suggested Preseed YAML ---")
+            yaml.dump(
+                output_data,
+                sys.stdout,
+                indent=2,
+                sort_keys=False,
+                default_flow_style=False,
+            )
+            print("--- End of Suggested Preseed YAML ---")
+
+            # Print instructions
+            print(
+                "\n# Instructions: Review and copy the 'package_preseeding_values' section",
+                file=sys.stderr,
+            )
+            print(
+                "# (including the key itself) into your config.yaml to apply these preseed values.",
+                file=sys.stderr,
+            )
+            print(
+                "# Only uncomment or include the packages and settings you wish to preseed.",
+                file=sys.stderr,
+            )
+
+            return 0
 
         orchestrator = ComponentOrchestrator(app_settings, logger)
 
