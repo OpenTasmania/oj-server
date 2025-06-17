@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+# filename: ot-osm-osrm-server/install.py
+# !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Entry point for the OSM-OSRM Server installer.
@@ -19,9 +20,8 @@ import logging
 import sys
 from typing import Callable, Dict, List, Optional, Set
 
-from modular.orchestrator import InstallerOrchestrator
-from modular.registry import InstallerRegistry
-from modular_setup.orchestrator import SetupOrchestrator
+from modular.orchestrator import ComponentOrchestrator
+from modular.registry import ComponentRegistry
 from setup.config_loader import load_app_settings
 
 
@@ -175,25 +175,38 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
 
     list_parser = subparsers.add_parser(  # noqa: F841
-        "list", help="List available installers"
+        "list", help="List available components"
+    )
+
+    apply_parser = subparsers.add_parser(
+        "apply", help="Apply (install and configure) components"
+    )
+    apply_parser.add_argument(
+        "components", nargs="*", help="Components to apply"
+    )
+    apply_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reconfiguration even if already configured",
     )
 
     install_parser = subparsers.add_parser(
-        "install", help="Install components"
+        "install", help="Install components (without configuring)"
     )
     install_parser.add_argument(
         "components", nargs="*", help="Components to install"
     )
 
-    install_subparsers = install_parser.add_subparsers(
-        dest="install_subcommand", help="Install subcommands"
+    configure_parser = subparsers.add_parser(
+        "configure", help="Configure components (without installing)"
     )
-
-    install_setup_parser = install_subparsers.add_parser(
-        "setup", help="Install and then setup a component or group"
+    configure_parser.add_argument(
+        "components", nargs="*", help="Components to configure"
     )
-    install_setup_parser.add_argument(
-        "component_name", help="Component or group to install and setup"
+    configure_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reconfiguration even if already configured",
     )
 
     uninstall_parser = subparsers.add_parser(
@@ -202,8 +215,16 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     uninstall_parser.add_argument(
         "components", nargs="+", help="Components to uninstall"
     )
+
+    unconfigure_parser = subparsers.add_parser(
+        "unconfigure", help="Unconfigure components"
+    )
+    unconfigure_parser.add_argument(
+        "components", nargs="+", help="Components to unconfigure"
+    )
+
     status_parser = subparsers.add_parser(
-        "status", help="Check installation status of components"
+        "status", help="Check status of components"
     )
     status_parser.add_argument(
         "components",
@@ -216,8 +237,10 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         help="Display status as a dependency tree",
     )
 
+    # Legacy commands for backward compatibility
     setup_parser = subparsers.add_parser(
-        "setup", help="Run the setup process for a component or group"
+        "setup",
+        help="Run the setup process for a component or group (legacy command)",
     )
     setup_parser.add_argument(
         "component",
@@ -261,67 +284,79 @@ def main(args: Optional[List[str]] = None) -> int:
     try:
         app_settings = load_app_settings()
 
-        orchestrator = InstallerOrchestrator(app_settings, logger)
+        orchestrator = ComponentOrchestrator(app_settings, logger)
 
         if parsed_args.command == "list":
-            installers = orchestrator.get_available_installers()
+            components_map = orchestrator.get_available_components()
 
-            logger.info("Available installers:")
-            for name, installer_class in installers.items():
-                description = getattr(installer_class, "metadata", {}).get(
+            logger.info("Available components:")
+            for name, component_class in components_map.items():
+                description = getattr(component_class, "metadata", {}).get(
                     "description", ""
                 )
                 logger.info(f"  {name}: {description}")
 
             return 0
 
-        elif parsed_args.command == "install":
-            if (
-                not hasattr(parsed_args, "install_subcommand")
-                or parsed_args.install_subcommand is None
-            ):
-                if not parsed_args.components:
-                    logger.error("No components specified for installation")
-                    return 1
+        elif parsed_args.command == "apply":
+            if not parsed_args.components:
+                logger.error("No components specified for application")
+                return 1
 
-                success = orchestrator.install(parsed_args.components)
+            logger.info(
+                f"Installing components: {', '.join(parsed_args.components)}"
+            )
+            install_success = orchestrator.install(parsed_args.components)
 
-                if success:
-                    logger.info("Installation completed successfully")
-                    return 0
-                else:
-                    logger.error("Installation failed")
-                    return 1
+            if not install_success:
+                logger.error("Installation failed")
+                return 1
 
-            elif parsed_args.install_subcommand == "setup":
-                component = parsed_args.component_name
+            logger.info("Installation completed successfully")
 
-                logger.info(f"Installing component: {component}")
-                success = orchestrator.install([component])
+            # Then configure the components
+            logger.info(
+                f"Configuring components: {', '.join(parsed_args.components)}"
+            )
+            configure_success = orchestrator.configure(
+                parsed_args.components, force=parsed_args.force
+            )
 
-                if success:
-                    logger.info(
-                        f"Installation of {component} completed successfully"
-                    )
-
-                    logger.info(f"Running setup for component: {component}")
-                    setup_orchestrator = SetupOrchestrator(logger=logger)
-                    setup_success = setup_orchestrator.configure([component])
-
-                    if setup_success:
-                        logger.info(
-                            f"Setup of {component} completed successfully"
-                        )
-                        return 0
-                    else:
-                        logger.error(f"Setup of {component} failed")
-                        return 1
-                else:
-                    logger.error(f"Installation of {component} failed")
-                    return 1
-
+            if configure_success:
+                logger.info("Configuration completed successfully")
+                return 0
             else:
-                logger.error("Invalid install subcommand")
+                logger.error("Configuration failed")
+                return 1
+
+        elif parsed_args.command == "install":
+            if not parsed_args.components:
+                logger.error("No components specified for installation")
+                return 1
+
+            success = orchestrator.install(parsed_args.components)
+
+            if success:
+                logger.info("Installation completed successfully")
+                return 0
+            else:
+                logger.error("Installation failed")
+                return 1
+
+        elif parsed_args.command == "configure":
+            if not parsed_args.components:
+                logger.error("No components specified for configuration")
+                return 1
+
+            success = orchestrator.configure(
+                parsed_args.components, force=parsed_args.force
+            )
+
+            if success:
+                logger.info("Configuration completed successfully")
+                return 0
+            else:
+                logger.error("Configuration failed")
                 return 1
 
         elif parsed_args.command == "uninstall":
@@ -334,46 +369,33 @@ def main(args: Optional[List[str]] = None) -> int:
                 logger.error("Uninstallation failed")
                 return 1
 
+        elif parsed_args.command == "unconfigure":
+            success = orchestrator.unconfigure(parsed_args.components)
+
+            if success:
+                logger.info("Unconfiguration completed successfully")
+                return 0
+            else:
+                logger.error("Unconfiguration failed")
+                return 1
+
         elif parsed_args.command == "status":
-            orchestrator._import_installer_modules()
+            requested_components: List[str] = parsed_args.components
+            all_available_component_names = list(
+                orchestrator.get_available_components().keys()
+            )
+            if not requested_components:
+                requested_components = all_available_component_names
 
-            all_installers = InstallerRegistry.get_all_installers()
-
-            components = parsed_args.components
-            if not components:
-                components = list(all_installers.keys())
-
-            status = orchestrator.check_installation_status(components)
-
-            setup_orchestrator = SetupOrchestrator(logger=logger)
-            setup_orchestrator._import_configurators()
-
-            setup_status = {}
-            try:
-                from modular_setup.registry import ConfiguratorRegistry
-
-                all_configurators = (
-                    ConfiguratorRegistry.get_all_configurators()
-                )
-
-                for component in components:
-                    if component in all_configurators:
-                        setup_status[component] = (
-                            setup_orchestrator.check_status([component]).get(
-                                component, False
-                            )
-                        )
-            except Exception as e:
-                logger.warning(f"Error checking setup status: {str(e)}")
+            status_dict = orchestrator.check_status(requested_components)
 
             if parsed_args.tree:
-                # Display status as a dependency tree
                 logger.info("Component dependency tree:")
 
                 tree = build_dependency_tree(
-                    components,
-                    lambda c: InstallerRegistry.get_installer_dependencies(c),
-                    set(all_installers.keys()),
+                    requested_components,
+                    lambda c: ComponentRegistry.get_component_dependencies(c),
+                    set(all_available_component_names),
                 )
 
                 all_dependencies = set()
@@ -381,41 +403,47 @@ def main(args: Optional[List[str]] = None) -> int:
                     all_dependencies.update(deps)
 
                 root_components = [
-                    c for c in components if c not in all_dependencies
+                    c
+                    for c in requested_components
+                    if c not in all_dependencies
                 ]
                 if not root_components:
-                    root_components = components
+                    root_components = requested_components
 
                 display_tree(
                     tree,
                     root_components,
-                    lambda c: status.get(c, False),
-                    lambda c: setup_status.get(c, False)
-                    if c in setup_status
-                    else None,
+                    lambda c: status_dict.get(c, {}).get("installed", False),
+                    lambda c: status_dict.get(c, {}).get("configured", False),
                     logger,
                 )
             else:
-                logger.info("Installation status:")
-                for component, installed in status.items():
-                    status_str = "installed" if installed else "not installed"
+                logger.info("Component status:")
+                for component, status in status_dict.items():
+                    installed = status.get("installed", False)
+                    configured = status.get("configured", False)
 
-                    if component in setup_status:
-                        configured = setup_status[component]
-                        setup_status_str = (
-                            "configured" if configured else "not configured"
-                        )
-                        status_str = f"{status_str}, {setup_status_str}"
+                    status_str = "installed" if installed else "not installed"
+                    status_str += ", " + (
+                        "configured" if configured else "not configured"
+                    )
 
                     logger.info(f"  {component}: {status_str}")
 
-            return 0 if all(status.values()) else 1
+            return (
+                0
+                if all(
+                    status.get("installed", False)
+                    and status.get("configured", False)
+                    for status in status_dict.values()
+                )
+                else 1
+            )
 
+        # Legacy commands for backward compatibility
         elif parsed_args.command == "setup":
-            setup_orchestrator = SetupOrchestrator(logger=logger)
-
-            components = (
-                None
+            setup_components: List[str] = (
+                list(orchestrator.get_available_components().keys())
                 if parsed_args.component == "all"
                 else [parsed_args.component]
             )
@@ -425,51 +453,49 @@ def main(args: Optional[List[str]] = None) -> int:
                 logger.info(
                     f"Checking configuration status for: {parsed_args.component}"
                 )
-                status = setup_orchestrator.check_status(components)
+
+                status_dict = orchestrator.check_status(setup_components)
 
                 logger.info("Configuration status:")
-                for component, configured in status.items():
+                for component, status in status_dict.items():
+                    configured = status.get("configured", False)
                     status_str = (
                         "configured" if configured else "not configured"
                     )
                     logger.info(f"  {component}: {status_str}")
 
-                return 0 if all(status.values()) else 1
+                return (
+                    0
+                    if all(
+                        status.get("configured", False)
+                        for status in status_dict.values()
+                    )
+                    else 1
+                )
 
             elif parsed_args.dry_run:
                 logger.info(
                     f"Dry run setup for component: {parsed_args.component}"
                 )
 
-                setup_orchestrator._import_configurators()
-
-                if components is None:
-                    from modular_setup.registry import ConfiguratorRegistry
-
-                    components = list(
-                        ConfiguratorRegistry.get_all_configurators().keys()
-                    )
-
                 try:
-                    from modular_setup.registry import ConfiguratorRegistry
-
-                    ordered_configurators = (
-                        ConfiguratorRegistry.resolve_dependencies(components)
+                    ordered_components = (
+                        ComponentRegistry.resolve_dependencies(
+                            setup_components
+                        )
                     )
 
                     logger.info(
                         "The following components would be configured (in order):"
                     )
-                    for configurator_name in ordered_configurators:
-                        configurator_class = (
-                            ConfiguratorRegistry.get_configurator(
-                                configurator_name
-                            )
+                    for component_name in ordered_components:
+                        component_class = ComponentRegistry.get_component(
+                            component_name
                         )
                         description = getattr(
-                            configurator_class, "metadata", {}
+                            component_class, "metadata", {}
                         ).get("description", "")
-                        logger.info(f"  {configurator_name}: {description}")
+                        logger.info(f"  {component_name}: {description}")
 
                     return 0
                 except Exception as e:
@@ -481,8 +507,8 @@ def main(args: Optional[List[str]] = None) -> int:
                     f"Running setup for component: {parsed_args.component}"
                 )
 
-                success = setup_orchestrator.configure(
-                    components, force=parsed_args.force
+                success = orchestrator.configure(
+                    setup_components, force=parsed_args.force
                 )
 
                 if success:

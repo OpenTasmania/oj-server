@@ -7,18 +7,20 @@ and a decorator for registering configurator classes.
 
 from typing import Any, Dict, List, Optional, Set, Type
 
-from modular_setup.base_configurator import BaseConfigurator
+from modular.base_component import BaseComponent
+from modular.registry import ComponentRegistry
 
 
+# For backward compatibility during migration
 class ConfiguratorRegistry:
     """
-    Registry for configurator modules.
+    Legacy registry for configurator modules.
 
-    This class provides a registry for configurator modules to register themselves
-    and methods for accessing registered configurators.
+    This class is maintained for backward compatibility during migration.
+    It provides aliases to the ComponentRegistry methods.
     """
 
-    _registry: Dict[str, Type["BaseConfigurator"]] = {}
+    _registry: Dict[str, Type["BaseComponent"]] = {}
 
     @classmethod
     def register(cls, name: str, metadata: Optional[Dict[str, Any]] = None):
@@ -32,27 +34,10 @@ class ConfiguratorRegistry:
         Returns:
             A decorator function that registers the configurator class.
         """
-
-        def decorator(
-            configurator_class: Type["BaseConfigurator"],
-        ) -> Type["BaseConfigurator"]:
-            if name in cls._registry:
-                raise ValueError(
-                    f"Configurator with name '{name}' already registered"
-                )
-
-            # Store metadata in the class if provided
-            if metadata:
-                configurator_class.metadata = metadata
-
-            # Register the configurator class
-            cls._registry[name] = configurator_class
-            return configurator_class
-
-        return decorator
+        return ComponentRegistry.register(name, metadata)
 
     @classmethod
-    def get_configurator(cls, name: str) -> Type["BaseConfigurator"]:
+    def get_configurator(cls, name: str) -> Type["BaseComponent"]:
         """
         Get a configurator class by name.
 
@@ -65,20 +50,17 @@ class ConfiguratorRegistry:
         Raises:
             KeyError: If no configurator with the given name is registered.
         """
-        if name not in cls._registry:
-            raise KeyError(f"No configurator registered with name '{name}'")
-
-        return cls._registry[name]
+        return ComponentRegistry.get_component(name)
 
     @classmethod
-    def get_all_configurators(cls) -> Dict[str, Type["BaseConfigurator"]]:
+    def get_all_configurators(cls) -> Dict[str, Type["BaseComponent"]]:
         """
         Get all registered configurators.
 
         Returns:
             A dictionary mapping configurator names to configurator classes.
         """
-        return cls._registry.copy()
+        return ComponentRegistry.get_all_components()
 
     @classmethod
     def get_configurator_dependencies(cls, name: str) -> Set[str]:
@@ -94,9 +76,7 @@ class ConfiguratorRegistry:
         Raises:
             KeyError: If no configurator with the given name is registered.
         """
-        configurator_class = cls.get_configurator(name)
-        metadata = getattr(configurator_class, "metadata", {})
-        return set(metadata.get("dependencies", []))
+        return ComponentRegistry.get_component_dependencies(name)
 
     @classmethod
     def resolve_dependencies(cls, configurators: List[str]) -> List[str]:
@@ -113,30 +93,4 @@ class ConfiguratorRegistry:
             KeyError: If any of the configurators or their dependencies are not registered.
             ValueError: If there is a circular dependency.
         """
-        result = []
-        visited = set()
-        temp_visited = set()
-
-        def visit(configurator: str):
-            if configurator in temp_visited:
-                raise ValueError(
-                    f"Circular dependency detected involving '{configurator}'"
-                )
-
-            if configurator in visited:
-                return
-
-            temp_visited.add(configurator)
-
-            for dependency in cls.get_configurator_dependencies(configurator):
-                visit(dependency)
-
-            temp_visited.remove(configurator)
-            visited.add(configurator)
-            result.append(configurator)
-
-        for configurator in configurators:
-            if configurator not in visited:
-                visit(configurator)
-
-        return result
+        return ComponentRegistry.resolve_dependencies(configurators)

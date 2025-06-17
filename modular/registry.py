@@ -1,148 +1,168 @@
 """
-Registry for installer modules.
+Registry for component modules.
 
-This module provides a registry for installer modules to register themselves
-and a decorator for registering installer classes.
+This module provides a registry for component modules to register themselves
+and a decorator for registering component classes.
 """
 
 from typing import Any, Dict, List, Optional, Set, Type
 
-from modular.base_installer import BaseInstaller
+from modular.base_component import BaseComponent
 
 
-class InstallerRegistry:
+class ComponentRegistry:
     """
-    Registry for installer modules.
+    Registry for component modules.
 
-    This class provides a registry for installer modules to register themselves
-    and methods for accessing registered installers.
+    This class provides a registry for component modules to register themselves
+    and methods for accessing registered components.
     """
 
-    _registry: Dict[str, Type["BaseInstaller"]] = {}
+    _registry: Dict[str, Type["BaseComponent"]] = {}
 
     @classmethod
     def register(cls, name: str, metadata: Optional[Dict[str, Any]] = None):
         """
-        Decorator for registering installer classes.
+        Decorator for registering component classes.
 
         Args:
-            name: The name of the installer.
-            metadata: Optional metadata for the installer, such as dependencies,
+            name: The name of the component.
+            metadata: Optional metadata for the component, such as dependencies,
                       estimated installation time, and required system resources.
 
         Returns:
-            A decorator function that registers the installer class.
+            A decorator function that registers the component class.
         """
 
         def decorator(
-            installer_class: Type["BaseInstaller"],
-        ) -> Type["BaseInstaller"]:
+            component_class: Type["BaseComponent"],
+        ) -> Type["BaseComponent"]:
             if name in cls._registry:
                 raise ValueError(
-                    f"Installer with name '{name}' already registered"
+                    f"Component with name '{name}' already registered"
                 )
 
             # Store metadata in the class if provided
             if metadata:
-                installer_class.metadata = metadata
+                component_class.metadata = metadata
 
-            # Register the installer class
-            cls._registry[name] = installer_class
-            return installer_class
+            # Register the component class
+            cls._registry[name] = component_class
+            return component_class
 
         return decorator
 
     @classmethod
-    def get_installer(cls, name: str) -> Type["BaseInstaller"]:
+    def get_component(cls, name: str) -> Type["BaseComponent"]:
         """
-        Get an installer class by name.
+        Get a component class by name.
 
         Args:
-            name: The name of the installer.
+            name: The name of the component.
 
         Returns:
-            The installer class.
+            The component class.
 
         Raises:
-            KeyError: If no installer with the given name is registered.
+            KeyError: If no component with the given name is registered.
         """
         if name not in cls._registry:
-            raise KeyError(f"No installer registered with name '{name}'")
+            raise KeyError(f"No component registered with name '{name}'")
 
         return cls._registry[name]
 
     @classmethod
-    def get_all_installers(cls) -> Dict[str, Type["BaseInstaller"]]:
+    def get_all_components(cls) -> Dict[str, Type["BaseComponent"]]:
         """
-        Get all registered installers.
+        Get all registered components.
 
         Returns:
-            A dictionary mapping installer names to installer classes.
+            A dictionary mapping component names to component classes.
         """
         return cls._registry.copy()
 
     @classmethod
-    def get_installer_dependencies(cls, name: str) -> Set[str]:
+    def get_component_dependencies(cls, name: str) -> Set[str]:
         """
-        Get the dependencies of an installer.
+        Get the dependencies of a component.
 
         Args:
-            name: The name of the installer.
+            name: The name of the component.
 
         Returns:
-            A set of installer names that the specified installer depends on.
+            A set of component names that the specified component depends on.
 
         Raises:
-            KeyError: If no installer with the given name is registered.
+            KeyError: If no component with the given name is registered.
         """
-        installer_class = cls.get_installer(name)
-        metadata = getattr(installer_class, "metadata", {})
+        component_class = cls.get_component(name)
+        metadata = getattr(component_class, "metadata", {})
         return set(metadata.get("dependencies", []))
 
     @classmethod
-    def resolve_dependencies(cls, installers: List[str]) -> List[str]:
+    def resolve_dependencies(cls, components: List[str]) -> List[str]:
         """
-        Resolve dependencies for a list of installers.
+        Resolve dependencies for a list of components.
 
         Args:
-            installers: A list of installer names.
+            components: A list of component names.
 
         Returns:
-            A list of installer names in the order they should be installed.
+            A list of component names in the order they should be processed.
 
         Raises:
-            KeyError: If any of the installers or their dependencies are not registered.
+            KeyError: If any of the components or their dependencies are not registered.
             ValueError: If there is a circular dependency.
         """
         result = []
         visited = set()
         temp_visited = set()
 
-        def visit(installer: str):
-            if installer in temp_visited:
+        def visit(component: str):
+            if component in temp_visited:
                 raise ValueError(
-                    f"Circular dependency detected involving '{installer}'"
+                    f"Circular dependency detected involving '{component}'"
                 )
 
-            if installer in visited:
+            if component in visited:
                 return
 
-            temp_visited.add(installer)
+            temp_visited.add(component)
 
-            for dependency in cls.get_installer_dependencies(installer):
+            for dependency in cls.get_component_dependencies(component):
                 visit(dependency)
 
-            temp_visited.remove(installer)
-            visited.add(installer)
-            result.append(installer)
+            temp_visited.remove(component)
+            visited.add(component)
+            result.append(component)
 
-        for installer in installers:
-            if installer not in visited:
-                visit(installer)
+        for component in components:
+            if component not in visited:
+                visit(component)
 
         return result
 
 
-# This comment is kept for reference:
-# Previously there was a BaseInstaller stub class here to avoid circular imports,
-# but now we import the actual BaseInstaller class from base_installer.py
+# For backward compatibility during migration
+class InstallerRegistry(ComponentRegistry):
+    """
+    Legacy registry for installer modules.
+
+    This class is maintained for backward compatibility during migration.
+    It inherits from ComponentRegistry and provides aliases for the methods.
+    """
+
+    @classmethod
+    def get_installer(cls, name: str) -> Type["BaseComponent"]:
+        """Alias for get_component"""
+        return cls.get_component(name)
+
+    @classmethod
+    def get_all_installers(cls) -> Dict[str, Type["BaseComponent"]]:
+        """Alias for get_all_components"""
+        return cls.get_all_components()
+
+    @classmethod
+    def get_installer_dependencies(cls, name: str) -> Set[str]:
+        """Alias for get_component_dependencies"""
+        return cls.get_component_dependencies(name)

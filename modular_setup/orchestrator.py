@@ -11,23 +11,23 @@ import importlib
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, Type
+from typing import Dict, List, Optional
 
 import yaml
 
 from common.orchestrator import Orchestrator
-from modular_setup.base_configurator import BaseConfigurator
+from modular.orchestrator import ComponentOrchestrator
 from modular_setup.registry import ConfiguratorRegistry
 from setup.config_models import AppSettings
 
 
+# For backward compatibility during migration
 class SetupOrchestrator:
     """
-    Core orchestrator for the modular setup framework.
+    Legacy orchestrator for the modular setup framework.
 
-    This class is responsible for loading the configuration file, iterating
-    through the requested configuration tasks, looking up the appropriate
-    configurator module in the registry, and executing it.
+    This class is maintained for backward compatibility during migration.
+    It forwards most of its method calls to the ComponentOrchestrator.
     """
 
     def __init__(
@@ -46,6 +46,7 @@ class SetupOrchestrator:
         self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.app_settings: Optional[AppSettings] = None
         self.orchestrator: Optional[Orchestrator] = None
+        self._component_orchestrator: Optional[ComponentOrchestrator] = None
 
     def load_config(self) -> AppSettings:
         """
@@ -110,6 +111,23 @@ class SetupOrchestrator:
                         f"Error importing configurator module {module_name}: {str(e)}"
                     )
 
+    def _get_component_orchestrator(self) -> ComponentOrchestrator:
+        """
+        Get or create a ComponentOrchestrator instance.
+
+        Returns:
+            A ComponentOrchestrator instance.
+        """
+        if self.app_settings is None:
+            self.app_settings = self.load_config()
+
+        if self._component_orchestrator is None:
+            self._component_orchestrator = ComponentOrchestrator(
+                self.app_settings, self.logger
+            )
+
+        return self._component_orchestrator
+
     def configure(
         self, configurators: Optional[List[str]] = None, force: bool = False
     ) -> bool:
@@ -138,63 +156,9 @@ class SetupOrchestrator:
                 ConfiguratorRegistry.get_all_configurators().keys()
             )
 
-        # Resolve dependencies to determine the order of configuration
-        try:
-            ordered_configurators = ConfiguratorRegistry.resolve_dependencies(
-                configurators
-            )
-        except (KeyError, ValueError) as e:
-            self.logger.error(
-                f"Error resolving configurator dependencies: {str(e)}"
-            )
-            return False
-
-        # Create a new orchestrator
-        orchestrator = Orchestrator(self.app_settings, self.logger)
-        self.orchestrator = orchestrator
-
-        # Add tasks for each configurator
-        for configurator_name in ordered_configurators:
-            try:
-                # Get the configurator class from the registry
-                configurator_class = ConfiguratorRegistry.get_configurator(
-                    configurator_name
-                )
-
-                # Create a function that will instantiate and configure the configurator
-                def configure_task(
-                    configurator_class: Type[BaseConfigurator],
-                    app_settings: AppSettings,
-                    context: Dict[str, Any],
-                ) -> bool:
-                    configurator = configurator_class(app_settings)
-
-                    # Check if the component is already configured and skip it if not forced
-                    if not force and configurator.is_configured():
-                        self.logger.info(
-                            f"{configurator_class.__name__} is already configured, skipping"
-                        )
-                        return True
-
-                    return configurator.configure()
-
-                # Add the task to the orchestrator
-                orchestrator.add_task(
-                    name=f"Configure {configurator_name}",
-                    func=configure_task,
-                    args=[configurator_class],
-                    kwargs={},
-                    fatal=True,
-                )
-            except KeyError:
-                self.logger.error(
-                    f"Configurator not found: {configurator_name}"
-                )
-                return False
-
-        # Run the orchestrator
-        result = orchestrator.run()
-        return bool(result)
+        # Forward to ComponentOrchestrator
+        component_orchestrator = self._get_component_orchestrator()
+        return component_orchestrator.configure(configurators, force)
 
     def unconfigure(self, configurators: Optional[List[str]] = None) -> bool:
         """
@@ -221,56 +185,9 @@ class SetupOrchestrator:
                 ConfiguratorRegistry.get_all_configurators().keys()
             )
 
-        # Resolve dependencies to determine the order of unconfiguration (reverse of configuration)
-        try:
-            ordered_configurators = ConfiguratorRegistry.resolve_dependencies(
-                configurators
-            )
-            ordered_configurators.reverse()  # Unconfigure in reverse order
-        except (KeyError, ValueError) as e:
-            self.logger.error(
-                f"Error resolving configurator dependencies: {str(e)}"
-            )
-            return False
-
-        # Create a new orchestrator
-        orchestrator = Orchestrator(self.app_settings, self.logger)
-        self.orchestrator = orchestrator
-
-        # Add tasks for each configurator
-        for configurator_name in ordered_configurators:
-            try:
-                # Get the configurator class from the registry
-                configurator_class = ConfiguratorRegistry.get_configurator(
-                    configurator_name
-                )
-
-                # Create a function that will instantiate and unconfigure the configurator
-                def unconfigure_task(
-                    configurator_class: Type[BaseConfigurator],
-                    app_settings: AppSettings,
-                    context: Dict[str, Any],
-                ) -> bool:
-                    configurator = configurator_class(app_settings)
-                    return configurator.unconfigure()
-
-                # Add the task to the orchestrator
-                orchestrator.add_task(
-                    name=f"Unconfigure {configurator_name}",
-                    func=unconfigure_task,
-                    args=[configurator_class],
-                    kwargs={},
-                    fatal=True,
-                )
-            except KeyError:
-                self.logger.error(
-                    f"Configurator not found: {configurator_name}"
-                )
-                return False
-
-        # Run the orchestrator
-        result = orchestrator.run()
-        return bool(result)
+        # Forward to ComponentOrchestrator
+        component_orchestrator = self._get_component_orchestrator()
+        return component_orchestrator.unconfigure(configurators)
 
     def check_status(
         self, configurators: Optional[List[str]] = None
@@ -299,24 +216,11 @@ class SetupOrchestrator:
                 ConfiguratorRegistry.get_all_configurators().keys()
             )
 
-        # Check the status of each configurator
-        status = {}
-        for configurator_name in configurators:
-            try:
-                # Get the configurator class from the registry
-                configurator_class = ConfiguratorRegistry.get_configurator(
-                    configurator_name
-                )
+        # Forward to ComponentOrchestrator
+        component_orchestrator = self._get_component_orchestrator()
+        status_dict = component_orchestrator.check_status(configurators)
 
-                # Instantiate the configurator and check if it's configured
-                # We know self.app_settings is not None at this point
-                assert self.app_settings is not None
-                configurator = configurator_class(self.app_settings)
-                status[configurator_name] = configurator.is_configured()
-            except KeyError:
-                self.logger.error(
-                    f"Configurator not found: {configurator_name}"
-                )
-                status[configurator_name] = False
-
-        return status
+        # Convert the status dict to the expected format
+        return {
+            name: info["configured"] for name, info in status_dict.items()
+        }
