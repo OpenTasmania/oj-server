@@ -9,7 +9,7 @@ import logging
 import os
 from getpass import getuser
 from grp import getgrgid
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from common.command_utils import log_map_server, run_elevated_command
 from common.core_utils import setup_logging as common_setup_logging
@@ -23,6 +23,7 @@ DEFAULT_GTFS_PROCESSOR_LOG_FILE = "/var/log/gtfs_processor_app.log"
 def setup_gtfs_environment(
     app_settings: AppSettings,
     current_logger_for_setup: Optional[logging.Logger] = None,
+    **kwargs: Dict[str, Any],
 ) -> None:
     """
     Sets up the GTFS environment by configuring logging, ensuring the log file's existence and
@@ -37,6 +38,9 @@ def setup_gtfs_environment(
             as PostgreSQL connection details.
         current_logger_for_setup (Optional[logging.Logger]): The logger to use for logging messages
             within this setup function. If None, the module's default logger will be used.
+        **kwargs (Dict[str, Any]): Accepts additional keyword arguments that are not used in this function.
+            This is necessary because the orchestrator passes a standard context object.
+
 
     Raises:
         Any exceptions related to file creation, permissions, or environment variable setting will not
