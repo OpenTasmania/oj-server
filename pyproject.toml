@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osm_osrm_server"
-version = "0.7.4.2"
+version = "0.7.5"
 description = "An Open Street Map and Open Source Routing Machine"
 readme = "README.md"
 authors = [
@@ -87,7 +87,7 @@ exclude = ["tests*"]
 python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
-exclude = ['\.git', '\.venv', 'build', 'dist']
+exclude = ['\.git', '\.venv', 'build', 'dist', 'modular']
 
 [tool.pytest.ini_options]
 addopts = """
