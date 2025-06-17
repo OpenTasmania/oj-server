@@ -6,6 +6,9 @@ This script is the central entry point for the modular installation and configur
 system. It imports and runs the InstallerOrchestrator from the modular directory
 for installation tasks and the SetupOrchestrator from the modular_setup directory
 for configuration tasks.
+
+Before any installation or configuration tasks are performed, the script runs
+a bootstrap process to ensure that all prerequisites are met.
 """
 
 import argparse
@@ -13,6 +16,7 @@ import logging
 import sys
 
 from modular.orchestrator import InstallerOrchestrator
+from modular_bootstrap import run_modular_bootstrap
 from modular_setup.orchestrator import SetupOrchestrator
 
 
@@ -120,6 +124,18 @@ def main() -> int:
     logger = setup_logging(args.verbose)
 
     try:
+        # Run the modular bootstrap process to ensure prerequisites are met
+        logger.info(
+            "Running modular bootstrap process to ensure prerequisites are met..."
+        )
+        bootstrap_success, bootstrap_context = run_modular_bootstrap(
+            None, logger
+        )
+        if not bootstrap_success:
+            logger.error("Modular bootstrap process failed. Cannot continue.")
+            return 1
+        logger.info("Modular bootstrap process completed successfully.")
+
         # Load the configuration
         setup_orchestrator = SetupOrchestrator(
             config_file=args.config,

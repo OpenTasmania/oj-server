@@ -75,6 +75,7 @@ The project is organized into several key directories:
 * `common/`: Shared utilities and helper functions used across the project.
   * `common/debian/`: Contains Debian-specific utilities, including the AptManager.
 * `docs/`: Project documentation, including the plans and strategies that guide our work.
+* `modular_bootstrap/`: Contains the self-contained bootstrap process for the modular setup script. This ensures all prerequisites are met before the script is executed.
 
 ### **Package Management with AptManager**
 
@@ -98,6 +99,23 @@ apt_manager.add_repository("deb http://example.com/debian stable main")
 # Add a GPG key
 apt_manager.add_gpg_key_from_url("https://example.com/key.gpg", "/etc/apt/keyrings/example.gpg")
 ```
+
+### **Modular Bootstrap Process**
+
+The modular setup script (`setup_modular.py`) uses a self-contained bootstrap process to ensure all prerequisites are met before execution. This process is implemented in the `/modular_bootstrap` directory.
+
+**Key components:**
+- `mb_utils.py`: Common utilities for the bootstrap process
+- `mb_apt.py`: Ensures the presence of the `python3-apt` package
+- `mb_pydantic.py`: Ensures the presence of the `pydantic` and `pydantic-settings` packages
+- `mb_build_tools.py`: Ensures the presence of build tools like `build-essential` and `python3-dev`
+- `mb_lsb.py`: Ensures the presence of the `lsb-release` package
+- `mb_util_linux.py`: Ensures the presence of the `util-linux` package
+- `orchestrator.py`: Manages the execution of the individual prerequisite checks
+
+The bootstrap process is automatically executed when running the `setup_modular.py` script. It checks for and installs any missing prerequisites before proceeding with the main configuration tasks.
+
+For more details, see the [README.md](/modular_bootstrap/README.md) in the `/modular_bootstrap` directory.
 
 ### **Logging Guidelines**
 
