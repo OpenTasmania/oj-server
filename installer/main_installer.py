@@ -1866,6 +1866,15 @@ def main_map_server_entry(cli_args_list: Optional[List[str]] = None) -> int:
     Returns:
         int: Exit code of the program. A value of 0 indicates success, while non-zero indicates an error condition.
     """
+    # DEPRECATION WARNING
+    print(
+        "\033[1;33mDEPRECATION WARNING: The current installer system is deprecated and will be removed in a future release.\033[0m"
+    )
+    print(
+        "\033[1;33mPlease use the new modular installer system by running 'install_modular.py' instead.\033[0m"
+    )
+    print()
+
     global APP_CONFIG
     parser = argparse.ArgumentParser(
         description="Map Server Installer Script",

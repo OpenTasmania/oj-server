@@ -93,140 +93,54 @@ fi
 2. Run the installer
     * Checks for required Python packages
     * Prompts to install any missing packages using sudo apt install
-    * Runs the main mapping installer ([main_map_server_entry](installer/main_installer.py))
+    * Uses the modular installer framework to install components
 
 ```bash
-python3 install.py --full
+python3 install.py install postgres nginx apache osrm
 ```
 
 ### Installer help
 
-To obtain install configuration options and associated help text, use this command (correct at 2025-05-28:
+To obtain install configuration options and associated help text, use this command:
 
 ```bash
-Usage: install.py <action_flag_or_help> [arguments_for_main_map_server_entry]
+python3 install.py --help
+```
 
-This script performs the following actions:
-1. Ensures 'uv' (Python packager and virtual environment manager) is installed.
-2. Ensures 'libpq-dev' (for 'pg_config' needed by psycopg) is installed.
-3. Creates a virtual environment in '.venv' using 'uv venv'.
-4. Installs project dependencies from 'pyproject.toml' into the venv.
-5. Based on the <action_flag>, performs the specified action.
+This will display the following help text:
 
-Action Flags and Help (one is required if not -h/--help):
-  -h, --help                  Show this help message, it will also attempt to display
-                                help from 'installer.main_installer'.
+```
+usage: install.py [-h] [-v] {list,install,uninstall,status} ...
+Installer for OSM-OSRM Server
 
-Arguments for installer.main_installer:
-  (Displayed below if accessible when --help)
-
-
-================================================================================
-Help information for the main setup module (installer.main_installer):
-================================================================================
-usage: main_installer.py [-h] [--generate-preseed-yaml [TASK_OR_GROUP ...]] [--full] [--view-config] [--view-state]
-                         [--clear-state] [--config-file CONFIG_FILE] [-a ADMIN_GROUP_IP] [-f GTFS_FEED_URL]
-                         [-v VM_IP_OR_DOMAIN] [-b PG_TILESERV_BINARY_LOCATION] [-l LOG_PREFIX]
-                         [--container-runtime-command CONTAINER_RUNTIME_COMMAND] [--osrm-image-tag OSRM_IMAGE_TAG]
-                         [--apache-listen-port APACHE_LISTEN_PORT] [-H PGHOST] [-P PGPORT] [-D PGDATABASE] [-U PGUSER]
-                         [-W PGPASSWORD] [--boot-verbosity] [--core-conflicts] [--docker-install] [--nodejs-install]
-                         [--ufw-pkg-check] [--ufw-rules] [--ufw-activate] [--ufw] [--postgres] [--carto] [--renderd]
-                         [--apache] [--nginx] [--certbot] [--pgtileserv] [--osrm] [--gtfs-prep] [--raster-prep]
-                         [--website-setup] [--task-systemd-reload] [--prereqs] [--services] [--data] [--systemd-reload]
-                         [--dev-override]
-
-Map Server Installer Script
+positional arguments:
+  {list,install,uninstall,status}
+                        Command to execute
+    list                List available installers
+    install             Install components
+    uninstall           Uninstall components
+    status              Check installation status of components
 
 options:
-  -h, --help            Show this help message and exit.
-  --generate-preseed-yaml [TASK_OR_GROUP ...]
-                        Generate package preseeding data as YAML and exit. Without arguments, shows all default preseed
-                        values. With specific task/group names (e.g., 'postgres', 'core_prereqs'), filters output to only
-                        show preseed data relevant to those tasks. Will include placeholder comments for packages without
-                        preseed data. (default: None)
-  --full                Run full installation process. (default: False)
-  --view-config         View current configuration settings and exit. (default: False)
-  --view-state          View completed installation steps and exit. (default: False)
-  --clear-state         Clear all progress state and exit. (default: False)
-  --config-file CONFIG_FILE
-                        Path to YAML configuration file (default: config.yaml). (default: config.yaml)
-
-Configuration Overrides (CLI > YAML > ENV > Defaults):
-  -a, --admin-group-ip ADMIN_GROUP_IP
-                        Admin IP (CIDR). Default: 192.168.128.0/22 (default: None)
-  -f, --gtfs-feed-url GTFS_FEED_URL
-                        GTFS URL. Default: https://www.transport.act.gov.au/googletransit/google_transit.zip (default: None)
-  -v, --vm-ip-or-domain VM_IP_OR_DOMAIN
-                        Public IP/FQDN. Default: example.com (default: None)
-  -b, --pg-tileserv-binary-location PG_TILESERV_BINARY_LOCATION
-                        pg_tileserv URL. Default: https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip (default:
-                        None)
-  -l, --log-prefix LOG_PREFIX
-                        Log prefix. Default: [MAP-SETUP] (default: None)
-  --container-runtime-command CONTAINER_RUNTIME_COMMAND
-                        Container runtime. Default: docker (default: None)
-  --osrm-image-tag OSRM_IMAGE_TAG
-                        OSRM Docker image. Default: osrm/osrm-backend:latest (default: None)
-  --apache-listen-port APACHE_LISTEN_PORT
-                        Apache listen port. Default: 8080 (default: None)
-
-PostgreSQL Overrides:
-  -H, --pghost PGHOST   Host. Default: 127.0.0.1 (default: None)
-  -P, --pgport PGPORT   Port. Default: 5432 (default: None)
-  -D, --pgdatabase PGDATABASE
-                        Database. Default: gis (default: None)
-  -U, --pguser PGUSER   User. Default: osmuser (default: None)
-  -W, --pgpassword PGPASSWORD
-                        Password. (default: None)
-
-Individual Task Flags:
-  --boot-verbosity      Boot verbosity setup. (Specific task or component) (default: False)
-  --core-conflicts      Core conflict removal. (Specific task or component) (default: False)
-  --docker-install      Docker installation. (Specific task or component) (default: False)
-  --nodejs-install      Node.js installation. (Specific task or component) (default: False)
-  --ufw-pkg-check       UFW Package Check. (Part of Group: 'Firewall Service (UFW)', Sub-step: 1) (default: False)
-  --ufw-rules           Configure UFW Rules. (Part of Group: 'Firewall Service (UFW)', Sub-step: 2) (default: False)
-  --ufw-activate        Activate UFW Service. (Part of Group: 'Firewall Service (UFW)', Sub-step: 3) (default: False)
-  --ufw                 UFW full setup. (Orchestrates Group: 'Firewall Service (UFW)') (default: False)
-  --postgres            PostgreSQL full setup. (Orchestrates Group: 'Database Service (PostgreSQL)') (default: False)
-  --carto               Carto full setup. (Orchestrates Group: 'Carto Service') (default: False)
-  --renderd             Renderd full setup. (Orchestrates Group: 'Renderd Service') (default: False)
-  --apache              Apache & mod_tile full setup. (Orchestrates Group: 'Apache Service') (default: False)
-  --nginx               Nginx full setup. (Orchestrates Group: 'Nginx Service') (default: False)
-  --certbot             Certbot full setup. (Orchestrates Group: 'Certbot Service') (default: False)
-  --pgtileserv          pg_tileserv full setup. (Orchestrates Group: 'pg_tileserv Service') (default: False)
-  --osrm                OSRM full setup & data processing. (Orchestrates Group: 'OSRM Service & Data Processing') (default:
-                        False)
-  --gtfs-prep           Full GTFS Pipeline. (Part of Group: 'GTFS Data Pipeline', Sub-step: 1) (default: False)
-  --raster-prep         Raster tile pre-rendering. (Part of Group: 'Raster Tile Pre-rendering', Sub-step: 1) (default:
-                        False)
-  --website-setup       Deploy test website. (Part of Group: 'Application Content', Sub-step: 1) (default: False)
-  --task-systemd-reload 
-                        Systemd reload task. (Part of Group: 'Systemd Reload', Sub-step: 1) (default: False)
-
-Group Task Flags:
-  --prereqs             Run 'Comprehensive Prerequisites' group. Includes: --boot-verbosity, --core-conflicts, --docker-
-                        install, --nodejs-install, and setup for essential utilities, Python, PostgreSQL, mapping & font
-                        packages, and unattended upgrades. (default: False)
-  --services            Run setup for ALL services. Includes: --ufw, --postgres, --pgtileserv, --carto, --renderd, --osrm,
-                        --apache, --nginx, --certbot, --website-setup, and a final systemd reload. (default: False)
-  --data                Run all data preparation tasks. Includes: --gtfs-prep (Full GTFS Pipeline) and --raster-prep (Raster
-                        tile pre-rendering). (default: False)
-  --systemd-reload      Run systemd reload task (as a group action). Same as --task-systemd-reload. (default: False)
-
-Developer Options:
-  --dev-override
-                        Override safety checks for development environments. Allows use of default/unsafe values: 
-                        password (default: 'yourStrongPasswordHere'), 
-                        vm_ip_or_domain (will be set to primary IP), 
-                        pghost (default: '127.0.0.1'), 
-                        pgport (default: 5432), 
-                        pgdatabase (default: 'gis'), 
-                        pguser (default: 'osmuser'), 
-                        admin_group_ip (default: '192.168.128.0/22').
-
-Example: python3 ./installer/main_installer.py --full -v mymap.example.com
+  -h, --help            show this help message and exit
+  -v, --verbose         Enable verbose output
 ```
+
+For more detailed help on a specific command, use:
+
+```bash
+python3 install.py <command> --help
+```
+
+For example:
+
+```bash
+python3 install.py install --help
+```
+
+This will display help for the install command, showing what components can be installed.
+
+---
 
 ### Detailed Setup
 
@@ -256,11 +170,10 @@ The setup process is designed to be followed sequentially.
 ## 4. Project Structure
 
 1. [Installer](install.py)
-    * Ensure prequisites are available.
-2. [Map server installer](installer/main_installer.py)
-    * Install the map server.
-    * Import data from processors.
-3. Submodules
+    * Modular installer framework for the OSM-OSRM Server.
+    * Installs and configures all components.
+    * Imports data from processors.
+2. Submodules
     * [GTFS processor](processors/plugins/importers/transit/gtfs) Python package to import GTFS data into the postgis
       database on which
       the mapping data exists.
