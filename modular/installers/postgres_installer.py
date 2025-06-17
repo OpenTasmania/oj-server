@@ -18,7 +18,7 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="postgres",
     metadata={
-        "dependencies": [],  # PostgreSQL is a base component with no dependencies
+        "dependencies": ["prerequisites"],  # Depends on core prerequisites
         "estimated_time": 120,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 512,  # Required memory in MB

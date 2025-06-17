@@ -22,7 +22,7 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="nginx",
     metadata={
-        "dependencies": [],  # Nginx has no dependencies on other installers
+        "dependencies": ["prerequisites"],  # Depends on core prerequisites
         "estimated_time": 60,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 256,  # Required memory in MB

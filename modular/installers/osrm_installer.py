@@ -29,7 +29,10 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="osrm",
     metadata={
-        "dependencies": ["docker"],  # OSRM depends on Docker
+        "dependencies": [
+            "prerequisites",
+            "docker",
+        ],  # OSRM depends on prerequisites and Docker
         "estimated_time": 180,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 1024,  # Required memory in MB

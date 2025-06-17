@@ -18,7 +18,10 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="pgagent",
     metadata={
-        "dependencies": ["postgres"],  # PgAgent depends on PostgreSQL
+        "dependencies": [
+            "prerequisites",
+            "postgres",
+        ],  # PgAgent depends on prerequisites and PostgreSQL
         "estimated_time": 60,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 256,  # Required memory in MB

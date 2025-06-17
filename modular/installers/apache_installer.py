@@ -1,3 +1,5 @@
+# modular/installers/apache_installer.py
+# -*- coding: utf-8 -*-
 """
 Apache installer module.
 
@@ -18,7 +20,7 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="apache",
     metadata={
-        "dependencies": [],  # Apache is a base component with no dependencies
+        "dependencies": ["prerequisites"],  # Depends on core prerequisites
         "estimated_time": 60,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 256,  # Required memory in MB

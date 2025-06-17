@@ -128,6 +128,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"install.py" = ["E402"] # Ignore import not at top of file for bootstrapping venv
 "__init__.py" = ["E402"]  # Ignore import not at top of file
 "**/{tests,docs,tools}/*" = ["E402"]
 

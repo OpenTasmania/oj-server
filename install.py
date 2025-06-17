@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Entry point for the OSM-OSRM Server installer.
 
 This script provides a command-line interface for installing and managing
 the OSM-OSRM Server components using a modular architecture.
 """
+
+# DO NOT MOVE OR REMOVE
+# This MUST be the very first thing that runs to ensure the environment is correct.
+from modular_bootstrap.mb_bootstrap import ensure_venv_and_dependencies
+
+ensure_venv_and_dependencies()
+# END DO NOT MOVE OR REMOVE
 
 import argparse
 import logging
@@ -60,22 +68,18 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         description="Installer for OSM-OSRM Server"
     )
 
-    # General options
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )
 
-    # Subcommands
     subparsers = parser.add_subparsers(
         dest="command", help="Command to execute"
     )
 
-    # List command
     list_parser = subparsers.add_parser(  # noqa: F841
         "list", help="List available installers"
     )
 
-    # Install command
     install_parser = subparsers.add_parser(
         "install", help="Install components"
     )
@@ -83,15 +87,12 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         "components", nargs="+", help="Components to install"
     )
 
-    # Uninstall command
     uninstall_parser = subparsers.add_parser(
         "uninstall", help="Uninstall components"
     )
     uninstall_parser.add_argument(
         "components", nargs="+", help="Components to uninstall"
     )
-
-    # Status command
     status_parser = subparsers.add_parser(
         "status", help="Check installation status of components"
     )
@@ -112,22 +113,16 @@ def main(args: Optional[List[str]] = None) -> int:
     Returns:
         Exit code (0 for success, non-zero for failure).
     """
-    # Parse command-line arguments
     parsed_args = parse_args(args)
 
-    # Set up logging
     logger = setup_logging(parsed_args.verbose)
 
     try:
-        # Load application settings
         app_settings = load_app_settings()
 
-        # Create orchestrator
         orchestrator = InstallerOrchestrator(app_settings, logger)
 
-        # Execute command
         if parsed_args.command == "list":
-            # List available installers
             installers = orchestrator.get_available_installers()
 
             logger.info("Available installers:")
@@ -140,7 +135,6 @@ def main(args: Optional[List[str]] = None) -> int:
             return 0
 
         elif parsed_args.command == "install":
-            # Install components
             success = orchestrator.install(parsed_args.components)
 
             if success:
@@ -151,7 +145,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 return 1
 
         elif parsed_args.command == "uninstall":
-            # Uninstall components
             success = orchestrator.uninstall(parsed_args.components)
 
             if success:
@@ -162,7 +155,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 return 1
 
         elif parsed_args.command == "status":
-            # Check installation status
             status = orchestrator.check_installation_status(
                 parsed_args.components
             )
@@ -172,11 +164,9 @@ def main(args: Optional[List[str]] = None) -> int:
                 status_str = "installed" if installed else "not installed"
                 logger.info(f"  {component}: {status_str}")
 
-            # Return 0 if all components are installed, 1 otherwise
             return 0 if all(status.values()) else 1
 
         else:
-            # No command specified
             logger.error(
                 "No command specified. Use --help for usage information."
             )

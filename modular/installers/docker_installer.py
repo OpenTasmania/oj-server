@@ -1,3 +1,5 @@
+# modular/installers/docker_installer.py
+# -*- coding: utf-8 -*-
 """
 Docker installer module.
 
@@ -26,7 +28,7 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="docker",
     metadata={
-        "dependencies": [],  # Docker has no dependencies on other installers
+        "dependencies": ["prerequisites"],  # Depends on core prerequisites
         "estimated_time": 120,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 512,  # Required memory in MB

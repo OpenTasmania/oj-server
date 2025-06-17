@@ -19,7 +19,10 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="pgadmin",
     metadata={
-        "dependencies": ["postgres"],  # pgAdmin depends on PostgreSQL
+        "dependencies": [
+            "prerequisites",
+            "postgres",
+        ],  # pgAdmin depends on prerequisites and PostgreSQL
         "estimated_time": 60,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 256,  # Required memory in MB

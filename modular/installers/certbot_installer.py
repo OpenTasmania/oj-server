@@ -1,3 +1,5 @@
+# modular/installers/certbot_installer.py
+# -*- coding: utf-8 -*-
 """
 Certbot installer module.
 
@@ -18,7 +20,7 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="certbot",
     metadata={
-        "dependencies": [],  # Certbot has no dependencies on other installers
+        "dependencies": ["prerequisites"],  # Depends on core prerequisites
         "estimated_time": 60,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 256,  # Required memory in MB

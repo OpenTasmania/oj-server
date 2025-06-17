@@ -23,7 +23,7 @@ from setup.config_models import AppSettings
 @InstallerRegistry.register(
     name="nodejs",
     metadata={
-        "dependencies": [],  # Node.js has no dependencies on other installers
+        "dependencies": ["prerequisites"],  # Depends on core prerequisites
         "estimated_time": 120,  # Estimated installation time in seconds
         "required_resources": {
             "memory": 512,  # Required memory in MB
