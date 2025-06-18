@@ -13,8 +13,10 @@ from typing import (
 )
 
 from common.command_utils import log_map_server
-from processors.data_handling.raster_processor import raster_tile_prerender
-from processors.plugins.importers.transit.gtfs.gtfs_process import (
+from modular.processors.data_handling.raster_processor import (
+    raster_tile_prerender,
+)
+from modular.processors.plugins.importers.transit.gtfs.gtfs_process import (
     run_gtfs_setup,
 )
 from setup import (
