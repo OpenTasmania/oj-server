@@ -135,6 +135,88 @@ class AptManager:
             self.logger.error(f"Failed to install packages: {e}")
             return False
 
+    def remove(
+        self,
+        packages: Union[List[str], str],
+        app_settings: AppSettings,
+        purge: bool = False,
+        autoremove: bool = False,
+    ) -> bool:
+        """
+        Removes or purges one or more packages using 'apt-get'.
+
+        This method checks if packages are installed before attempting removal
+        to prevent errors and improve efficiency.
+
+        Args:
+            packages: A single package name or a list of package names.
+            app_settings: The application settings, required for command execution.
+            purge: If True, purges packages (removes config files).
+                   If False, just removes them. Defaults to False.
+            autoremove: If True, runs 'autoremove' after the operation to
+                        clean up unused dependencies. Defaults to False.
+
+        Returns:
+            True if the operation was successful, False otherwise.
+        """
+        if isinstance(packages, str):
+            packages = [packages]
+
+        packages_to_action = []
+        for pkg_name in packages:
+            try:
+                status_cmd = [
+                    "dpkg-query",
+                    "-W",
+                    "-f=${db:Status-Status}",
+                    pkg_name,
+                ]
+                result = run_command(
+                    status_cmd,
+                    app_settings,
+                    capture_output=True,
+                    check=False,
+                    current_logger=self.logger,
+                )
+                if result.returncode == 0 and "installed" in result.stdout:
+                    packages_to_action.append(pkg_name)
+                else:
+                    self.logger.info(
+                        f"Package '{pkg_name}' is not installed. Skipping."
+                    )
+            except subprocess.CalledProcessError as e:
+                self.logger.warning(
+                    f"Could not determine status of '{pkg_name}', skipping: {e}"
+                )
+
+        if not packages_to_action:
+            self.logger.info(
+                "No installed packages to remove from the provided list."
+            )
+            return True
+
+        action = "purge" if purge else "remove"
+        self.logger.info(
+            f"Committing action '{action}' for: {', '.join(packages_to_action)}"
+        )
+        try:
+            cmd = ["apt-get", action, "-yq"] + packages_to_action
+            run_elevated_command(
+                cmd, app_settings, current_logger=self.logger
+            )
+            self.logger.info(f"Packages {action}d successfully.")
+
+            if autoremove:
+                self.logger.info(
+                    "Running autoremove to clean up dependencies..."
+                )
+                return self.autoremove(purge=purge, app_settings=app_settings)
+
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to {action} packages: {e}")
+            return False
+
     def add_repository(
         self,
         repo_name: str,
