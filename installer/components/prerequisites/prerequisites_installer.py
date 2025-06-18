@@ -1,4 +1,4 @@
-# modular/installers/prerequisites_installer.py
+# installers/prerequisites_installer.py
 # -*- coding: utf-8 -*-
 """
 Installer for core system prerequisites required by all other installers.
@@ -11,13 +11,8 @@ run. It serves as a foundational "Stage 0" for the installation process.
 import logging
 from typing import Optional
 
-from common.command_utils import (
-    check_package_installed,
-    log_map_server,
-    run_elevated_command,
-)
+from common.command_utils import check_package_installed
 from common.debian.apt_manager import AptManager
-from installer import config
 from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import InstallerRegistry
@@ -100,19 +95,13 @@ class PrerequisitesInstaller(BaseComponent):
         Returns:
             True if the installation was successful, False otherwise.
         """
+        from common.command_utils import run_elevated_command
+
         try:
-            log_map_server(
-                f"{config.SYMBOLS['info']} Setting up core system prerequisites...",
-                "info",
-                self.logger,
-            )
+            self.logger.info("Setting up core system prerequisites...")
 
             if not self.apt_manager.update(self.app_settings):
-                log_map_server(
-                    f"{config.SYMBOLS['error']} Failed to update package lists.",
-                    "error",
-                    self.logger,
-                )
+                self.logger.error("Failed to update package lists.")
                 return False
 
             try:
@@ -122,25 +111,15 @@ class PrerequisitesInstaller(BaseComponent):
                     current_logger=self.logger,
                 )
             except Exception as e:
-                log_map_server(
-                    f"{config.SYMBOLS['warning']} System upgrade failed: {str(e)}. Continuing with installation.",
-                    "warning",
-                    self.logger,
+                self.logger.warning(
+                    f"System upgrade failed: {str(e)}. Continuing with installation."
                 )
 
-            log_map_server(
-                f"{config.SYMBOLS['package']} Installing core system packages...",
-                "info",
-                self.logger,
-            )
+            self.logger.info("Installing core system packages...")
             if not self.apt_manager.install(
                 self.core_packages, self.app_settings
             ):
-                log_map_server(
-                    f"{config.SYMBOLS['error']} Failed to install core system packages.",
-                    "error",
-                    self.logger,
-                )
+                self.logger.error("Failed to install core system packages.")
                 return False
 
             try:
@@ -150,28 +129,32 @@ class PrerequisitesInstaller(BaseComponent):
                     current_logger=self.logger,
                 )
             except Exception as e:
-                log_map_server(
-                    f"{config.SYMBOLS['warning']} Failed to reconfigure tzdata: {str(e)}. This is not critical.",
-                    "warning",
-                    self.logger,
+                self.logger.warning(
+                    f"Failed to reconfigure tzdata: {str(e)}. This is not critical."
                 )
 
-            log_map_server(
-                f"{config.SYMBOLS['success']} Core system prerequisites installed successfully.",
-                "success",
-                self.logger,
+            self.logger.info(
+                "Core system prerequisites installed successfully."
             )
 
             return True
 
         except Exception as e:
-            log_map_server(
-                f"{config.SYMBOLS['error']} Error installing core system prerequisites: {str(e)}",
-                "error",
-                self.logger,
+            self.logger.error(
+                f"Error installing core system prerequisites: {str(e)}",
                 exc_info=True,
             )
             return False
+
+    def configure(self) -> bool:
+        """
+        Configure is not needed for prerequisites.
+
+        Returns:
+            True to indicate that the operation was acknowledged.
+        """
+        self.logger.info("Configuration for prerequisites is not required.")
+        return True
 
     def uninstall(self) -> bool:
         """
@@ -180,11 +163,19 @@ class PrerequisitesInstaller(BaseComponent):
         Returns:
             True to indicate that the operation was acknowledged.
         """
-        log_map_server(
-            f"{config.SYMBOLS['warning']} Uninstalling core prerequisites is not recommended and not implemented.",
-            "warning",
-            self.logger,
+        self.logger.warning(
+            "Uninstalling core prerequisites is not recommended and not implemented."
         )
+        return True
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfigure is not needed for prerequisites.
+
+        Returns:
+            True to indicate that the operation was acknowledged.
+        """
+        self.logger.info("Unconfiguration for prerequisites is not required.")
         return True
 
     def is_installed(self) -> bool:
@@ -198,16 +189,21 @@ class PrerequisitesInstaller(BaseComponent):
             if not check_package_installed(
                 package, self.app_settings, self.logger
             ):
-                log_map_server(
-                    f"{config.SYMBOLS['info']} Core prerequisite package '{package}' is not installed.",
-                    "info",
-                    self.logger,
+                self.logger.info(
+                    f"Core prerequisite package '{package}' is not installed."
                 )
                 return False
 
-        log_map_server(
-            f"{config.SYMBOLS['success']} All core prerequisite packages are installed.",
-            "success",
-            self.logger,
-        )
+        self.logger.info("All core prerequisite packages are installed.")
         return True
+
+    def is_configured(self) -> bool:
+        """
+        Check if prerequisites are configured.
+
+        Since there is no configuration step, this is the same as being installed.
+
+        Returns:
+            True if the component is considered configured, False otherwise.
+        """
+        return self.is_installed()
