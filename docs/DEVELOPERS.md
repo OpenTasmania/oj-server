@@ -1,83 +1,70 @@
-# **Developer Guide**
+# OSM-OSRM Server Development Guidelines
 
-Welcome to the development team! This guide provides everything you need to get the project running on your local
-machine for development and testing purposes.
+This document provides essential information for developers working on the OSM-OSRM Server project. It includes
+build/configuration instructions, testing information, and additional development guidelines.
 
-## **Getting Started**
+## Build/Configuration Instructions
 
-Follow these steps to set up your development environment.
+### Environment Setup
 
-### **1. Prerequisites**
+1. **Python Requirements**:
+    - Python 3.13 is required for this project
+    - The project uses `uv` for package management and virtual environment
 
-Before you begin, ensure you have the following tools installed on your system:
-
-* **Git**: For version control.
-* **Python 3.13**: The project's runtime.
-* **python3-apt**: Required for the AptManager module.
-* **uv**: An extremely fast Python package and project manager. We use it to manage our virtual environments and
-  dependencies.
-
-**NOTE:** This project is developed on
-x86_64 [Debian](https://www.debian.org/) [Trixie](https://www.debian.org/releases/trixie/). For
-now, YMMV on other systems.
-
-### **2. Fork and Clone**
-
-First, create a fork of the main repository on GitHub. Then, clone your fork to your local machine:
-
-```bash
-git clone https://github.com/opentasmania/osm-osrm-server.git
-cd osm-osrm-server
-```
-
-### **3. Environment Setup**
-
-We use [uv](https://docs.astral.sh/uv/) to ensure a consistent development environment.
-
-1. **Create a virtual environment:**
+2. **Initial Setup**:
    ```bash
-   uv venv
-   ```
-2. **Activate the virtual environment:**
-    * On macOS and Linux:
-        ```bash
-        source .venv/bin/activate
-        ```
-    * On Windows:
-        ```bash
-        .venv\Scripts\activate
-        ```
-3. **Install dependencies:**
-   Sync the environment with our project's requirements.
-   ```bash
-   uv pip sync requirements.txt
+   # Clone the repository
+   git clone https://gitlab.com/opentasmania/osm-osrm-server.git
+   cd osm-osrm-server
+
+   # Run the install script which will set up uv and create a virtual environment
+   python3 install.py
    ```
 
-### **4. Configuration**
+3. **Configuration**:
+    - The main configuration file is `config.yaml` in the project root
+    - You can generate a preseed YAML configuration using:
+      ```bash
+      python3 install.py --generate-preseed-yaml
+      ```
 
-The server is configured using a YAML file.
+### Installation Process
 
-1. Copy the configuration template to a new local file. This file is ignored by Git, so your local settings won't be
-   committed.
+The installation process is handled by the `install.py` script and the modules in the `installer` directory:
+
+1. **Prerequisites Installation**:
    ```bash
-   cp config.yaml config.local.yaml
+   python3 install.py --prereqs
    ```
-2. Open `config.local.yaml` and adjust the settings (like database credentials and file paths) as needed for your local
-   environment.
 
-## **Project Architecture**
+2. **Services Installation**:
+   ```bash
+   python3 install.py --services
+   ```
+
+3. **Data Preparation**:
+   ```bash
+   python3 install.py --data
+   ```
+
+4. **Full Installation**:
+   ```bash
+   python3 install.py --full -v your-domain.example.com
+   ```
+
+## Project Architecture
 
 The project is organized into several key directories:
 
-* `installer/`: Contains scripts for installing individual services (e.g., PostgreSQL, Nginx).
-* `configure/`: Holds the logic for configuring those services after installation.
-* `processors/`: This is where our core data processing logic lives. It's built on a new, modern architecture.
+* `bootstrap/`: Contains the self-contained bootstrap process for the modular setup script.
+* `installer/`: Contains components (individual services)
+  * `components/`: Contains installer and configure code for a various component.
+  * `processors/`: Where our core data processing logic lives.
 * `common/`: Shared utilities and helper functions used across the project.
   * `common/debian/`: Contains Debian-specific utilities, including the AptManager.
 * `docs/`: Project documentation, including the plans and strategies that guide our work.
-* `modular_bootstrap/`: Contains the self-contained bootstrap process for the modular setup script. This ensures all prerequisites are met before the script is executed.
 
-### **Package Management with AptManager**
+### Package Management with AptManager
 
 For Debian package management, we use the `AptManager` class located in `common/debian/apt_manager.py`. This provides a centralized, consistent interface for all apt operations.
 
@@ -101,28 +88,12 @@ apt_manager.add_repository("deb http://example.com/debian stable main")
 apt_manager.add_gpg_key_from_url("https://example.com/key.gpg", "/etc/apt/keyrings/example.gpg")
 ```
 
-### **Modular Bootstrap Process**
+### Installer Commands
 
-The modular setup script (`setup_modular.py`) uses a self-contained bootstrap process to ensure all prerequisites are met before execution. This process is implemented in the `/modular_bootstrap` directory.
+The `install.py` script provides several commands for managing the installation and configuration of components:
 
-**Key components:**
-- `mb_utils.py`: Common utilities for the bootstrap process
-- `mb_apt.py`: Ensures the presence of the `python3-apt` package
-- `mb_pydantic.py`: Ensures the presence of the `pydantic` and `pydantic-settings` packages
-- `mb_build_tools.py`: Ensures the presence of build tools like `build-essential` and `python3-dev`
-- `mb_lsb.py`: Ensures the presence of the `lsb-release` package
-- `mb_util_linux.py`: Ensures the presence of the `util-linux` package
-- `orchestrator.py`: Manages the execution of the individual prerequisite checks
+#### Setup Command
 
-The bootstrap process is automatically executed when running the `setup_modular.py` script. It checks for and installs any missing prerequisites before proceeding with the main configuration tasks.
-
-For more details, see the [README.md](/bootstrap/README.md) in the `/modular_bootstrap` directory.
-
-### **Setup Command**
-
-The `install.py` script provides a `setup` command that allows you to configure components of the system after they have been installed. This command uses the `SetupOrchestrator` class to manage the configuration process.
-
-**Usage:**
 ```bash
 # Configure all components
 ./install.py setup
@@ -140,11 +111,8 @@ The `install.py` script provides a `setup` command that allows you to configure 
 ./install.py setup --dry-run
 ```
 
-### **Install and Setup Command**
+#### Install and Setup Command
 
-The `install.py` script also provides an `install setup` command that allows you to install a component or group and then immediately run the setup process for it. This is a convenient way to perform both steps in a single command.
-
-**Usage:**
 ```bash
 # Install and then configure a component
 ./install.py install setup postgres
@@ -153,15 +121,8 @@ The `install.py` script also provides an `install setup` command that allows you
 ./install.py install setup web_server
 ```
 
-This command will:
-1. Install the specified component or group using the `InstallerOrchestrator`
-2. If installation is successful, run the setup process for the component or group using the `SetupOrchestrator`
+#### Status Command
 
-### **Status Command**
-
-The `install.py` script provides a `status` command that allows you to check the installation and configuration status of components. The command can display the status as a flat list or as a dependency tree.
-
-**Usage:**
 ```bash
 # Check status of all components
 ./install.py status
@@ -176,58 +137,16 @@ The `install.py` script provides a `status` command that allows you to check the
 ./install.py status postgres apache --tree
 ```
 
-The tree view shows the interdependencies between components and provides both installation and setup status for each component. Components are organized based on their dependencies, with root components (those that don't depend on any other components) at the top level.
-
-Example output:
-```
-Component dependency tree:
-└── postgres: installed, configured
-    ├── postgis: installed, configured
-    └── osm_db: installed, not configured
-        └── osrm: not installed
-```
-
-This visualization makes it easy to understand the relationships between components and identify any issues in the installation or configuration process.
-
-The `setup` command will:
-1. Load the configuration from `config.yaml`
-2. Import all configurator modules from the `modular_setup/configurators` directory
-3. Resolve dependencies between configurators to determine the order of execution
-4. Execute each configurator in the correct order
-
-Each configurator is responsible for configuring a specific component of the system, such as PostgreSQL, Apache, or Docker. Configurators are registered with the `ConfiguratorRegistry` using a decorator, similar to how installers are registered with the `InstallerRegistry`.
-
-**Example configurator registration:**
-
-```python
-from installer.registry import ComponentRegistry
-from installer.base_configurator import BaseConfigurator
-
-
-@ComponentRegistry.register(
-    name="postgres",
-    metadata={
-        "dependencies": [],
-        "description": "Configures PostgreSQL for the OSM-OSRM server.",
-    },
-)
-class PostgresConfigurator(BaseConfigurator):
-# Implementation details...
-```
-
-To add a new configurator, create a new Python module in the `modular_setup/configurators` directory and register it with the `ConfiguratorRegistry` using the `@ConfiguratorRegistry.register` decorator.
-
-### **Logging Guidelines**
+### Logging Guidelines
 
 For consistent logging across the project, we use a centralized logging configuration approach.
 
-**Important:** All logging must be configured exclusively through the `setup_logging` function in `/common/core_utils.py`. This function is called once at the application's entry point in `main_map_server_entry` and sets up console and file logging for the entire application.
+**Important:** All logging must be configured exclusively through the `setup_logging` function in `/common/core_utils.py`. This function is called once at the application's entry point and sets up console and file logging for the entire application.
 
 Key principles:
 1. **Never** call `logging.basicConfig()` or other logging configuration functions in your modules.
 2. **Always** acquire a logger using the standard Python mechanism: `import logging; logger = logging.getLogger(__name__)`.
-3. For custom logging handlers (like `TuiLogHandler`), integrate them with the central logging system rather than creating separate configurations.
-4. **All logging automatically includes symbols** based on the log level (e.g., ℹ️ for info, ⚠️ for warning, ❌ for error). These symbols are defined in `SYMBOLS_DEFAULT` in `setup/config_models.py`.
+3. For custom logging handlers, integrate them with the central logging system rather than creating separate configurations.
 
 Example usage:
 
@@ -237,10 +156,10 @@ import logging
 # Get a logger for the current module
 logger = logging.getLogger(__name__)
 
-# Use the logger - symbols are automatically added based on log level
-logger.info("This is an informational message")  # Will include ℹ️ symbol
-logger.warning("This is a warning message")  # Will include ⚠️ symbol
-logger.error("This is an error message")  # Will include ❌ symbol
+# Use the logger
+logger.info("This is an informational message")
+logger.warning("This is a warning message")
+logger.error("This is an error message")
 
 # For user-facing messages that require consistent formatting
 from common.command_utils import log_map_server
@@ -248,22 +167,9 @@ from common.command_utils import log_map_server
 log_map_server("Step completed successfully", "info", current_logger=logger, app_settings=app_settings)
 ```
 
-Available symbols:
-- `info`: ℹ️ - For informational messages
-- `warning`: ⚠️ - For warning messages
-- `error`: ❌ - For error messages
-- `critical`: 🔥 - For critical error messages
-- `debug`: 🐛 - For debug messages
-- `success`: ✅ - For success messages
-- `step`: ➡️ - For step indicators
-- `gear`: ⚙️ - For configuration or processing operations
-- `package`: 📦 - For package-related operations
-- `rocket`: 🚀 - For deployment or startup operations
-- `sparkles`: ✨ - For cleanup or completion operations
+### Core Design Principle: Pluggable Processors
 
-### **Core Design Principle: Pluggable Processors**
-
-To handle a wide variety of transit data, we have adopted a modular, pluggable architecture.
+To handle a wide variety of transit data, the project has adopted a modular, pluggable architecture:
 
 * **Static Data Pipeline**: The ETL (Extract, Transform, Load) pipeline for static data like GTFS and NeTEx uses
   independent processor plugins for each format. All data is transformed into a single **Canonical Database Schema**,
@@ -271,62 +177,143 @@ To handle a wide variety of transit data, we have adopted a modular, pluggable a
 * **Real-time Data Service**: Similarly, real-time feeds like GTFS-RT and SIRI are handled by dedicated plugins. Each
   plugin transforms its data into a standard **Canonical Data Model** before it's cached and served to the frontend.
 
-Understanding this principle is key to working with the data processing parts of the application. For a deep dive,
-please read the strategy documents:
+For more details, see the strategy documents in the `docs/strategies/` directory.
 
-* [Static Strategy](docs/strategies/StaticStrategy.md)
-* [Realtime Strategy](docs/strategies/RealTimeStrategy.md)
+## Testing Information
 
-## **Development Workflow**
+### Test Configuration
 
-### **Running Tests**
+The project uses pytest for testing. Test configuration is defined in the `pyproject.toml` file:
 
-We use [pytest](https://pytest.org/) for testing. To run the full test suite, execute:
+```toml
+[tool.pytest.ini_options]
+addopts = """
+        --cov-report html:cover/coverage_html
+        --cov-report json:cover/coverage.json
+        --cov-report xml:cover/coverage.xml
+        """
 
-```bash
-pytest
+[tool.coverage.report]
+show_missing = true
+omit = ["/etc/python3.13/sitecustomize.py", ]
+
+[tool.coverage.xml]
+output = "coverage.xml"
 ```
 
-Please ensure all tests pass before submitting a pull request.
+### Running Tests
 
-### **Code Style & Linting**
-
-We use **[Ruff](https://docs.astral.sh/ruff/)** for lightning-fast code formatting and linting. Before committing your
-code, please run:
+To run all tests:
 
 ```bash
-# Format your code
-ruff format .
-
-# Check for linting errors
-ruff check .
+python -m pytest
 ```
 
-### **Running a Data Processor**
-
-To run the static data ETL pipeline, you can execute the main orchestrator script:
+To run specific tests:
 
 ```bash
-python processors/run_static_etl.py
+python -m pytest tests/test_specific_file.py
 ```
 
-This script will read the `static_feeds` from your `config.local.yaml` and run the appropriate processor plugins.
+To run tests with verbose output:
 
-## **Contributing**
+```bash
+python -m pytest -v
+```
 
-We welcome contributions! Please follow these steps:
+To run tests with coverage:
 
-1. **Find an Issue**: Look for open tasks in
-   the [issue tracker](https://gitlab.com/opentasmania/osm-osrm-server/-/issues), or in the [tasks](docs/tasks.md)
-   documentation file. This file is prioritized based on our main improvement plan.
-2. **Create a Branch**: Create a new feature branch for your work.
-   ```bash
-   git checkout -b your-feature-name
-   ```
-3. **Develop**: Make your changes, write tests, and ensure all checks pass.
-4. **Submit a Pull Request**: Push your branch to your fork and open
-   a [pull request](https://gitlab.com/opentasmania/osm-osrm-server/-/merge_requests)
-   against the main repository. Provide a clear description of the changes you've made.
+```bash
+python -m pytest --cov=.
+```
 
-For more detailed policies on contributions, please review [Contributing](docs/CONTRIBUTING.md). To understand the
-project's long-term vision, refer to [the plan](docs/plan.md)
+### Adding New Tests
+
+1. Create a new test file in the `tests` directory with a name starting with `test_`.
+2. Import necessary modules and define test functions with names starting with `test_`.
+3. Use assertions to verify expected behavior.
+
+Example:
+
+```python
+# tests/test_example.py
+import sys
+from pathlib import Path
+
+# Add the project root to the Python path
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+def test_example():
+    """
+    Example test function.
+    """
+    # Setup
+    expected_result = True
+
+    # Execute
+    actual_result = True  # Replace with actual function call
+
+    # Assert
+    assert actual_result == expected_result, "Test failed"
+```
+
+## Additional Development Information
+
+### Code Style
+
+The project follows PEP 8 guidelines for Python code. Code formatting and linting are handled by ruff:
+
+```toml
+[tool.ruff]
+line-length = 78
+preview = true
+
+[tool.ruff.lint]
+select = [
+    "E1", # Indentation
+    "E2", # Whitespace
+    "E3", # Blank lines
+    "E4", # Import formatting
+    "E5", # Line length
+    "E7", # Statement, imports, expression formatting
+    "E9", # Syntax errors
+    "F", # PyFlakes
+    "B", # Bugbear
+    "I"  # isort rules
+]
+
+ignore = [
+    "E501"  # Line length will be handled by ruff format
+]
+```
+
+### Type Checking
+
+The project uses mypy for type checking:
+
+```toml
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+exclude = ['\.git', '\.venv', 'build', 'dist']
+```
+
+### Pre-commit Hooks
+
+The project uses pre-commit hooks to ensure code quality. To install pre-commit hooks:
+
+```bash
+uv run pre-commit install
+```
+
+### Contribution Workflow
+
+1. Fork the repository
+2. Create a new branch for your feature or bug fix
+3. Make your changes
+4. Run tests to ensure your changes don't break existing functionality
+5. Submit a merge request
+
+For more detailed information, refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file.

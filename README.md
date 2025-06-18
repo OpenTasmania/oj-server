@@ -207,3 +207,7 @@ as a Wiki.
 ## 8. Contributions
 
 Contributions welcome. Please see the [Contributions](docs/CONTRIBUTING.md) file for more details.
+
+## 9. Developer Guidelines
+
+For detailed development guidelines, including build/configuration instructions, testing information, and additional development information, please see the [Developer Guidelines](.junie/guidelines.md) file.

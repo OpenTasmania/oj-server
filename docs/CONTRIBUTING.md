@@ -67,6 +67,8 @@ We encourage code contributions! If you'd like to contribute code, please follow
   code).
 * **Testing:** If possible, include unit tests for new functionality.
 
+For more detailed information about the development environment, testing, and code style, please refer to the [Developer Guidelines](../.junie/guidelines.md) file.
+
 ## Contact
 
 For any questions regarding contributions, please feel free to reach out to the primary
