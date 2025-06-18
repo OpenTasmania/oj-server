@@ -18,8 +18,8 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-from modular_setup.base_configurator import BaseConfigurator
-from modular_setup.registry import ConfiguratorRegistry
+from modular.base_configurator import BaseConfigurator
+from modular.registry2 import ConfiguratorRegistry
 from setup.config_models import (
     PGPASSWORD_DEFAULT,
     AppSettings,

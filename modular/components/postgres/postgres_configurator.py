@@ -19,8 +19,8 @@ from common.network_utils import validate_cidr
 from common.system_utils import (
     get_current_script_hash,
 )
-from modular_setup.base_configurator import BaseConfigurator
-from modular_setup.registry import ConfiguratorRegistry
+from modular.base_configurator import BaseConfigurator
+from modular.registry2 import ConfiguratorRegistry
 from setup import (
     config as static_config,
 )

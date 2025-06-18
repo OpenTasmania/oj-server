@@ -11,8 +11,8 @@ from typing import Optional
 from common.command_utils import log_map_server, run_elevated_command
 from common.network_utils import validate_cidr
 from common.system_utils import systemd_reload
-from modular_setup.base_configurator import BaseConfigurator
-from modular_setup.registry import ConfiguratorRegistry
+from modular.base_configurator import BaseConfigurator
+from modular.registry2 import ConfiguratorRegistry
 from setup.config_models import AppSettings
 
 
