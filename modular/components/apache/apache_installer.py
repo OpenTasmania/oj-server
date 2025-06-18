@@ -1,4 +1,4 @@
-# modular/installers/apache_installer.py
+# modular/components/apache/apache_installer.py
 # -*- coding: utf-8 -*-
 """
 Apache installer module.

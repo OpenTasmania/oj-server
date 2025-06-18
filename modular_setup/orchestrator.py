@@ -7,10 +7,8 @@ tasks, looking up the appropriate configurator module in the registry, and
 executing it.
 """
 
-import importlib
 import logging
 import os
-import sys
 from typing import Dict, List, Optional
 
 import yaml
@@ -83,33 +81,14 @@ class SetupOrchestrator:
         """
         Import all configurator modules to ensure they are registered.
 
-        This method dynamically imports all Python modules in the configurators
+        This method dynamically imports all Python modules in the components
         directory to ensure that their decorators are executed and they are
         registered with the ConfiguratorRegistry.
         """
-        configurators_dir = os.path.join(
-            os.path.dirname(__file__), "configurators"
-        )
-
-        # Add the configurators directory to the Python path if it's not already there
-        if configurators_dir not in sys.path:
-            sys.path.append(configurators_dir)
-
-        # Import all Python modules in the configurators directory
-        for filename in os.listdir(configurators_dir):
-            if filename.endswith(".py") and not filename.startswith("__"):
-                module_name = filename[:-3]  # Remove the .py extension
-                try:
-                    importlib.import_module(
-                        f"modular_setup.configurators.{module_name}"
-                    )
-                    self.logger.debug(
-                        f"Imported configurator module: {module_name}"
-                    )
-                except ImportError as e:
-                    self.logger.error(
-                        f"Error importing configurator module {module_name}: {str(e)}"
-                    )
+        # This method is intentionally left empty as the configurator modules
+        # are now imported by the ComponentOrchestrator._import_component_modules method.
+        # This is part of the unification process described in the modular_unification_plan.md.
+        pass
 
     def _get_component_orchestrator(self) -> ComponentOrchestrator:
         """

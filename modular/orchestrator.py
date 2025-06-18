@@ -51,55 +51,50 @@ class ComponentOrchestrator:
         import importlib
         import pkgutil
 
-        # Import installer modules
+        # Import component modules from the new structure
         try:
-            import modular.installers
+            import modular.components
 
-            # Get the path to the installers package
-            installers_path = os.path.dirname(modular.installers.__file__)
+            # Get the path to the components package
+            components_path = os.path.dirname(modular.components.__file__)
 
-            # Import all modules in the installers package
-            for _, module_name, _ in pkgutil.iter_modules([installers_path]):
-                # Skip __init__.py
-                if module_name == "__init__":
+            # Iterate through each component subdirectory
+            for _, component_name, is_pkg in pkgutil.iter_modules([
+                components_path
+            ]):
+                # Skip __init__.py and non-packages
+                if component_name == "__init__" or not is_pkg:
                     continue
 
-                # Import the module
-                importlib.import_module(f"modular.installers.{module_name}")
+                # Try to import installer module
+                try:
+                    importlib.import_module(
+                        f"modular.components.{component_name}.{component_name}_installer"
+                    )
+                    self.logger.debug(
+                        f"Imported installer module: {component_name}"
+                    )
+                except ImportError as e:
+                    self.logger.debug(
+                        f"No installer module found for {component_name}: {str(e)}"
+                    )
 
-                self.logger.debug(f"Imported installer module: {module_name}")
+                # Try to import configurator module
+                try:
+                    importlib.import_module(
+                        f"modular.components.{component_name}.{component_name}_configurator"
+                    )
+                    self.logger.debug(
+                        f"Imported configurator module: {component_name}"
+                    )
+                except ImportError as e:
+                    self.logger.debug(
+                        f"No configurator module found for {component_name}: {str(e)}"
+                    )
         except (ImportError, AttributeError) as e:
             self.logger.warning(
-                f"Error importing installer modules: {str(e)}"
+                f"Error importing component modules: {str(e)}"
             )
-
-        # Import configurator modules (Legacy - Commented out to prevent duplicates)
-        # try:
-        #     configurators_dir = os.path.join(
-        #         os.path.dirname(os.path.dirname(__file__)),
-        #         "modular_setup",
-        #         "configurators",
-        #     )
-        #
-        #     # Import all Python modules in the configurators directory
-        #     for filename in os.listdir(configurators_dir):
-        #         if filename.endswith(".py") and not filename.startswith("__"):
-        #             module_name = filename[:-3]  # Remove the .py extension
-        #             try:
-        #                 importlib.import_module(
-        #                     f"modular_setup.configurators.{module_name}"
-        #                 )
-        #                 self.logger.debug(
-        #                     f"Imported configurator module: {module_name}"
-        #                 )
-        #             except ImportError as e:
-        #                 self.logger.warning(
-        #                     f"Error importing configurator module {module_name}: {str(e)}"
-        #                 )
-        # except (ImportError, FileNotFoundError) as e:
-        #     self.logger.warning(
-        #         f"Error importing configurator modules: {str(e)}"
-        #     )
 
     def get_available_components(self) -> Dict[str, Type[BaseComponent]]:
         """
