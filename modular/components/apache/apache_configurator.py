@@ -16,7 +16,7 @@ from common.command_utils import (
 from common.file_utils import backup_file
 from common.system_utils import get_current_script_hash, systemd_reload
 from modular.base_configurator import BaseConfigurator
-from modular.registry2 import ConfiguratorRegistry
+from modular.registry import ComponentRegistry
 from setup import (
     config as static_config,
 )
@@ -26,7 +26,7 @@ from setup.config_models import (
 )
 
 
-@ConfiguratorRegistry.register(
+@ComponentRegistry.register(
     name="apache",
     metadata={
         "dependencies": [],  # Apache is a base component with no dependencies

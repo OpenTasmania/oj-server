@@ -19,7 +19,7 @@ from common.command_utils import (
 )
 from common.system_utils import get_current_script_hash, systemd_reload
 from modular.base_configurator import BaseConfigurator
-from modular.registry2 import ConfiguratorRegistry
+from modular.registry import ComponentRegistry
 from setup import config as static_config
 from setup.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
@@ -27,7 +27,7 @@ from setup.config_models import (
 )
 
 
-@ConfiguratorRegistry.register(
+@ComponentRegistry.register(
     name="renderd",
     metadata={
         "dependencies": [

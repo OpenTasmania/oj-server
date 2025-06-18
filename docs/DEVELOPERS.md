@@ -198,7 +198,10 @@ Each configurator is responsible for configuring a specific component of the sys
 
 **Example configurator registration:**
 ```python
-@ConfiguratorRegistry.register(
+from modular.registry import ComponentRegistry
+from modular.base_configurator import BaseConfigurator
+
+@ComponentRegistry.register(
     name="postgres",
     metadata={
         "dependencies": [],

@@ -20,14 +20,14 @@ from common.system_utils import (
     get_current_script_hash,
 )
 from modular.base_configurator import BaseConfigurator
-from modular.registry2 import ConfiguratorRegistry
+from modular.registry import ComponentRegistry
 from setup import (
     config as static_config,
 )
 from setup.config_models import AppSettings
 
 
-@ConfiguratorRegistry.register(
+@ComponentRegistry.register(
     name="postgres",
     metadata={
         "dependencies": [],  # PostgreSQL is a base component with no dependencies

@@ -12,11 +12,11 @@ from common.command_utils import log_map_server, run_elevated_command
 from common.network_utils import validate_cidr
 from common.system_utils import systemd_reload
 from modular.base_configurator import BaseConfigurator
-from modular.registry2 import ConfiguratorRegistry
+from modular.registry import ComponentRegistry
 from setup.config_models import AppSettings
 
 
-@ConfiguratorRegistry.register(
+@ComponentRegistry.register(
     name="ufw",
     metadata={
         "dependencies": [],  # UFW is a base component with no dependencies

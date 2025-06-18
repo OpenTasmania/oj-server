@@ -12,7 +12,7 @@ from typing import Optional
 from common.command_utils import log_map_server, run_elevated_command
 from common.system_utils import get_current_script_hash, systemd_reload
 from modular.base_configurator import BaseConfigurator
-from modular.registry2 import ConfiguratorRegistry
+from modular.registry import ComponentRegistry
 from setup import config as static_config
 from setup.config_models import (
     PGPASSWORD_DEFAULT,
@@ -20,7 +20,7 @@ from setup.config_models import (
 )
 
 
-@ConfiguratorRegistry.register(
+@ComponentRegistry.register(
     name="pg_tileserv",
     metadata={
         "dependencies": ["postgres"],  # pg_tileserv depends on PostgreSQL

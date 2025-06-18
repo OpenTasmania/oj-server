@@ -12,14 +12,14 @@ from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
 from modular.base_configurator import BaseConfigurator
-from modular.registry2 import ConfiguratorRegistry
+from modular.registry import ComponentRegistry
 from setup.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
 )
 
 
-@ConfiguratorRegistry.register(
+@ComponentRegistry.register(
     name="certbot",
     metadata={
         "dependencies": ["nginx"],  # Certbot depends on Nginx
