@@ -16,12 +16,12 @@ from common.command_utils import (
 )
 from common.debian.apt_manager import AptManager
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
-from installer.registry import InstallerRegistry
+from installer.registry import ComponentRegistry
 
 
-@InstallerRegistry.register(
+@ComponentRegistry.register(
     name="carto",
     metadata={
         "dependencies": ["nodejs"],  # Carto depends on Node.js
@@ -34,7 +34,7 @@ from installer.registry import InstallerRegistry
         "description": "Carto mapping and visualization tool",
     },
 )
-class CartoInstaller(BaseInstaller):
+class CartoInstaller(BaseComponent):
     """
     Installer for Carto mapping and visualization tool.
 
@@ -374,3 +374,42 @@ class CartoInstaller(BaseInstaller):
                 self.logger,
             )
             return False
+
+    def configure(self) -> bool:
+        """
+        Configure Carto.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would configure Carto after it has been installed.
+
+        Returns:
+            True if the configuration was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfigure Carto.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would unconfigure Carto.
+
+        Returns:
+            True if the unconfiguration was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Check if Carto is configured.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would check if Carto is configured.
+
+        Returns:
+            True if Carto is configured, False otherwise.
+        """
+        # This is a placeholder implementation
+        return self.is_installed()

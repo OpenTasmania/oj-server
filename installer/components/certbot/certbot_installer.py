@@ -12,12 +12,12 @@ from typing import List, Optional
 from common.command_utils import check_package_installed, log_map_server
 from common.debian.apt_manager import AptManager
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
-from installer.registry import InstallerRegistry
+from installer.registry import ComponentRegistry
 
 
-@InstallerRegistry.register(
+@ComponentRegistry.register(
     name="certbot",
     metadata={
         "dependencies": ["prerequisites"],  # Depends on core prerequisites
@@ -30,7 +30,7 @@ from installer.registry import InstallerRegistry
         "description": "Certbot SSL certificate manager",
     },
 )
-class CertbotInstaller(BaseInstaller):
+class CertbotInstaller(BaseComponent):
     """
     Installer for Certbot SSL certificate manager.
 
@@ -201,3 +201,42 @@ class CertbotInstaller(BaseInstaller):
                 all_installed = False
 
         return all_installed
+
+    def configure(self) -> bool:
+        """
+        Configure Certbot.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would configure Certbot after it has been installed.
+
+        Returns:
+            True if the configuration was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfigure Certbot.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would unconfigure Certbot.
+
+        Returns:
+            True if the unconfiguration was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Check if Certbot is configured.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would check if Certbot is configured.
+
+        Returns:
+            True if Certbot is configured, False otherwise.
+        """
+        # This is a placeholder implementation
+        return self.is_installed()

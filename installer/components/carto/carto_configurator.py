@@ -18,7 +18,7 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-from installer.base_configurator import BaseConfigurator
+from installer.base_component import BaseComponent
 from installer.config_models import (
     PGPASSWORD_DEFAULT,
     AppSettings,
@@ -33,7 +33,7 @@ from installer.registry import ComponentRegistry
         "description": "CartoCSS project configuration and stylesheet compilation",
     },
 )
-class CartoConfigurator(BaseConfigurator):
+class CartoConfigurator(BaseComponent):
     """
     Configurator for CartoCSS project.
 
@@ -595,3 +595,42 @@ class CartoConfigurator(BaseConfigurator):
                 self.app_settings,
             )
             # This might not be fatal for all setups, but important for map rendering
+
+    def install(self) -> bool:
+        """
+        Install Carto.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would install Carto.
+
+        Returns:
+            True if the installation was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall Carto.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would uninstall Carto.
+
+        Returns:
+            True if the uninstallation was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def is_installed(self) -> bool:
+        """
+        Check if Carto is installed.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would check if Carto is installed.
+
+        Returns:
+            True if Carto is installed, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True

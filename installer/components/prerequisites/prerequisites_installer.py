@@ -18,7 +18,7 @@ from common.command_utils import (
 )
 from common.debian.apt_manager import AptManager
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import InstallerRegistry
 
@@ -36,7 +36,7 @@ from installer.registry import InstallerRegistry
         "description": "Installs core system packages and prerequisites required by other installers.",
     },
 )
-class PrerequisitesInstaller(BaseInstaller):
+class PrerequisitesInstaller(BaseComponent):
     """
     Installer for core system prerequisites.
 

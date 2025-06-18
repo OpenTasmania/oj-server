@@ -20,7 +20,7 @@ from common.command_utils import (
 from common.debian.apt_manager import AptManager
 from common.system_utils import get_debian_codename
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import InstallerRegistry
 
@@ -38,7 +38,7 @@ from installer.registry import InstallerRegistry
         "description": "Docker Engine container runtime",
     },
 )
-class DockerInstaller(BaseInstaller):
+class DockerInstaller(BaseComponent):
     """
     Installer for Docker Engine container runtime.
 

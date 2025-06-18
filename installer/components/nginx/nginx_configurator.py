@@ -15,7 +15,7 @@ from common.command_utils import (
 )
 from common.system_utils import get_current_script_hash, systemd_reload
 from installer import config as static_config
-from installer.base_configurator import BaseConfigurator
+from installer.base_component import BaseComponent
 from installer.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
@@ -30,7 +30,7 @@ from installer.registry import ComponentRegistry
         "description": "Nginx web server and reverse proxy configuration",
     },
 )
-class NginxConfigurator(BaseConfigurator):
+class NginxConfigurator(BaseComponent):
     """
     Configurator for Nginx web server and reverse proxy.
 
@@ -458,3 +458,42 @@ class NginxConfigurator(BaseConfigurator):
             self.logger,
             self.app_settings,
         )
+
+    def install(self) -> bool:
+        """
+        Install Nginx.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would install Nginx.
+
+        Returns:
+            True if the installation was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall Nginx.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would uninstall Nginx.
+
+        Returns:
+            True if the uninstallation was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def is_installed(self) -> bool:
+        """
+        Check if Nginx is installed.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would check if Nginx is installed.
+
+        Returns:
+            True if Nginx is installed, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True

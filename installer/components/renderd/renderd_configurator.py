@@ -19,7 +19,7 @@ from common.command_utils import (
 )
 from common.system_utils import get_current_script_hash, systemd_reload
 from installer import config as static_config
-from installer.base_configurator import BaseConfigurator
+from installer.base_component import BaseComponent
 from installer.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
@@ -36,7 +36,7 @@ from installer.registry import ComponentRegistry
         "description": "Renderd configuration and service activation",
     },
 )
-class RenderdConfigurator(BaseConfigurator):
+class RenderdConfigurator(BaseComponent):
     """
     Configurator for Renderd.
 

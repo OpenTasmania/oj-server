@@ -11,7 +11,7 @@ from typing import Optional
 from common.command_utils import log_map_server, run_elevated_command
 from common.network_utils import validate_cidr
 from common.system_utils import systemd_reload
-from installer.base_configurator import BaseConfigurator
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import ComponentRegistry
 
@@ -23,7 +23,7 @@ from installer.registry import ComponentRegistry
         "description": "UFW (Uncomplicated Firewall) configuration",
     },
 )
-class UFWConfigurator(BaseConfigurator):
+class UFWConfigurator(BaseComponent):
     """
     Configurator for UFW (Uncomplicated Firewall).
 

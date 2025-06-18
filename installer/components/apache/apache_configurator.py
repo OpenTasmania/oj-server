@@ -16,7 +16,7 @@ from common.command_utils import (
 from common.file_utils import backup_file
 from common.system_utils import get_current_script_hash, systemd_reload
 from installer import config as static_config
-from installer.base_configurator import BaseConfigurator
+from installer.base_component import BaseComponent
 from installer.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
@@ -31,7 +31,7 @@ from installer.registry import ComponentRegistry
         "description": "Apache web server configuration with mod_tile",
     },
 )
-class ApacheConfigurator(BaseConfigurator):
+class ApacheConfigurator(BaseComponent):
     """
     Configurator for Apache web server with mod_tile.
 

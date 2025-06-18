@@ -14,12 +14,12 @@ from common.command_utils import (
 )
 from common.debian.apt_manager import AptManager
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
-from installer.registry import InstallerRegistry
+from installer.registry import ComponentRegistry
 
 
-@InstallerRegistry.register(
+@ComponentRegistry.register(
     name="nginx",
     metadata={
         "dependencies": ["prerequisites"],  # Depends on core prerequisites
@@ -32,7 +32,7 @@ from installer.registry import InstallerRegistry
         "description": "Nginx web server",
     },
 )
-class NginxInstaller(BaseInstaller):
+class NginxInstaller(BaseComponent):
     """
     Installer for Nginx web server.
 
@@ -183,3 +183,42 @@ class NginxInstaller(BaseInstaller):
                 self.logger,
             )
             return False
+
+    def configure(self) -> bool:
+        """
+        Configure Nginx.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would configure Nginx after it has been installed.
+
+        Returns:
+            True if the configuration was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfigure Nginx.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would unconfigure Nginx.
+
+        Returns:
+            True if the unconfiguration was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Check if Nginx is configured.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would check if Nginx is configured.
+
+        Returns:
+            True if Nginx is configured, False otherwise.
+        """
+        # This is a placeholder implementation
+        return self.is_installed()

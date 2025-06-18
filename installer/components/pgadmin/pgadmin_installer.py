@@ -11,7 +11,7 @@ from common.command_utils import check_package_installed, log_map_server
 from common.constants_loader import is_feature_enabled
 from common.debian.apt_manager import AptManager
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import InstallerRegistry
 
@@ -32,7 +32,7 @@ from installer.registry import InstallerRegistry
         "description": "pgAdmin PostgreSQL administration tool",
     },
 )
-class PgAdminInstaller(BaseInstaller):
+class PgAdminInstaller(BaseComponent):
     """
     Installer for pgAdmin PostgreSQL administration tool.
 

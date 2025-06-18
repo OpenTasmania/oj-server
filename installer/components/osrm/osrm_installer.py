@@ -19,7 +19,7 @@ from common.debian.apt_manager import AptManager
 from common.file_utils import ensure_directory_owned_by_current_user
 from common.json_utils import JsonFileType, check_json_file
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import InstallerRegistry
 
@@ -41,7 +41,7 @@ from installer.registry import InstallerRegistry
         "description": "Open Source Routing Machine (OSRM)",
     },
 )
-class OsrmInstaller(BaseInstaller):
+class OsrmInstaller(BaseComponent):
     """
     Installer for Open Source Routing Machine (OSRM).
 

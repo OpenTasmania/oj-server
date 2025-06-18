@@ -11,7 +11,7 @@ import subprocess
 from typing import Optional
 
 from common.command_utils import log_map_server, run_elevated_command
-from installer.base_configurator import BaseConfigurator
+from installer.base_component import BaseComponent
 from installer.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
@@ -26,7 +26,7 @@ from installer.registry import ComponentRegistry
         "description": "SSL certificate configuration using Certbot with Nginx plugin",
     },
 )
-class CertbotConfigurator(BaseConfigurator):
+class CertbotConfigurator(BaseComponent):
     """
     Configurator for SSL certificates using Certbot with the Nginx plugin.
 
@@ -299,3 +299,42 @@ class CertbotConfigurator(BaseConfigurator):
                 exc_info=True,
             )
             raise
+
+    def install(self) -> bool:
+        """
+        Install Certbot.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would install Certbot.
+
+        Returns:
+            True if the installation was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall Certbot.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would uninstall Certbot.
+
+        Returns:
+            True if the uninstallation was successful, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True
+
+    def is_installed(self) -> bool:
+        """
+        Check if Certbot is installed.
+
+        This is a placeholder implementation. In a real implementation, this method
+        would check if Certbot is installed.
+
+        Returns:
+            True if Certbot is installed, False otherwise.
+        """
+        # This is a placeholder implementation
+        return True

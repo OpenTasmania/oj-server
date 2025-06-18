@@ -10,7 +10,7 @@ from typing import List, Optional
 from common.command_utils import check_package_installed, log_map_server
 from common.debian.apt_manager import AptManager
 from installer import config
-from installer.base_installer import BaseInstaller
+from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
 from installer.registry import InstallerRegistry
 
@@ -28,7 +28,7 @@ from installer.registry import InstallerRegistry
         "description": "PostgreSQL database server with PostGIS extensions",
     },
 )
-class PostgresInstaller(BaseInstaller):
+class PostgresInstaller(BaseComponent):
     """
     Installer for PostgreSQL database server with PostGIS extensions.
 
