@@ -13,7 +13,7 @@ import socket
 import subprocess
 from os import cpu_count
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from common.command_utils import (
     log_map_server,
@@ -321,6 +321,114 @@ def get_debian_codename(
             app_settings,
         )
         return None
+
+
+def systemd_restart_service(
+    service_name: str,
+    logger_or_app_settings: Any,
+    current_logger: Optional[logging.Logger] = None,
+) -> bool:
+    """
+    Restart a systemd service.
+
+    This function executes the systemctl restart command with elevated privileges
+    to restart the specified systemd service. It logs the process and any errors that occur.
+
+    Args:
+        service_name (str): The name of the systemd service to restart.
+        logger_or_app_settings: Either a logger instance or an AppSettings object.
+            If a logger is provided, it will be used for logging.
+            If an AppSettings object is provided, it will be used for configuration.
+        current_logger (Optional[logging.Logger]): Logger instance to use for logging
+            messages when app_settings is provided. If None and app_settings is provided,
+            a module-wide default logger is used.
+
+    Returns:
+        bool: True if the service was successfully restarted, False otherwise.
+    """
+    # Determine if the second parameter is a logger or app_settings
+    if isinstance(logger_or_app_settings, logging.Logger):
+        # Second parameter is a logger
+        logger_to_use = logger_or_app_settings
+        # Use default symbols since we don't have app_settings
+        symbols_to_use = SYMBOLS_DEFAULT
+        app_settings = None
+    else:
+        # Second parameter is app_settings
+        app_settings = logger_or_app_settings
+        logger_to_use = current_logger if current_logger else module_logger
+        symbols_to_use = (
+            app_settings.symbols
+            if hasattr(app_settings, "symbols")
+            else SYMBOLS_DEFAULT
+        )
+
+    # Log the start of the restart operation
+    if app_settings:
+        log_map_server(
+            f"{symbols_to_use.get('gear', '⚙️')} Restarting systemd service: {service_name}...",
+            "info",
+            logger_to_use,
+            app_settings,
+        )
+    else:
+        logger_to_use.info(f"Restarting systemd service: {service_name}...")
+
+    try:
+        # Run the command with elevated privileges
+        if app_settings:
+            result = run_elevated_command(
+                ["systemctl", "restart", service_name],
+                app_settings,
+                current_logger=logger_to_use,
+            )
+        else:
+            result = run_elevated_command(
+                ["systemctl", "restart", service_name],
+                app_settings,
+                current_logger=logger_to_use,
+            )
+
+        # Check the result
+        if result.returncode == 0:
+            if app_settings:
+                log_map_server(
+                    f"{symbols_to_use.get('success', '✅')} Service {service_name} restarted successfully.",
+                    "success",
+                    logger_to_use,
+                    app_settings,
+                )
+            else:
+                logger_to_use.info(
+                    f"Service {service_name} restarted successfully."
+                )
+            return True
+        else:
+            if app_settings:
+                log_map_server(
+                    f"{symbols_to_use.get('error', '❌')} Failed to restart service {service_name}.",
+                    "error",
+                    logger_to_use,
+                    app_settings,
+                )
+            else:
+                logger_to_use.error(
+                    f"Failed to restart service {service_name}."
+                )
+            return False
+    except Exception as e:
+        if app_settings:
+            log_map_server(
+                f"{symbols_to_use.get('error', '❌')} Error restarting service {service_name}: {e}",
+                "error",
+                logger_to_use,
+                app_settings,
+            )
+        else:
+            logger_to_use.error(
+                f"Error restarting service {service_name}: {e}"
+            )
+        return False
 
 
 def calculate_threads(
