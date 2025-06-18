@@ -174,7 +174,7 @@ The setup process is designed to be followed sequentially.
     * Installs and configures all components.
     * Imports data from processors.
 2. Submodules
-    * [GTFS processor](modular/processors/plugins/importers/transit/gtfs) Python package to import GTFS data into the postgis
+    * [GTFS processor](installer/processors/plugins/importers/transit/gtfs) Python package to import GTFS data into the postgis
       database on which
       the mapping data exists.
 

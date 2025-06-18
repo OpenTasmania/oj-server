@@ -12,7 +12,7 @@ from os import getgid, getuid
 from pathlib import Path
 from typing import Optional
 
-from setup.config_models import (
+from installer.config_models import (
     SYMBOLS_DEFAULT,
     AppSettings,
 )

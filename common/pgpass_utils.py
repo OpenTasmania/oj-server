@@ -9,7 +9,7 @@ import logging
 import os
 from typing import List, Optional
 
-from setup.config_models import PGPASSWORD_DEFAULT, AppSettings
+from installer.config_models import PGPASSWORD_DEFAULT, AppSettings
 
 from .command_utils import log_map_server
 

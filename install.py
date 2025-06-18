@@ -10,19 +10,57 @@ the OSM-OSRM Server components using a modular architecture.
 
 # DO NOT MOVE OR REMOVE
 # This MUST be the very first thing that runs to ensure the environment is correct.
-from modular_bootstrap.mb_bootstrap import ensure_venv_and_dependencies
+from bootstrap.mb_bootstrap import ensure_venv_and_dependencies
 
 ensure_venv_and_dependencies()
 # END DO NOT MOVE OR REMOVE
 
 import argparse
+import importlib
 import logging
+import pkgutil
 import sys
 from typing import Callable, Dict, List, Optional, Set
 
-from modular.orchestrator import ComponentOrchestrator
-from modular.registry import ComponentRegistry
-from setup.config_loader import load_app_settings
+from installer.config_loader import load_app_settings
+from installer.orchestrator import ComponentOrchestrator
+from installer.registry import ComponentRegistry
+
+
+def load_all_components(logger: logging.Logger):
+    """
+    Dynamically discover and import all component modules to register them.
+
+    This function iterates through the 'install.components' package,
+    finds all modules, and imports them. This process triggers the
+    @ComponentRegistry.register decorators within each component module.
+    """
+    try:
+        import installer.components
+
+        package = installer.components
+        package_name = package.__name__
+        package_path = package.__path__
+
+        logger.debug(f"Searching for components in: {package_path}")
+
+        for _, name, ispkg in pkgutil.walk_packages(
+            package_path, prefix=f"{package_name}."
+        ):
+            if not ispkg:
+                try:
+                    logger.debug(f"Importing component module: {name}")
+                    importlib.import_module(name)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to import component module {name}: {e}"
+                    )
+    except ImportError as e:
+        logger.error(f"Could not import the components package: {e}")
+    except Exception as e:
+        logger.error(
+            f"An unexpected error occurred during component loading: {e}"
+        )
 
 
 def setup_logging(verbose: bool = False) -> logging.Logger:
@@ -286,6 +324,9 @@ def main(args: Optional[List[str]] = None) -> int:
     parsed_args = parse_args(args)
 
     logger = setup_logging(parsed_args.verbose)
+
+    logger.debug("Loading all available components...")
+    load_all_components(logger)
 
     try:
         app_settings = load_app_settings()

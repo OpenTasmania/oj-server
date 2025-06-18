@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from setup.config_models import SYMBOLS_DEFAULT
+from installer.config_models import SYMBOLS_DEFAULT
 
 module_logger = logging.getLogger(__name__)
 

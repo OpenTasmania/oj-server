@@ -20,7 +20,7 @@ from common.command_utils import (
     run_command,
     run_elevated_command,
 )
-from setup.config_models import (
+from installer.config_models import (
     SYMBOLS_DEFAULT,
     AppSettings,
 )

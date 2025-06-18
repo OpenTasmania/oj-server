@@ -84,6 +84,7 @@ For Debian package management, we use the `AptManager` class located in `common/
 **Important:** All apt package operations must be handled exclusively through the `AptManager` module. Direct calls to `apt-get` or similar commands should be avoided.
 
 Example usage:
+
 ```python
 from common.debian.apt_manager import AptManager
 
@@ -115,7 +116,7 @@ The modular setup script (`setup_modular.py`) uses a self-contained bootstrap pr
 
 The bootstrap process is automatically executed when running the `setup_modular.py` script. It checks for and installs any missing prerequisites before proceeding with the main configuration tasks.
 
-For more details, see the [README.md](/modular_bootstrap/README.md) in the `/modular_bootstrap` directory.
+For more details, see the [README.md](/bootstrap/README.md) in the `/modular_bootstrap` directory.
 
 ### **Setup Command**
 
@@ -197,9 +198,11 @@ The `setup` command will:
 Each configurator is responsible for configuring a specific component of the system, such as PostgreSQL, Apache, or Docker. Configurators are registered with the `ConfiguratorRegistry` using a decorator, similar to how installers are registered with the `InstallerRegistry`.
 
 **Example configurator registration:**
+
 ```python
-from modular.registry import ComponentRegistry
-from modular.base_configurator import BaseConfigurator
+from installer.registry import ComponentRegistry
+from installer.base_configurator import BaseConfigurator
+
 
 @ComponentRegistry.register(
     name="postgres",
@@ -209,7 +212,7 @@ from modular.base_configurator import BaseConfigurator
     },
 )
 class PostgresConfigurator(BaseConfigurator):
-    # Implementation details...
+# Implementation details...
 ```
 
 To add a new configurator, create a new Python module in the `modular_setup/configurators` directory and register it with the `ConfiguratorRegistry` using the `@ConfiguratorRegistry.register` decorator.
@@ -227,6 +230,7 @@ Key principles:
 4. **All logging automatically includes symbols** based on the log level (e.g., ℹ️ for info, ⚠️ for warning, ❌ for error). These symbols are defined in `SYMBOLS_DEFAULT` in `setup/config_models.py`.
 
 Example usage:
+
 ```python
 import logging
 
@@ -235,11 +239,12 @@ logger = logging.getLogger(__name__)
 
 # Use the logger - symbols are automatically added based on log level
 logger.info("This is an informational message")  # Will include ℹ️ symbol
-logger.warning("This is a warning message")      # Will include ⚠️ symbol
-logger.error("This is an error message")         # Will include ❌ symbol
+logger.warning("This is a warning message")  # Will include ⚠️ symbol
+logger.error("This is an error message")  # Will include ❌ symbol
 
 # For user-facing messages that require consistent formatting
 from common.command_utils import log_map_server
+
 log_map_server("Step completed successfully", "info", current_logger=logger, app_settings=app_settings)
 ```
 

@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from typing import Dict, List, Optional, Union
 
-from setup.config_models import SYMBOLS_DEFAULT, AppSettings
+from installer.config_models import SYMBOLS_DEFAULT, AppSettings
 
 module_logger = logging.getLogger(__name__)
 
