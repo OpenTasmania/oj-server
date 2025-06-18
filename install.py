@@ -208,18 +208,17 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )
 
-    parser.add_argument(
-        "--generate-preseed-yaml",
-        action="store_true",
-        help="Generate package preseeding data as YAML and exit. Shows all default preseed values.",
-    )
-
     subparsers = parser.add_subparsers(
         dest="command", help="Command to execute"
     )
 
     list_parser = subparsers.add_parser(  # noqa: F841
         "list", help="List available components"
+    )
+
+    generate_preseed_parser = subparsers.add_parser(  # noqa: F841
+        "generate-preseed",
+        help="Generate package preseeding data as YAML and exit.",
     )
 
     apply_parser = subparsers.add_parser(
@@ -260,13 +259,6 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         "components", nargs="+", help="Components to uninstall"
     )
 
-    unconfigure_parser = subparsers.add_parser(
-        "unconfigure", help="Unconfigure components"
-    )
-    unconfigure_parser.add_argument(
-        "components", nargs="+", help="Components to unconfigure"
-    )
-
     status_parser = subparsers.add_parser(
         "status", help="Check status of components"
     )
@@ -279,33 +271,6 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         "--tree",
         action="store_true",
         help="Display status as a dependency tree",
-    )
-
-    # Legacy commands for backward compatibility
-    setup_parser = subparsers.add_parser(
-        "setup",
-        help="Run the setup process for a component or group (legacy command)",
-    )
-    setup_parser.add_argument(
-        "component",
-        nargs="?",
-        default="all",
-        help="The component or group to set up (default: all)",
-    )
-    setup_parser.add_argument(
-        "--status",
-        action="store_true",
-        help="Check if components are already configured",
-    )
-    setup_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reconfiguration even if already configured",
-    )
-    setup_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be configured without actually doing it",
     )
 
     return parser.parse_args(args)
@@ -331,8 +296,9 @@ def main(args: Optional[List[str]] = None) -> int:
     try:
         app_settings = load_app_settings()
 
-        # Handle preseed YAML generation
-        if parsed_args.generate_preseed_yaml:
+        orchestrator = ComponentOrchestrator(app_settings, logger)
+
+        if parsed_args.command == "generate-preseed":
             import sys
 
             import yaml
@@ -376,9 +342,7 @@ def main(args: Optional[List[str]] = None) -> int:
 
             return 0
 
-        orchestrator = ComponentOrchestrator(app_settings, logger)
-
-        if parsed_args.command == "list":
+        elif parsed_args.command == "list":
             components_map = orchestrator.get_available_components()
 
             logger.info("Available components:")
@@ -461,16 +425,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 logger.error("Uninstallation failed")
                 return 1
 
-        elif parsed_args.command == "unconfigure":
-            success = orchestrator.unconfigure(parsed_args.components)
-
-            if success:
-                logger.info("Unconfiguration completed successfully")
-                return 0
-            else:
-                logger.error("Unconfiguration failed")
-                return 1
-
         elif parsed_args.command == "status":
             requested_components: List[str] = parsed_args.components
             all_available_component_names = list(
@@ -531,84 +485,6 @@ def main(args: Optional[List[str]] = None) -> int:
                 )
                 else 1
             )
-
-        # Legacy commands for backward compatibility
-        elif parsed_args.command == "setup":
-            setup_components: List[str] = (
-                list(orchestrator.get_available_components().keys())
-                if parsed_args.component == "all"
-                else [parsed_args.component]
-            )
-
-            if parsed_args.status:
-                # Check if components are already configured
-                logger.info(
-                    f"Checking configuration status for: {parsed_args.component}"
-                )
-
-                status_dict = orchestrator.check_status(setup_components)
-
-                logger.info("Configuration status:")
-                for component, status in status_dict.items():
-                    configured = status.get("configured", False)
-                    status_str = (
-                        "configured" if configured else "not configured"
-                    )
-                    logger.info(f"  {component}: {status_str}")
-
-                return (
-                    0
-                    if all(
-                        status.get("configured", False)
-                        for status in status_dict.values()
-                    )
-                    else 1
-                )
-
-            elif parsed_args.dry_run:
-                logger.info(
-                    f"Dry run setup for component: {parsed_args.component}"
-                )
-
-                try:
-                    ordered_components = (
-                        ComponentRegistry.resolve_dependencies(
-                            setup_components
-                        )
-                    )
-
-                    logger.info(
-                        "The following components would be configured (in order):"
-                    )
-                    for component_name in ordered_components:
-                        component_class = ComponentRegistry.get_component(
-                            component_name
-                        )
-                        description = getattr(
-                            component_class, "metadata", {}
-                        ).get("description", "")
-                        logger.info(f"  {component_name}: {description}")
-
-                    return 0
-                except Exception as e:
-                    logger.error(f"Error resolving dependencies: {str(e)}")
-                    return 1
-
-            else:
-                logger.info(
-                    f"Running setup for component: {parsed_args.component}"
-                )
-
-                success = orchestrator.configure(
-                    setup_components, force=parsed_args.force
-                )
-
-                if success:
-                    logger.info("Setup completed successfully")
-                    return 0
-                else:
-                    logger.error("Setup failed")
-                    return 1
 
         else:
             logger.error(
