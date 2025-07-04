@@ -17,6 +17,7 @@ from common.file_utils import backup_file
 from common.system_utils import get_current_script_hash, systemd_reload
 from installer import config as static_config
 from installer.base_component import BaseComponent
+from installer.components.apache.apache_installer import ApacheInstaller
 from installer.config_models import (
     VM_IP_OR_DOMAIN_DEFAULT,
     AppSettings,
@@ -59,6 +60,32 @@ class ApacheConfigurator(BaseComponent):
             logger: Optional logger instance. If not provided, a new logger will be created.
         """
         super().__init__(app_settings, logger)
+        # The configurator USES the installer for package operations
+        self.installer = ApacheInstaller(app_settings, self.logger)
+
+    def install(self) -> bool:
+        """
+        Install the component's packages by delegating to ApacheInstaller.
+        """
+        self.logger.info(
+            "Delegating package installation to ApacheInstaller."
+        )
+        return self.installer.install()
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall the component's packages by delegating to ApacheInstaller.
+        """
+        self.logger.info(
+            "Delegating package uninstallation to ApacheInstaller."
+        )
+        return self.installer.uninstall()
+
+    def is_installed(self) -> bool:
+        """
+        Check if the component's packages are installed by delegating to ApacheInstaller.
+        """
+        return self.installer.is_installed()
 
     def configure(self) -> bool:
         """

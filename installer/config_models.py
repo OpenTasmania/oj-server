@@ -673,6 +673,24 @@ class DockerSettings(BaseSettings):
     )
 
 
+# --- Add new UfwSettings model here ---
+class UfwSettings(BaseSettings):
+    """UFW (Uncomplicated Firewall) settings."""
+
+    model_config = SettingsConfigDict(env_prefix="UFW_", extra="ignore")
+    allow_rules: List[str] = Field(
+        default_factory=lambda: ["80/tcp", "443/tcp"],
+        description="List of UFW 'allow' rules to apply.",
+    )
+    deny_rules: List[str] = Field(
+        default_factory=list, description="List of UFW 'deny' rules to apply."
+    )
+    limit_rules: List[str] = Field(
+        default_factory=lambda: ["22/tcp"],
+        description="List of UFW 'limit' rules to apply (e.g., for SSH).",
+    )
+
+
 # New Model for Package Preseeding
 class PackagePreseedingSettings(BaseSettings):
     """Holds preseed configurations for Debian packages.
@@ -719,6 +737,7 @@ class AppSettings(BaseSettings):
     pgadmin: PgAdminSettings = Field(default_factory=PgAdminSettings)
     pgagent: PgAgentSettings = Field(default_factory=PgAgentSettings)
     docker: DockerSettings = Field(default_factory=DockerSettings)
+    ufw: UfwSettings = Field(default_factory=UfwSettings)
 
     # Centralized package preseeding configurations
     package_preseeding_values: Dict[str, Dict[str, str]] = Field(

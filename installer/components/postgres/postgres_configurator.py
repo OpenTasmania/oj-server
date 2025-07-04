@@ -6,6 +6,7 @@ This module provides a self-contained configurator for PostgreSQL.
 
 import logging
 import os
+import shutil
 import subprocess
 from typing import Optional, Tuple
 
@@ -61,6 +62,34 @@ class PostgresConfigurator(BaseComponent):
             logger: Optional logger instance. If not provided, a new logger will be created.
         """
         super().__init__(app_settings, logger)
+
+    def install(self) -> bool:
+        """
+        This component is a configurator. The actual installation of PostgreSQL
+        packages is assumed to be handled separately. This method is a placeholder
+        to satisfy the BaseComponent interface.
+        """
+        self.logger.info(
+            "PostgresConfigurator: Skipping installation phase. Configuration will be applied if the component is installed."
+        )
+        return True
+
+    def uninstall(self) -> bool:
+        """
+        Uninstallation of PostgreSQL is not handled by this component
+        to prevent accidental data loss. This should be done manually.
+        """
+        self.logger.warning(
+            "PostgresConfigurator: Uninstallation is not supported to prevent data loss. Please uninstall PostgreSQL manually if required."
+        )
+        return True
+
+    def is_installed(self) -> bool:
+        """
+        Check if PostgreSQL appears to be installed by checking for the psql executable.
+        """
+        # Using shutil.which to find the psql executable in the system's PATH.
+        return shutil.which("psql") is not None
 
     def configure(self) -> bool:
         """

@@ -19,6 +19,7 @@ from common.command_utils import (
     run_elevated_command,
 )
 from installer.base_component import BaseComponent
+from installer.components.carto.carto_installer import CartoInstaller
 from installer.config_models import (
     PGPASSWORD_DEFAULT,
     AppSettings,
@@ -29,7 +30,7 @@ from installer.registry import ComponentRegistry
 @ComponentRegistry.register(
     name="carto",
     metadata={
-        "dependencies": ["postgres"],  # Carto depends on PostgreSQL
+        "dependencies": ["postgres", "nodejs"],
         "description": "CartoCSS project configuration and stylesheet compilation",
     },
 )
@@ -61,6 +62,27 @@ class CartoConfigurator(BaseComponent):
             logger: Optional logger instance. If not provided, a new logger will be created.
         """
         super().__init__(app_settings, logger)
+        self.installer = CartoInstaller(app_settings, self.logger)
+
+    def install(self) -> bool:
+        """
+        Install the component's packages by delegating to CartoInstaller.
+        """
+        self.logger.info("Delegating installation tasks to CartoInstaller.")
+        return self.installer.install()
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall the component's packages by delegating to CartoInstaller.
+        """
+        self.logger.info("Delegating uninstallation tasks to CartoInstaller.")
+        return self.installer.uninstall()
+
+    def is_installed(self) -> bool:
+        """
+        Check if the component's packages are installed by delegating to CartoInstaller.
+        """
+        return self.installer.is_installed()
 
     def configure(self) -> bool:
         """
@@ -161,7 +183,6 @@ class CartoConfigurator(BaseComponent):
         )
 
         original_cwd = os.getcwd()
-        # Initialize to ensure it's always "assigned" before the except block can be reached
         mml_content_original_text: Optional[str] = None
         mml_content_updated_for_log: str = ""
 
@@ -219,7 +240,6 @@ class CartoConfigurator(BaseComponent):
                 )
                 raise FileNotFoundError(f"{project_mml_path} not found.")
 
-            # Backup original project.mml
             backup_timestamp = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_{int(os.times().user % 10000)}"
             backup_mml_path = project_mml_path.with_suffix(
                 f".mml.bak.{backup_timestamp}"
@@ -244,7 +264,6 @@ class CartoConfigurator(BaseComponent):
                 encoding="utf-8"
             )
 
-            # --- Start of MML processing logic ---
             original_lines = mml_content_original_text.splitlines(
                 keepends=False
             )
@@ -383,10 +402,8 @@ class CartoConfigurator(BaseComponent):
                     self.app_settings,
                 )
                 raise ValueError(err_msg)
-            # --- End of MML processing logic ---
 
             mml_content_updated_for_log = "\n".join(output_lines_collector)
-            # Ensure original text was read before trying to access its attributes
             if (
                 mml_content_original_text
                 and mml_content_original_text.endswith("\n")
@@ -431,7 +448,7 @@ class CartoConfigurator(BaseComponent):
                     self.logger,
                     self.app_settings,
                 )
-                return str(compiled_mapnik_xml_path)  # Successful return
+                return str(compiled_mapnik_xml_path)
             else:
                 log_map_server(
                     f"{symbols.get('error', '')} Failed to compile mapnik.xml. RC: {carto_result.returncode}. Check '{compile_log_filename}'.",
@@ -454,7 +471,6 @@ class CartoConfigurator(BaseComponent):
                 self.app_settings,
                 exc_info=True,
             )
-            # Safely log original or updated MML content if available
             if mml_content_updated_for_log:
                 self.logger.debug(
                     f"MML content (updated) at time of error:\n{mml_content_updated_for_log}"
@@ -474,13 +490,6 @@ class CartoConfigurator(BaseComponent):
     def _deploy_mapnik_stylesheet(self, compiled_xml_path_str: str) -> None:
         """
         Deploy the compiled Mapnik XML stylesheet to the target directory.
-
-        Args:
-            compiled_xml_path_str: Path to the compiled Mapnik XML file to deploy.
-
-        Raises:
-            ValueError: If the compiled XML path is not provided.
-            FileNotFoundError: If the compiled XML file is missing or empty.
         """
         symbols = self.app_settings.symbols
         log_map_server(
@@ -490,13 +499,7 @@ class CartoConfigurator(BaseComponent):
             self.app_settings,
         )
 
-        if not compiled_xml_path_str:  # Check if path is None or empty
-            log_map_server(
-                f"{symbols.get('error', '')} Compiled mapnik.xml path is not provided. Cannot deploy.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
+        if not compiled_xml_path_str:
             raise ValueError("Compiled XML path is required for deployment.")
 
         source_mapnik_xml = Path(compiled_xml_path_str)
@@ -504,20 +507,12 @@ class CartoConfigurator(BaseComponent):
             not source_mapnik_xml.is_file()
             or source_mapnik_xml.stat().st_size == 0
         ):
-            log_map_server(
-                f"{symbols.get('error', '')} Compiled mapnik.xml at {source_mapnik_xml} is missing or empty. Cannot deploy.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
             raise FileNotFoundError(
                 f"Valid mapnik.xml not found at {source_mapnik_xml} for deployment."
             )
 
         target_dir = Path(self.MAPNIK_STYLE_TARGET_DIR_CONFIG)
-        target_xml_path = (
-            target_dir / "mapnik.xml"
-        )  # Standard name in target dir
+        target_xml_path = target_dir / "mapnik.xml"
 
         run_elevated_command(
             ["mkdir", "-p", str(target_dir)],
@@ -533,7 +528,7 @@ class CartoConfigurator(BaseComponent):
             ["chmod", "644", str(target_xml_path)],
             self.app_settings,
             current_logger=self.logger,
-        )  # Standard read permissions
+        )
         log_map_server(
             f"{symbols.get('success', '')} mapnik.xml copied to {target_xml_path}",
             "success",
@@ -594,43 +589,3 @@ class CartoConfigurator(BaseComponent):
                 self.logger,
                 self.app_settings,
             )
-            # This might not be fatal for all setups, but important for map rendering
-
-    def install(self) -> bool:
-        """
-        Install Carto.
-
-        This is a placeholder implementation. In a real implementation, this method
-        would install Carto.
-
-        Returns:
-            True if the installation was successful, False otherwise.
-        """
-        # This is a placeholder implementation
-        return True
-
-    def uninstall(self) -> bool:
-        """
-        Uninstall Carto.
-
-        This is a placeholder implementation. In a real implementation, this method
-        would uninstall Carto.
-
-        Returns:
-            True if the uninstallation was successful, False otherwise.
-        """
-        # This is a placeholder implementation
-        return True
-
-    def is_installed(self) -> bool:
-        """
-        Check if Carto is installed.
-
-        This is a placeholder implementation. In a real implementation, this method
-        would check if Carto is installed.
-
-        Returns:
-            True if Carto is installed, False otherwise.
-        """
-        # This is a placeholder implementation
-        return True

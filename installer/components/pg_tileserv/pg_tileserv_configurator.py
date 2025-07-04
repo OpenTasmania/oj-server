@@ -9,10 +9,13 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from common.command_utils import log_map_server, run_elevated_command
+from common.command_utils import run_elevated_command
 from common.system_utils import get_current_script_hash, systemd_reload
 from installer import config as static_config
 from installer.base_component import BaseComponent
+from installer.components.pg_tileserv.pg_tileserv_installer import (
+    PgTileservInstaller,
+)
 from installer.config_models import (
     PGPASSWORD_DEFAULT,
     AppSettings,
@@ -23,7 +26,7 @@ from installer.registry import ComponentRegistry
 @ComponentRegistry.register(
     name="pg_tileserv",
     metadata={
-        "dependencies": ["postgres"],  # pg_tileserv depends on PostgreSQL
+        "dependencies": ["postgres"],
         "description": "pg_tileserv configuration and service activation",
     },
 )
@@ -42,24 +45,31 @@ class PgTileservConfigurator(BaseComponent):
     ):
         """
         Initialize the pg_tileserv configurator.
-
-        Args:
-            app_settings: The application settings.
-            logger: Optional logger instance. If not provided, a new logger will be created.
         """
         super().__init__(app_settings, logger)
+        self.installer = PgTileservInstaller(app_settings, self.logger)
+
+    def install(self) -> bool:
+        """
+        Install pg_tileserv by delegating to the installer.
+        """
+        return self.installer.install()
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall pg_tileserv by delegating to the installer.
+        """
+        return self.installer.uninstall()
+
+    def is_installed(self) -> bool:
+        """
+        Check if pg_tileserv is installed by delegating to the installer.
+        """
+        return self.installer.is_installed()
 
     def configure(self) -> bool:
         """
-        Configure pg_tileserv.
-
-        This method performs the following configuration tasks:
-        1. Creates the pg_tileserv config.toml file and sets appropriate permissions
-        2. Creates the systemd service file for pg_tileserv
-        3. Activates the pg_tileserv service
-
-        Returns:
-            True if the configuration was successful, False otherwise.
+        Configure pg_tileserv service and config file.
         """
         try:
             self._create_pg_tileserv_config_file()
@@ -72,83 +82,36 @@ class PgTileservConfigurator(BaseComponent):
 
     def unconfigure(self) -> bool:
         """
-        Unconfigure pg_tileserv.
-
-        This method performs the following unconfiguration tasks:
-        1. Stops and disables the pg_tileserv service
-        2. Removes the systemd service file
-        3. Removes the pg_tileserv config file
-
-        Returns:
-            True if the unconfiguration was successful, False otherwise.
+        Unconfigure pg_tileserv service and config file.
         """
         try:
-            symbols = self.app_settings.symbols
-            pg_tileserv_settings = self._get_pg_tileserv_settings()
-
-            # Stop and disable the service
-            log_map_server(
-                f"{symbols.get('step', '')} Stopping and disabling pg_tileserv service...",
-                "info",
-                self.logger,
-                self.app_settings,
-            )
             run_elevated_command(
                 ["systemctl", "stop", "pg_tileserv.service"],
                 self.app_settings,
-                current_logger=self.logger,
                 check=False,
             )
             run_elevated_command(
                 ["systemctl", "disable", "pg_tileserv.service"],
                 self.app_settings,
-                current_logger=self.logger,
                 check=False,
             )
 
-            # Remove the systemd service file
-            service_file_path = "/etc/systemd/system/pg_tileserv.service"
-            if Path(service_file_path).exists():
+            service_file_path = Path(
+                "/etc/systemd/system/pg_tileserv.service"
+            )
+            if service_file_path.exists():
                 run_elevated_command(
-                    ["rm", service_file_path],
-                    self.app_settings,
-                    current_logger=self.logger,
-                )
-                log_map_server(
-                    f"{symbols.get('success', '')} Removed pg_tileserv systemd service file.",
-                    "success",
-                    self.logger,
-                    self.app_settings,
+                    ["rm", str(service_file_path)], self.app_settings
                 )
 
-            # Remove the config file
-            config_dir = Path(pg_tileserv_settings.config_dir)
-            config_file_path = (
-                config_dir / pg_tileserv_settings.config_filename
-            )
+            cfg = self.app_settings.pg_tileserv
+            config_file_path = Path(cfg.config_dir) / cfg.config_filename
             if config_file_path.exists():
                 run_elevated_command(
-                    ["rm", str(config_file_path)],
-                    self.app_settings,
-                    current_logger=self.logger,
-                )
-                log_map_server(
-                    f"{symbols.get('success', '')} Removed pg_tileserv config file.",
-                    "success",
-                    self.logger,
-                    self.app_settings,
+                    ["rm", str(config_file_path)], self.app_settings
                 )
 
-            # Reload systemd to apply changes
-            systemd_reload(self.app_settings, current_logger=self.logger)
-
-            log_map_server(
-                f"{symbols.get('success', '')} pg_tileserv unconfigured successfully.",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-
+            systemd_reload(self.app_settings, self.logger)
             return True
         except Exception as e:
             self.logger.error(f"Error unconfiguring pg_tileserv: {str(e)}")
@@ -156,312 +119,146 @@ class PgTileservConfigurator(BaseComponent):
 
     def is_configured(self) -> bool:
         """
-        Check if pg_tileserv is configured.
-
-        This method checks if the pg_tileserv config file exists, the systemd
-        service file exists, and the service is enabled and active.
-
-        Returns:
-            True if pg_tileserv is configured, False otherwise.
+        Check if pg_tileserv is configured and running.
         """
         try:
-            pg_tileserv_settings = self._get_pg_tileserv_settings()
-
-            # Check if the config file exists
-            config_dir = Path(pg_tileserv_settings.config_dir)
-            config_file_path = (
-                config_dir / pg_tileserv_settings.config_filename
+            cfg = self.app_settings.pg_tileserv
+            config_file_path = Path(cfg.config_dir) / cfg.config_filename
+            service_file_path = Path(
+                "/etc/systemd/system/pg_tileserv.service"
             )
-            if not config_file_path.exists():
-                return False
 
-            # Check if the systemd service file exists
-            service_file_path = "/etc/systemd/system/pg_tileserv.service"
-            if not Path(service_file_path).exists():
-                return False
-
-            # Check if the service is enabled
-            result = run_elevated_command(
-                ["systemctl", "is-enabled", "pg_tileserv.service"],
-                self.app_settings,
-                capture_output=True,
-                check=False,
-                current_logger=self.logger,
+            service_active = (
+                run_elevated_command(
+                    ["systemctl", "is-active", "pg_tileserv.service"],
+                    self.app_settings,
+                    check=False,
+                ).returncode
+                == 0
             )
-            if result.returncode != 0:
-                return False
 
-            # Check if the service is active
-            result = run_elevated_command(
-                ["systemctl", "is-active", "pg_tileserv.service"],
-                self.app_settings,
-                capture_output=True,
-                check=False,
-                current_logger=self.logger,
+            return (
+                config_file_path.exists()
+                and service_file_path.exists()
+                and service_active
             )
-            if result.returncode != 0:
-                return False
-
-            return True
         except Exception as e:
             self.logger.error(
-                f"Error checking if pg_tileserv is configured: {str(e)}"
+                f"Error checking pg_tileserv configuration: {str(e)}"
             )
             return False
 
-    def _get_pg_tileserv_settings(self):
-        """
-        Get pg_tileserv settings from app_settings.
-
-        Returns:
-            The pg_tileserv settings section from app_settings.
-        """
-        return self.app_settings.pg_tileserv
-
     def _create_pg_tileserv_config_file(self) -> None:
         """
-        Create the pg_tileserv config.toml file and set appropriate permissions.
-
-        Raises:
-            KeyError: If a required placeholder key is missing in the pg_tileserv template.
-            Exception: For any other errors encountered during file creation or permission setting.
+        Create the pg_tileserv config.toml file and set permissions.
         """
-        symbols = self.app_settings.symbols
         script_hash = (
             get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=self.app_settings,
-                logger_instance=self.logger,
+                static_config.OSM_PROJECT_ROOT, self.app_settings, self.logger
             )
             or "UNKNOWN_HASH"
         )
 
-        pg_tileserv_settings = self._get_pg_tileserv_settings()
-        config_dir = Path(pg_tileserv_settings.config_dir)
-        config_file_path = config_dir / pg_tileserv_settings.config_filename
-
-        log_map_server(
-            f"{symbols.get('step', '')} Creating pg_tileserv configuration file at {config_file_path} from template...",
-            "info",
-            self.logger,
-            self.app_settings,
-        )
-
+        cfg = self.app_settings.pg_tileserv
+        config_dir = Path(cfg.config_dir)
+        config_file_path = config_dir / cfg.config_filename
         run_elevated_command(
-            ["mkdir", "-p", str(config_dir)],
-            self.app_settings,
-            current_logger=self.logger,
+            ["mkdir", "-p", str(config_dir)], self.app_settings
         )
 
-        # Construct DatabaseURL for the template
-        db_url_for_config = (
+        db_url = (
             f"postgresql://{self.app_settings.pg.user}:{self.app_settings.pg.password}@"
             f"{self.app_settings.pg.host}:{self.app_settings.pg.port}/{self.app_settings.pg.database}"
         )
-        # Check for default password usage
         if (
             self.app_settings.pg.password == PGPASSWORD_DEFAULT
             and not self.app_settings.dev_override_unsafe_password
         ):
-            log_map_server(
-                f"{symbols.get('warning', '')} Default PGPASSWORD used in pg_tileserv config.toml. "
-                "Service may not connect if password is not updated in DB or if this is not a dev environment with override.",
-                "warning",
-                self.logger,
-                self.app_settings,
-            )
-            db_url_for_config = (
-                f"postgresql://{self.app_settings.pg.user}:{self.app_settings.pg.password}@"
-                f"{self.app_settings.pg.host}:{self.app_settings.pg.port}/{self.app_settings.pg.database}"
+            self.logger.warning(
+                "Default PGPASSWORD used in pg_tileserv config."
             )
 
-        config_template_str = pg_tileserv_settings.config_template
         format_vars = {
             "script_hash": script_hash,
-            "pg_tileserv_http_host": pg_tileserv_settings.http_host,
-            "pg_tileserv_http_port": pg_tileserv_settings.http_port,
-            "db_url_for_pg_tileserv": db_url_for_config,
-            "pg_tileserv_default_max_features": pg_tileserv_settings.default_max_features,
-            "pg_tileserv_publish_schemas": pg_tileserv_settings.publish_schemas,
-            "pg_tileserv_uri_prefix": pg_tileserv_settings.uri_prefix,
+            "pg_tileserv_http_host": cfg.http_host,
+            "pg_tileserv_http_port": cfg.http_port,
+            "db_url_for_pg_tileserv": db_url,
+            "pg_tileserv_default_max_features": cfg.default_max_features,
+            "pg_tileserv_publish_schemas": cfg.publish_schemas,
+            "pg_tileserv_uri_prefix": cfg.uri_prefix,
             "pg_tileserv_development_mode_bool": str(
-                pg_tileserv_settings.development_mode
-            ).lower(),  # bool to "true"/"false"
-            "pg_tileserv_allow_function_sources_bool": str(
-                pg_tileserv_settings.allow_function_sources
+                cfg.development_mode
             ).lower(),
-            # bool to "true"/"false"
+            "pg_tileserv_allow_function_sources_bool": str(
+                cfg.allow_function_sources
+            ).lower(),
         }
 
-        try:
-            pg_tileserv_config_content_final = config_template_str.format(
-                **format_vars
-            )
-            run_elevated_command(
-                ["tee", str(config_file_path)],
-                self.app_settings,
-                cmd_input=pg_tileserv_config_content_final,
-                current_logger=self.logger,
-            )
-            log_map_server(
-                f"{symbols.get('success', '')} Created/Updated {config_file_path}",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-
-            # Set ownership and permissions for config file
-            system_user = pg_tileserv_settings.system_user
-            run_elevated_command(
-                [
-                    "chown",
-                    f"{system_user}:{system_user}",
-                    str(config_file_path),
-                ],
-                self.app_settings,
-                current_logger=self.logger,
-            )
-            run_elevated_command(
-                ["chmod", "640", str(config_file_path)],
-                self.app_settings,
-                current_logger=self.logger,
-            )  # Readable by owner and group
-            log_map_server(
-                f"{symbols.get('success', '')} Permissions set for {config_file_path}.",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-
-        except KeyError as e_key:
-            log_map_server(
-                f"{symbols.get('error', '')} Missing placeholder key '{e_key}' for pg_tileserv config template. Check config.yaml/models.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
-            raise
-        except Exception as e:
-            log_map_server(
-                f"{symbols.get('error', '')} Failed to write pg_tileserv config: {e}",
-                "error",
-                self.logger,
-                self.app_settings,
-                exc_info=True,
-            )
-            raise
+        config_content = cfg.config_template.format(**format_vars)
+        run_elevated_command(
+            ["tee", str(config_file_path)],
+            self.app_settings,
+            cmd_input=config_content,
+        )
+        run_elevated_command(
+            [
+                "chown",
+                f"{cfg.system_user}:{cfg.system_user}",
+                str(config_file_path),
+            ],
+            self.app_settings,
+        )
+        run_elevated_command(
+            ["chmod", "640", str(config_file_path)], self.app_settings
+        )
 
     def _create_pg_tileserv_systemd_service_file(self) -> None:
         """
         Create the systemd service file for pg_tileserv.
-
-        Raises:
-            KeyError: If a required placeholder key is missing in the systemd template.
-            Exception: For any other errors encountered during file creation or writing.
         """
-        symbols = self.app_settings.symbols
         script_hash = (
             get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=self.app_settings,
-                logger_instance=self.logger,
+                static_config.OSM_PROJECT_ROOT, self.app_settings, self.logger
             )
             or "UNKNOWN_HASH"
         )
 
-        pg_tileserv_settings = self._get_pg_tileserv_settings()
-        service_file_path = (
-            "/etc/systemd/system/pg_tileserv.service"  # Standard system path
-        )
+        cfg = self.app_settings.pg_tileserv
+        service_file_path = "/etc/systemd/system/pg_tileserv.service"
         config_file_full_path = str(
-            Path(pg_tileserv_settings.config_dir)
-            / pg_tileserv_settings.config_filename
+            Path(cfg.config_dir) / cfg.config_filename
         )
-
-        log_map_server(
-            f"{symbols.get('step', '')} Creating pg_tileserv systemd service file at {service_file_path} from template...",
-            "info",
-            self.logger,
-            self.app_settings,
-        )
-        systemd_template = pg_tileserv_settings.systemd_template
-        db_url_for_config = (
+        db_url = (
             f"postgresql://{self.app_settings.pg.user}:{self.app_settings.pg.password}@"
             f"{self.app_settings.pg.host}:{self.app_settings.pg.port}/{self.app_settings.pg.database}"
         )
+
         format_vars = {
             "script_hash": script_hash,
-            "pg_tileserv_system_user": pg_tileserv_settings.system_user,
-            "pg_tileserv_system_group": pg_tileserv_settings.system_user,  # Assumes group is same as user
-            "pg_tileserv_binary_path": str(
-                pg_tileserv_settings.binary_install_path
-            ),
+            "pg_tileserv_system_user": cfg.system_user,
+            "pg_tileserv_system_group": cfg.system_user,
+            "pg_tileserv_binary_path": str(cfg.binary_install_path),
             "pg_tileserv_config_file_path_systemd": config_file_full_path,
-            "pg_tileserv_systemd_environment": db_url_for_config,
+            "pg_tileserv_systemd_environment": db_url,
         }
 
-        try:
-            pg_tileserv_service_content_final = systemd_template.format(
-                **format_vars
-            )
-            run_elevated_command(
-                ["tee", service_file_path],
-                self.app_settings,
-                cmd_input=pg_tileserv_service_content_final,
-                current_logger=self.logger,
-            )
-            log_map_server(
-                f"{symbols.get('success', '')} Created/Updated {service_file_path}",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-        except KeyError as e_key:
-            log_map_server(
-                f"{symbols.get('error', '')} Missing placeholder key '{e_key}' for pg_tileserv systemd template. Check config.yaml/models.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
-            raise
-        except Exception as e:
-            log_map_server(
-                f"{symbols.get('error', '')} Failed to write pg_tileserv systemd service file: {e}",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
-            raise
+        service_content = cfg.systemd_template.format(**format_vars)
+        run_elevated_command(
+            ["tee", service_file_path],
+            self.app_settings,
+            cmd_input=service_content,
+        )
 
     def _activate_pg_tileserv_service(self) -> None:
         """
         Reload systemd, enable and restart the pg_tileserv service.
         """
-        symbols = self.app_settings.symbols
-        log_map_server(
-            f"{symbols.get('step', '')} Activating pg_tileserv systemd service...",
-            "info",
-            self.logger,
-            self.app_settings,
-        )
-
-        systemd_reload(self.app_settings, current_logger=self.logger)
+        systemd_reload(self.app_settings, self.logger)
         run_elevated_command(
-            ["systemctl", "enable", "pg_tileserv.service"],
-            self.app_settings,
-            current_logger=self.logger,
+            ["systemctl", "enable", "pg_tileserv.service"], self.app_settings
         )
         run_elevated_command(
-            ["systemctl", "restart", "pg_tileserv.service"],
-            self.app_settings,
-            current_logger=self.logger,
-        )
-
-        log_map_server(
-            f"{symbols.get('info', '')} pg_tileserv service status:",
-            "info",
-            self.logger,
-            self.app_settings,
+            ["systemctl", "restart", "pg_tileserv.service"], self.app_settings
         )
         run_elevated_command(
             [
@@ -471,12 +268,5 @@ class PgTileservConfigurator(BaseComponent):
                 "--no-pager",
                 "-l",
             ],
-            self.app_settings,
-            current_logger=self.logger,
-        )
-        log_map_server(
-            f"{symbols.get('success', '')} pg_tileserv service activated.",
-            "success",
-            self.logger,
             self.app_settings,
         )

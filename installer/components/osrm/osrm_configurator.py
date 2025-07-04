@@ -8,16 +8,15 @@ for processed regions.
 
 import logging
 from pathlib import Path
-from subprocess import CalledProcessError
 from typing import Optional
 
 from common.command_utils import (
-    log_map_server,
     run_elevated_command,
 )
 from common.system_utils import get_current_script_hash, systemd_reload
 from installer import config as static_config
 from installer.base_component import BaseComponent
+from installer.components.osrm.osrm_installer import OsrmInstaller
 from installer.config_models import AppSettings
 from installer.registry import ComponentRegistry
 
@@ -26,9 +25,11 @@ from installer.registry import ComponentRegistry
     name="osrm",
     metadata={
         "dependencies": [
-            "postgres",
+            "prerequisites",
+            "docker",
             "data_processing",
-        ],  # OSRM depends on PostgreSQL and data processing
+            "postgres",
+        ],
         "description": "OSRM (Open Source Routing Machine) services configuration",
     },
 )
@@ -48,24 +49,31 @@ class OsrmConfigurator(BaseComponent):
     ):
         """
         Initialize the OSRM configurator.
-
-        Args:
-            app_settings: The application settings.
-            logger: Optional logger instance. If not provided, a new logger will be created.
         """
         super().__init__(app_settings, logger)
+        self.installer = OsrmInstaller(app_settings, self.logger)
+
+    def install(self) -> bool:
+        """
+        Install OSRM data by delegating to the OsrmInstaller.
+        """
+        return self.installer.install()
+
+    def uninstall(self) -> bool:
+        """
+        Uninstall OSRM data by delegating to the OsrmInstaller.
+        """
+        return self.installer.uninstall()
+
+    def is_installed(self) -> bool:
+        """
+        Check if OSRM data is installed by delegating to the OsrmInstaller.
+        """
+        return self.installer.is_installed()
 
     def configure(self) -> bool:
         """
-        Configure OSRM services.
-
-        This method configures the OSRM services based on the specified application
-        settings and logged information. It handles configuration for all processed
-        regions listed in the OSRM data directory, logging progress, warnings, and
-        errors encountered during the process.
-
-        Returns:
-            True if the configuration was successful, False otherwise.
+        Configure OSRM services for all processed regions.
         """
         try:
             return self._configure_osrm_services()
@@ -75,108 +83,41 @@ class OsrmConfigurator(BaseComponent):
 
     def unconfigure(self) -> bool:
         """
-        Unconfigure OSRM services.
-
-        This method removes the OSRM services by disabling and stopping
-        the systemd services for all processed regions.
-
-        Returns:
-            True if the unconfiguration was successful, False otherwise.
+        Unconfigure OSRM services by stopping and removing them.
         """
         try:
-            symbols = self.app_settings.symbols
             processed_dir = Path(self.app_settings.osrm_data.processed_dir)
-
             if not processed_dir.is_dir():
-                log_map_server(
-                    f"{symbols.get('warning', '')} Processed OSRM data directory not found at {processed_dir}. Nothing to unconfigure.",
-                    "warning",
-                    self.logger,
-                    self.app_settings,
-                )
-                return True
-
-            processed_regions = [
-                d.name for d in processed_dir.iterdir() if d.is_dir()
-            ]
-
-            if not processed_regions:
-                log_map_server(
-                    f"{symbols.get('warning', '')} No processed OSRM regions found in {processed_dir}. No services to remove.",
-                    "warning",
-                    self.logger,
-                    self.app_settings,
-                )
                 return True
 
             all_successful = True
-            for region_name_key in processed_regions:
-                service_name = f"osrm-routed-{region_name_key}.service"
-                service_file_path = f"/etc/systemd/system/{service_name}"
-
+            for region_dir in processed_dir.iterdir():
+                if not region_dir.is_dir():
+                    continue
+                service_name = f"osrm-routed-{region_dir.name}.service"
                 try:
-                    log_map_server(
-                        f"{symbols.get('step', '')} Stopping and disabling {service_name}...",
-                        "info",
-                        self.logger,
-                        self.app_settings,
-                    )
-
-                    # Stop and disable the service
                     run_elevated_command(
                         ["systemctl", "stop", service_name],
                         self.app_settings,
-                        current_logger=self.logger,
                         check=False,
                     )
                     run_elevated_command(
                         ["systemctl", "disable", service_name],
                         self.app_settings,
-                        current_logger=self.logger,
                         check=False,
                     )
-
-                    # Remove the service file
-                    if Path(service_file_path).exists():
+                    service_file = Path(f"/etc/systemd/system/{service_name}")
+                    if service_file.exists():
                         run_elevated_command(
-                            ["rm", service_file_path],
-                            self.app_settings,
-                            current_logger=self.logger,
+                            ["rm", str(service_file)], self.app_settings
                         )
-
-                    log_map_server(
-                        f"{symbols.get('success', '')} {service_name} stopped, disabled, and removed.",
-                        "success",
-                        self.logger,
-                        self.app_settings,
-                    )
                 except Exception as e:
-                    log_map_server(
-                        f"{symbols.get('error', '')} Error unconfiguring {service_name}: {str(e)}",
-                        "error",
-                        self.logger,
-                        self.app_settings,
+                    self.logger.error(
+                        f"Error unconfiguring {service_name}: {e}"
                     )
                     all_successful = False
 
-            # Reload systemd to apply changes
-            systemd_reload(self.app_settings, current_logger=self.logger)
-
-            if all_successful:
-                log_map_server(
-                    f"{symbols.get('success', '')} All OSRM services unconfigured successfully.",
-                    "success",
-                    self.logger,
-                    self.app_settings,
-                )
-            else:
-                log_map_server(
-                    f"{symbols.get('error', '')} Some OSRM services failed to unconfigure. Please check the logs.",
-                    "error",
-                    self.logger,
-                    self.app_settings,
-                )
-
+            systemd_reload(self.app_settings, self.logger)
             return all_successful
         except Exception as e:
             self.logger.error(f"Error unconfiguring OSRM: {str(e)}")
@@ -184,362 +125,144 @@ class OsrmConfigurator(BaseComponent):
 
     def is_configured(self) -> bool:
         """
-        Check if OSRM services are configured.
-
-        This method checks if the OSRM services are properly configured
-        by verifying that the systemd services for all processed regions
-        are enabled and active.
-
-        Returns:
-            True if OSRM services are configured, False otherwise.
+        Check if OSRM services for all processed regions are configured and active.
         """
         try:
             processed_dir = Path(self.app_settings.osrm_data.processed_dir)
-
             if not processed_dir.is_dir():
                 return False
 
             processed_regions = [
-                d.name for d in processed_dir.iterdir() if d.is_dir()
+                d for d in processed_dir.iterdir() if d.is_dir()
             ]
-
             if not processed_regions:
                 return False
 
-            for region_name_key in processed_regions:
-                service_name = f"osrm-routed-{region_name_key}.service"
-
-                # Check if the service is enabled
-                result = run_elevated_command(
-                    ["systemctl", "is-enabled", service_name],
-                    self.app_settings,
-                    capture_output=True,
-                    check=False,
-                    current_logger=self.logger,
+            for region_dir in processed_regions:
+                service_name = f"osrm-routed-{region_dir.name}.service"
+                is_active = (
+                    run_elevated_command(
+                        ["systemctl", "is-active", service_name],
+                        self.app_settings,
+                        check=False,
+                    ).returncode
+                    == 0
                 )
-                if result.returncode != 0:
-                    return False
-
-                # Check if the service is active
-                result = run_elevated_command(
-                    ["systemctl", "is-active", service_name],
-                    self.app_settings,
-                    capture_output=True,
-                    check=False,
-                    current_logger=self.logger,
+                is_enabled = (
+                    run_elevated_command(
+                        ["systemctl", "is-enabled", service_name],
+                        self.app_settings,
+                        check=False,
+                    ).returncode
+                    == 0
                 )
-                if result.returncode != 0:
+                if not (is_active and is_enabled):
                     return False
-
             return True
         except Exception as e:
-            self.logger.error(
-                f"Error checking if OSRM is configured: {str(e)}"
-            )
+            self.logger.error(f"Error checking OSRM configuration: {str(e)}")
             return False
 
     def _get_next_available_port(self) -> int:
         """
-        Determine the next available port not currently in use within the region port map.
-
-        Returns:
-            The next available port number starting from the default host port.
+        Determine the next available port for an OSRM service.
         """
         osrm_service_cfg = self.app_settings.osrm_service
         base_port = osrm_service_cfg.car_profile_default_host_port
-
         used_ports = set(osrm_service_cfg.region_port_map.values())
-
         next_port = base_port
         while next_port in used_ports:
             next_port += 1
-
         return next_port
 
     def _create_osrm_routed_service_file(self, region_name_key: str) -> None:
         """
-        Create or update a systemd service file for an OSRM routed service for a particular region.
-
-        Args:
-            region_name_key: Unique key for the region, such as "Australia_Tasmania_Hobart".
-
-        Raises:
-            FileNotFoundError: If the required OSRM data file for the specified region is not found.
-            KeyError: If a required placeholder key is missing in the systemd service template.
-            Exception: For any other errors occurring while generating or writing the service file.
+        Create a systemd service file for a specific OSRM region.
         """
-        symbols = self.app_settings.symbols
         script_hash = (
             get_current_script_hash(
-                project_root_dir=static_config.OSM_PROJECT_ROOT,
-                app_settings=self.app_settings,
-                logger_instance=self.logger,
+                static_config.OSM_PROJECT_ROOT, self.app_settings, self.logger
             )
             or "UNKNOWN_HASH"
         )
 
         osrm_data_cfg = self.app_settings.osrm_data
         osrm_service_cfg = self.app_settings.osrm_service
-
         service_name = f"osrm-routed-{region_name_key}.service"
         service_file_path = f"/etc/systemd/system/{service_name}"
-
-        host_osrm_data_dir_for_this_region = (
+        host_osrm_data_dir = (
             Path(osrm_data_cfg.processed_dir) / region_name_key
         )
-        osrm_filename_stem_in_container = region_name_key
 
-        log_map_server(
-            f"{symbols.get('step', '')} Creating systemd service file for {service_name} at {service_file_path} from template...",
-            "info",
-            self.logger,
-            self.app_settings,
-        )
-
-        expected_osrm_file_on_host = (
-            host_osrm_data_dir_for_this_region
-            / f"{osrm_filename_stem_in_container}.osrm"
-        )
-        if not expected_osrm_file_on_host.exists():
-            log_map_server(
-                f"{symbols.get('error', '')} OSRM data file {expected_osrm_file_on_host} not found. Cannot create service for {region_name_key}.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
+        expected_osrm_file = host_osrm_data_dir / f"{region_name_key}.osrm"
+        if not expected_osrm_file.exists():
             raise FileNotFoundError(
-                f"OSRM data file {expected_osrm_file_on_host} missing for service {service_name}"
+                f"OSRM data file {expected_osrm_file} missing for service."
             )
 
-        if region_name_key in osrm_service_cfg.region_port_map:
-            host_port_for_this_region = osrm_service_cfg.region_port_map[
-                region_name_key
-            ]
-            log_map_server(
-                f"{symbols.get('info', '')} Using configured port {host_port_for_this_region} for region {region_name_key}",
-                "info",
-                self.logger,
-                self.app_settings,
-            )
-        else:
-            host_port_for_this_region = self._get_next_available_port()
-            log_map_server(
-                f"{symbols.get('info', '')} Auto-assigned port {host_port_for_this_region} for region {region_name_key}",
-                "info",
-                self.logger,
-                self.app_settings,
-            )
-
-        osrm_service_cfg.region_port_map[region_name_key] = (
-            host_port_for_this_region
+        port = osrm_service_cfg.region_port_map.get(
+            region_name_key, self._get_next_available_port()
         )
+        osrm_service_cfg.region_port_map[region_name_key] = port
 
-        systemd_template_str = osrm_service_cfg.systemd_template
         format_vars = {
             "script_hash": script_hash,
             "region_name": region_name_key,
             "container_runtime_command": self.app_settings.container_runtime_command,
-            "host_port_for_region": host_port_for_this_region,
+            "host_port_for_region": port,
             "container_osrm_port": osrm_service_cfg.container_osrm_port,
-            "host_osrm_data_dir_for_region": str(
-                host_osrm_data_dir_for_this_region
-            ),
+            "host_osrm_data_dir_for_region": str(host_osrm_data_dir),
             "osrm_image_tag": osrm_service_cfg.image_tag,
-            "osrm_filename_in_container": f"{osrm_filename_stem_in_container}.osrm",
+            "osrm_filename_in_container": f"{region_name_key}.osrm",
             "max_table_size_routed": osrm_data_cfg.max_table_size_routed,
             "extra_osrm_routed_args": osrm_service_cfg.extra_routed_args,
         }
 
-        try:
-            service_content_final = systemd_template_str.format(**format_vars)
-            run_elevated_command(
-                ["tee", service_file_path],
-                self.app_settings,
-                cmd_input=service_content_final,
-                current_logger=self.logger,
-            )
-            log_map_server(
-                f"{symbols.get('success', '')} Created/Updated {service_file_path}",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-        except KeyError as e_key:
-            log_map_server(
-                f"{symbols.get('error', '')} Missing placeholder key '{e_key}' for OSRM systemd template. Check config.yaml/models.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
-            raise
-        except Exception as e:
-            log_map_server(
-                f"{symbols.get('error', '')} Failed to write {service_file_path}: {e}",
-                "error",
-                self.logger,
-                self.app_settings,
-                exc_info=True,
-            )
-            raise
+        service_content = osrm_service_cfg.systemd_template.format(
+            **format_vars
+        )
+        run_elevated_command(
+            ["tee", service_file_path],
+            self.app_settings,
+            cmd_input=service_content,
+        )
 
     def _activate_osrm_routed_service(self, region_name_key: str) -> None:
         """
-        Activate and ensure the proper startup and status of an OSRM routed service for a specific region.
-
-        Args:
-            region_name_key: The key corresponding to the region-specific service name.
-
-        Raises:
-            CalledProcessError: Raised if the systemctl command indicates the service has failed to start.
-            Exception: Raised for unexpected errors during service status verification.
+        Enable, start, and check the status of a specific OSRM service.
         """
-        symbols = self.app_settings.symbols
         service_name = f"osrm-routed-{region_name_key}.service"
-        log_map_server(
-            f"{symbols.get('step', '')} Activating {service_name}...",
-            "info",
-            self.logger,
-            self.app_settings,
-        )
-
-        systemd_reload(self.app_settings, current_logger=self.logger)
+        systemd_reload(self.app_settings, self.logger)
         run_elevated_command(
-            ["systemctl", "enable", service_name],
-            self.app_settings,
-            current_logger=self.logger,
+            ["systemctl", "enable", service_name], self.app_settings
         )
         run_elevated_command(
-            ["systemctl", "restart", service_name],
-            self.app_settings,
-            current_logger=self.logger,
+            ["systemctl", "restart", service_name], self.app_settings
         )
-
-        try:
-            log_map_server(
-                f"{symbols.get('info', '')} Checking status of {service_name}...",
-                "info",
-                self.logger,
-                self.app_settings,
-            )
-            run_elevated_command(
-                ["systemctl", "status", service_name, "--no-pager", "-l"],
-                self.app_settings,
-                current_logger=self.logger,
-                check=True,
-            )
-            log_map_server(
-                f"{symbols.get('success', '')} {service_name} is active.",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-        except CalledProcessError:
-            log_map_server(
-                f"{symbols.get('critical', '')} {service_name} FAILED to start. Aborting OSRM configuration.",
-                "critical",
-                self.logger,
-                self.app_settings,
-            )
-            raise
-        except Exception as e:
-            log_map_server(
-                f"{symbols.get('critical', '')} Unexpected error while checking {service_name} status: {e}",
-                "critical",
-                self.logger,
-                self.app_settings,
-                exc_info=True,
-            )
-            raise
-
-        log_map_server(
-            f"{symbols.get('success', '')} {service_name} activation process completed.",
-            "success",
-            self.logger,
+        run_elevated_command(
+            ["systemctl", "status", service_name, "--no-pager", "-l"],
             self.app_settings,
+            check=True,
         )
 
     def _configure_osrm_services(self) -> bool:
         """
-        Configure the OSRM services based on the specified application settings.
-
-        Returns:
-            True if all OSRM services are successfully configured, otherwise False.
+        Iterate through processed regions and configure a service for each.
         """
-        symbols = self.app_settings.symbols
         processed_dir = Path(self.app_settings.osrm_data.processed_dir)
-
-        log_map_server(
-            f"{symbols.get('step', '')} Starting OSRM service configuration...",
-            "info",
-            self.logger,
-            self.app_settings,
-        )
-
         if not processed_dir.is_dir():
-            log_map_server(
-                f"{symbols.get('warning', '')} Processed OSRM data directory not found at {processed_dir}. Nothing to configure.",
-                "warning",
-                self.logger,
-                self.app_settings,
-            )
-            return True
-
-        processed_regions = [
-            d.name for d in processed_dir.iterdir() if d.is_dir()
-        ]
-
-        if not processed_regions:
-            log_map_server(
-                f"{symbols.get('warning', '')} No processed OSRM regions found in {processed_dir}. No services to create.",
-                "warning",
-                self.logger,
-                self.app_settings,
-            )
             return True
 
         all_successful = True
-        for region_name_key in processed_regions:
-            try:
-                log_map_server(
-                    f"--- Configuring OSRM service for region: {region_name_key} ---",
-                    "info",
-                    self.logger,
-                    self.app_settings,
-                )
-                self._create_osrm_routed_service_file(region_name_key)
-                self._activate_osrm_routed_service(region_name_key)
-            except FileNotFoundError as e:
-                log_map_server(
-                    f"{symbols.get('error', '')} Skipping configuration for {region_name_key}: {e}",
-                    "error",
-                    self.logger,
-                    self.app_settings,
-                )
-                all_successful = False
+        for region_dir in processed_dir.iterdir():
+            if not region_dir.is_dir():
                 continue
+            try:
+                self._create_osrm_routed_service_file(region_dir.name)
+                self._activate_osrm_routed_service(region_dir.name)
             except Exception as e:
-                log_map_server(
-                    f"{symbols.get('critical', '')} Unexpected error configuring {region_name_key}: {e}",
-                    "critical",
-                    self.logger,
-                    self.app_settings,
-                    exc_info=True,
+                self.logger.error(
+                    f"Failed to configure OSRM service for {region_dir.name}: {e}"
                 )
                 all_successful = False
-
-        if all_successful:
-            log_map_server(
-                f"{symbols.get('success', '')} All OSRM services configured successfully.",
-                "success",
-                self.logger,
-                self.app_settings,
-            )
-        else:
-            log_map_server(
-                f"{symbols.get('error', '')} Some OSRM services failed to configure. Please check the logs.",
-                "error",
-                self.logger,
-                self.app_settings,
-            )
-
         return all_successful
