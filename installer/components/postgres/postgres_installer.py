@@ -1,7 +1,5 @@
 """
 PostgreSQL installer module.
-
-This module provides a self-contained installer for PostgreSQL.
 """
 
 import logging
@@ -9,31 +7,13 @@ from typing import List, Optional
 
 from common.command_utils import check_package_installed, log_map_server
 from common.debian.apt_manager import AptManager
-from installer import config
-from installer.base_component import BaseComponent
 from installer.config_models import AppSettings
-from installer.registry import InstallerRegistry
 
 
-@InstallerRegistry.register(
-    name="postgres",
-    metadata={
-        "dependencies": ["prerequisites"],  # Depends on core prerequisites
-        "estimated_time": 120,  # Estimated installation time in seconds
-        "required_resources": {
-            "memory": 512,  # Required memory in MB
-            "disk": 1024,  # Required disk space in MB
-            "cpu": 1,  # Required CPU cores
-        },
-        "description": "PostgreSQL database server with PostGIS extensions",
-    },
-)
-class PostgresInstaller(BaseComponent):
+class PostgresInstaller:
     """
-    Installer for PostgreSQL database server with PostGIS extensions.
-
-    This installer ensures that PostgreSQL and related packages are installed
-    and properly configured.
+    Installer for PostgreSQL packages.
+    It does not act as a registered component.
     """
 
     def __init__(
@@ -41,177 +21,86 @@ class PostgresInstaller(BaseComponent):
         app_settings: AppSettings,
         logger: Optional[logging.Logger] = None,
     ):
-        """
-        Initialize the PostgreSQL installer.
-
-        Args:
-            app_settings: The application settings.
-            logger: Optional logger instance. If not provided, a new logger will be created.
-        """
-        super().__init__(app_settings, logger)
+        """Initialize the PostgreSQL installer."""
+        self.app_settings = app_settings
+        self.logger = logger or logging.getLogger(__name__)
         self.apt_manager = AptManager(logger=self.logger)
 
-    def install(self) -> bool:
-        """
-        Install PostgreSQL and related packages.
+    def _get_packages(self) -> List[str]:
+        """Get the list of PostgreSQL packages to install."""
+        pg_version = self.app_settings.pg.version
+        return [
+            f"postgresql-{pg_version}",
+            f"postgresql-contrib-{pg_version}",
+            f"postgresql-server-dev-{pg_version}",
+            "postgis",
+            f"postgresql-{pg_version}-postgis-3",
+        ]
 
-        Returns:
-            True if the installation was successful, False otherwise.
-        """
+    def install(self) -> bool:
+        """Install PostgreSQL packages."""
+        symbols = self.app_settings.symbols
         try:
-            # Log the start of the installation
             log_map_server(
-                f"{config.SYMBOLS['info']} Installing PostgreSQL and related packages...",
+                f"{symbols.get('info', '')} Installing PostgreSQL packages...",
                 "info",
                 self.logger,
+                self.app_settings,
             )
-
-            # Get the list of packages to install
-            packages = self._get_postgres_packages()
-
-            if not packages:
-                log_map_server(
-                    f"{config.SYMBOLS['warning']} No PostgreSQL packages specified in configuration.",
-                    "warning",
-                    self.logger,
+            packages = self._get_packages()
+            self.apt_manager.install(
+                packages, self.app_settings, update_first=True
+            )
+            if not all(
+                check_package_installed(p, self.app_settings, self.logger)
+                for p in packages
+            ):
+                raise RuntimeError(
+                    "Not all PostgreSQL packages were installed successfully."
                 )
-                return False
-
-            # Install the packages
-            self.apt_manager.install(packages, self.app_settings)
-
-            # Verify that all packages were installed
-            if not self._verify_packages_installed(packages):
-                log_map_server(
-                    f"{config.SYMBOLS['error']} Failed to install all required PostgreSQL packages.",
-                    "error",
-                    self.logger,
-                )
-                return False
-
             log_map_server(
-                f"{config.SYMBOLS['success']} PostgreSQL and related packages installed successfully.",
+                f"{symbols.get('success', '')} PostgreSQL packages installed.",
                 "success",
                 self.logger,
+                self.app_settings,
             )
-
             return True
-
         except Exception as e:
-            log_map_server(
-                f"{config.SYMBOLS['error']} Error installing PostgreSQL: {str(e)}",
-                "error",
-                self.logger,
+            self.logger.error(
+                f"Error installing PostgreSQL packages: {e}", exc_info=True
             )
             return False
 
     def uninstall(self) -> bool:
-        """
-        Uninstall PostgreSQL and related packages.
-
-        Returns:
-            True if the uninstallation was successful, False otherwise.
-        """
+        """Uninstall PostgreSQL packages."""
+        symbols = self.app_settings.symbols
         try:
-            # Log the start of the uninstallation
             log_map_server(
-                f"{config.SYMBOLS['info']} Uninstalling PostgreSQL and related packages...",
+                f"{symbols.get('info', '')} Uninstalling PostgreSQL packages...",
                 "info",
                 self.logger,
+                self.app_settings,
             )
-
-            # Get the list of packages to uninstall
-            packages = self._get_postgres_packages()
-
-            if not packages:
-                log_map_server(
-                    f"{config.SYMBOLS['warning']} No PostgreSQL packages specified in configuration.",
-                    "warning",
-                    self.logger,
-                )
-                return False
-
-            # Uninstall the packages
-            self.apt_manager.purge(packages, self.app_settings)
-
-            # Clean up any remaining packages
+            self.apt_manager.purge(self._get_packages(), self.app_settings)
             self.apt_manager.autoremove(
                 purge=True, app_settings=self.app_settings
             )
-
             log_map_server(
-                f"{config.SYMBOLS['success']} PostgreSQL and related packages uninstalled successfully.",
+                f"{symbols.get('success', '')} PostgreSQL packages uninstalled.",
                 "success",
                 self.logger,
+                self.app_settings,
             )
-
             return True
-
         except Exception as e:
-            log_map_server(
-                f"{config.SYMBOLS['error']} Error uninstalling PostgreSQL: {str(e)}",
-                "error",
-                self.logger,
+            self.logger.error(
+                f"Error uninstalling PostgreSQL packages: {e}", exc_info=True
             )
             return False
 
     def is_installed(self) -> bool:
-        """
-        Check if PostgreSQL is installed.
-
-        Returns:
-            True if PostgreSQL is installed, False otherwise.
-        """
-        packages = self._get_postgres_packages()
-
-        if not packages:
-            log_map_server(
-                f"{config.SYMBOLS['warning']} No PostgreSQL packages specified in configuration.",
-                "warning",
-                self.logger,
-            )
-            return False
-
-        return self._verify_packages_installed(packages)
-
-    def _get_postgres_packages(self) -> List[str]:
-        """
-        Get the list of PostgreSQL packages to install.
-
-        Returns:
-            A list of package names.
-        """
-        return config.POSTGRES_PACKAGES
-
-    def _verify_packages_installed(self, packages: List[str]) -> bool:
-        """
-        Verify that all specified packages are installed.
-
-        Args:
-            packages: A list of package names to verify.
-
-        Returns:
-            True if all packages are installed, False otherwise.
-        """
-        all_installed = True
-
-        for pkg in packages:
-            if check_package_installed(
-                pkg,
-                app_settings=self.app_settings,
-                current_logger=self.logger,
-            ):
-                log_map_server(
-                    f"{config.SYMBOLS['success']} Package '{pkg}' is installed.",
-                    "debug",
-                    self.logger,
-                )
-            else:
-                log_map_server(
-                    f"{config.SYMBOLS['error']} Package '{pkg}' is NOT installed.",
-                    "error",
-                    self.logger,
-                )
-                all_installed = False
-
-        return all_installed
+        """Check if PostgreSQL packages are installed."""
+        return all(
+            check_package_installed(p, self.app_settings, self.logger)
+            for p in self._get_packages()
+        )

@@ -1,8 +1,8 @@
-# modular/components/gtfs/gtfs_configurator.py
+# modular/components/py3gtfskit/py3gtfskit_configurator.py
 """
-Configurator for GTFS data processing.
+Configurator for Py3GTFSKit data processing.
 
-This module provides a component for configuring GTFS data processing tasks.
+This module provides a component for configuring Py3GTFSKit data processing tasks.
 """
 
 import logging
@@ -19,7 +19,7 @@ from installer.registry import ComponentRegistry
 
 
 @ComponentRegistry.register(
-    name="gtfs",
+    name="py3gtfskit",
     metadata={
         "dependencies": [
             "postgres",
@@ -30,14 +30,14 @@ from installer.registry import ComponentRegistry
             "disk": 2048,
             "cpu": 2,
         },
-        "description": "GTFS Data Processing",
+        "description": "Py3GTFSKit Data Processing",
     },
 )
-class GtfsConfigurator(BaseComponent):
+class Py3GTFSKitConfigurator(BaseComponent):
     """
-    Configurator for GTFS data processing.
+    Configurator for Py3GTFSKit data processing.
 
-    This configurator handles GTFS data processing tasks such as importing GTFS data
+    This configurator handles Py3GTFSKit data processing tasks such as importing Py3GTFSKit data
     into the database.
     """
 
@@ -47,7 +47,7 @@ class GtfsConfigurator(BaseComponent):
         logger: Optional[logging.Logger] = None,
     ):
         """
-        Initialize the GTFS data processing configurator.
+        Initialize the Py3GTFSKit data processing configurator.
 
         Args:
             app_settings: The application settings.
@@ -57,9 +57,9 @@ class GtfsConfigurator(BaseComponent):
 
     def install(self) -> bool:
         """
-        Install GTFS data processing.
+        Install Py3GTFSKit data processing.
 
-        This is a no-op as there's no installation needed for GTFS data processing.
+        This is a no-op as there's no installation needed for Py3GTFSKit data processing.
 
         Returns:
             True always.
@@ -68,16 +68,16 @@ class GtfsConfigurator(BaseComponent):
 
     def configure(self) -> bool:
         """
-        Configure GTFS data processing.
+        Configure Py3GTFSKit data processing.
 
-        This method calls the run_gtfs_setup function to execute the full GTFS pipeline.
+        This method calls the run_gtfs_setup function to execute the full Py3GTFSKit pipeline.
 
         Returns:
             True if the configuration was successful, False otherwise.
         """
         try:
             log_map_server(
-                f"{config.SYMBOLS['info']} Configuring GTFS data processing...",
+                f"{config.SYMBOLS['info']} Configuring Py3GTFSKit data processing...",
                 "info",
                 self.logger,
             )
@@ -87,14 +87,14 @@ class GtfsConfigurator(BaseComponent):
                 logger=self.logger,
             ):
                 log_map_server(
-                    f"{config.SYMBOLS['error']} Failed to run GTFS setup.",
+                    f"{config.SYMBOLS['error']} Failed to run Py3GTFSKit setup.",
                     "error",
                     self.logger,
                 )
                 return False
 
             log_map_server(
-                f"{config.SYMBOLS['success']} GTFS data processing configured successfully.",
+                f"{config.SYMBOLS['success']} Py3GTFSKit data processing configured successfully.",
                 "success",
                 self.logger,
             )
@@ -103,7 +103,7 @@ class GtfsConfigurator(BaseComponent):
 
         except Exception as e:
             log_map_server(
-                f"{config.SYMBOLS['error']} Error configuring GTFS data processing: {str(e)}",
+                f"{config.SYMBOLS['error']} Error configuring Py3GTFSKit data processing: {str(e)}",
                 "error",
                 self.logger,
             )
@@ -111,7 +111,7 @@ class GtfsConfigurator(BaseComponent):
 
     def uninstall(self) -> bool:
         """
-        Uninstall GTFS data processing.
+        Uninstall Py3GTFSKit data processing.
 
         This is a no-op as there's nothing to uninstall.
 
@@ -122,28 +122,28 @@ class GtfsConfigurator(BaseComponent):
 
     def unconfigure(self) -> bool:
         """
-        Unconfigure GTFS data processing.
+        Unconfigure Py3GTFSKit data processing.
 
-        This method removes the GTFS data from the database.
+        This method removes the Py3GTFSKit data from the database.
 
         Returns:
             True if the unconfiguration was successful, False otherwise.
         """
         try:
             log_map_server(
-                f"{config.SYMBOLS['info']} Unconfiguring GTFS data processing...",
+                f"{config.SYMBOLS['info']} Unconfiguring Py3GTFSKit data processing...",
                 "info",
                 self.logger,
             )
 
             log_map_server(
-                f"{config.SYMBOLS['warning']} GTFS data removal not implemented yet.",
+                f"{config.SYMBOLS['warning']} Py3GTFSKit data removal not implemented yet.",
                 "warning",
                 self.logger,
             )
 
             log_map_server(
-                f"{config.SYMBOLS['success']} GTFS data processing unconfigured successfully.",
+                f"{config.SYMBOLS['success']} Py3GTFSKit data processing unconfigured successfully.",
                 "success",
                 self.logger,
             )
@@ -152,7 +152,7 @@ class GtfsConfigurator(BaseComponent):
 
         except Exception as e:
             log_map_server(
-                f"{config.SYMBOLS['error']} Error unconfiguring GTFS data processing: {str(e)}",
+                f"{config.SYMBOLS['error']} Error unconfiguring Py3GTFSKit data processing: {str(e)}",
                 "error",
                 self.logger,
             )
@@ -160,23 +160,29 @@ class GtfsConfigurator(BaseComponent):
 
     def is_installed(self) -> bool:
         """
-        Check if GTFS data processing is installed.
+        Check if Py3GTFSKit data processing is installed.
 
-        This is a no-op as there's no installation needed for GTFS data processing.
+        This method checks if the gtfs-kit package is installed.
 
         Returns:
-            True always.
+            True if gtfs-kit is installed, False otherwise.
         """
-        return True
+        try:
+            import importlib.metadata
+
+            importlib.metadata.version("gtfs-kit")
+            return True
+        except importlib.metadata.PackageNotFoundError:
+            return False
 
     def is_configured(self) -> bool:
         """
-        Check if GTFS data processing is configured.
+        Check if Py3GTFSKit data processing is configured.
 
-        This method verifies that the GTFS tables have been populated in the database.
+        This method verifies that the Py3GTFSKit tables have been populated in the database.
 
         Returns:
-            True if the GTFS data processing is configured, False otherwise.
+            True if the Py3GTFSKit data processing is configured, False otherwise.
         """
         try:
             from installer.registry import ComponentRegistry
@@ -189,7 +195,7 @@ class GtfsConfigurator(BaseComponent):
 
         except Exception as e:
             log_map_server(
-                f"{config.SYMBOLS['error']} Error checking GTFS configuration: {str(e)}",
+                f"{config.SYMBOLS['error']} Error checking Py3GTFSKit configuration: {str(e)}",
                 "error",
                 self.logger,
             )

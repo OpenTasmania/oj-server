@@ -173,3 +173,25 @@ class PgAdminInstaller(BaseComponent):
             app_settings=self.app_settings,
             current_logger=self.logger,
         )
+
+    def configure(self) -> bool:
+        """
+        Configuration is not needed for this component.
+        """
+        self.logger.info("pgAdmin installer does not require configuration.")
+        return True
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfiguration is not needed for this component.
+        """
+        self.logger.info(
+            "pgAdmin installer does not require unconfiguration."
+        )
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Configuration status is not applicable for this component.
+        """
+        return False

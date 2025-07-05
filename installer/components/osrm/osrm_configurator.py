@@ -27,7 +27,6 @@ from installer.registry import ComponentRegistry
         "dependencies": [
             "prerequisites",
             "docker",
-            "data_processing",
             "postgres",
         ],
         "description": "OSRM (Open Source Routing Machine) services configuration",

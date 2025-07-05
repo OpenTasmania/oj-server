@@ -69,7 +69,7 @@ class ComponentOrchestrator:
                 # Try to import installer module
                 try:
                     importlib.import_module(
-                        f"modular.components.{component_name}.{component_name}_installer"
+                        f"installer.components.{component_name}.{component_name}_installer"
                     )
                     self.logger.debug(
                         f"Imported installer module: {component_name}"
@@ -82,7 +82,7 @@ class ComponentOrchestrator:
                 # Try to import configurator module
                 try:
                     importlib.import_module(
-                        f"modular.components.{component_name}.{component_name}_configurator"
+                        f"installer.components.{component_name}.{component_name}_configurator"
                     )
                     self.logger.debug(
                         f"Imported configurator module: {component_name}"
@@ -423,22 +423,21 @@ class ComponentOrchestrator:
         Returns:
             A dictionary mapping component names to their status (installed and configured).
         """
-        try:
-            # Create component instances
-            components = {
-                name: ComponentRegistry.get_component(name)(
+        # Check status of each component
+        status = {}
+
+        for name in component_names:
+            self.logger.info(f"Checking status of component: {name}")
+
+            try:
+                # Create component instance
+                component = ComponentRegistry.get_component(name)(
                     self.app_settings, self.logger
                 )
-                for name in component_names
-            }
 
-            # Check status of each component
-            status = {}
-            for name in component_names:
-                self.logger.info(f"Checking status of component: {name}")
-
-                installed = components[name].is_installed()
-                configured = components[name].is_configured()
+                # Check installation and configuration status
+                installed = component.is_installed()
+                configured = component.is_configured()
 
                 status[name] = {
                     "installed": installed,
@@ -455,14 +454,16 @@ class ComponentOrchestrator:
                 else:
                     self.logger.info(f"Component {name} is not configured")
 
-            return status
+            except Exception as e:
+                self.logger.error(
+                    f"Error checking status of component {name}: {str(e)}"
+                )
+                status[name] = {
+                    "installed": False,
+                    "configured": False,
+                }
 
-        except Exception as e:
-            self.logger.error(f"Error checking status: {str(e)}")
-            return {
-                name: {"installed": False, "configured": False}
-                for name in component_names
-            }
+        return status
 
 
 # For backward compatibility during migration

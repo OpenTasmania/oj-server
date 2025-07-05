@@ -137,12 +137,12 @@ class ApacheInstaller(BaseComponent):
 
     def is_configured(self) -> bool:
         """
-        Configuration status is checked by ApacheConfigurator. This method returns True.
+        Configuration status is checked by ApacheConfigurator. This method returns False.
         """
         self.logger.debug(
             "ApacheInstaller does not check configuration status."
         )
-        return True  # Assumes not its responsibility
+        return False  # This component does not handle configuration
 
     def _get_apache_packages(self) -> List[str]:
         """

@@ -166,6 +166,48 @@ class NodejsInstaller(BaseComponent):
         except Exception:
             return False
 
+    def configure(self) -> bool:
+        """
+        Configure Node.js.
+
+        Node.js configuration is handled during installation, so this method
+        just returns True to indicate success.
+
+        Returns:
+            True to indicate that Node.js is considered configured.
+        """
+        self.logger.info(
+            "Node.js configuration is handled during installation."
+        )
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Check if Node.js is configured.
+
+        Since Node.js configuration is handled during installation,
+        this method just checks if Node.js is installed.
+
+        Returns:
+            True if Node.js is installed (and thus configured), False otherwise.
+        """
+        return self.is_installed()
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfigure Node.js.
+
+        Node.js unconfiguration is handled during uninstallation, so this method
+        just returns True to indicate success.
+
+        Returns:
+            True to indicate that the operation was acknowledged.
+        """
+        self.logger.info(
+            "Node.js unconfiguration is handled during uninstallation."
+        )
+        return True
+
     def _setup_nodesource_repository(self) -> bool:
         """
         Set up the NodeSource repository.

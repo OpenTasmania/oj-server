@@ -95,6 +95,7 @@ def run_command(
     cwd: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
     stdin=None,
+    log_errors: bool = True,
 ) -> subprocess.CompletedProcess:
     """
     Executes a system command and logs the process details and results, including both
@@ -121,6 +122,7 @@ def run_command(
         env (Optional[Dict[str, str]]): A dictionary defining the environment variables for the command
             execution. Defaults to the inherited environment of the current process.
         stdin: Optional stream for command input.
+        log_errors (bool): Whether to log errors if the command fails. Defaults to True.
 
     Returns:
         subprocess.CompletedProcess: The completed process instance, containing information about the
@@ -211,59 +213,62 @@ def run_command(
                 )
         return result
     except subprocess.CalledProcessError as e:
-        stdout_info = (
-            e.stdout.strip()
-            if e.stdout and hasattr(e.stdout, "strip")
-            else "N/A"
-        )
-        stderr_info = (
-            e.stderr.strip()
-            if e.stderr and hasattr(e.stderr, "strip")
-            else "N/A"
-        )
-        cmd_executed_str = (
-            subprocess.list2cmdline(e.cmd)
-            if isinstance(e.cmd, list)
-            else str(e.cmd)
-        )
+        if log_errors:
+            stdout_info = (
+                e.stdout.strip()
+                if e.stdout and hasattr(e.stdout, "strip")
+                else "N/A"
+            )
+            stderr_info = (
+                e.stderr.strip()
+                if e.stderr and hasattr(e.stderr, "strip")
+                else "N/A"
+            )
+            cmd_executed_str = (
+                subprocess.list2cmdline(e.cmd)
+                if isinstance(e.cmd, list)
+                else str(e.cmd)
+            )
 
-        log_map_server(
-            f"{symbols.get('error', '❌')} Command `{cmd_executed_str}` failed (rc {e.returncode}).",
-            "error",
-            effective_logger,
-            app_settings,
-        )
-        if stdout_info != "N/A":
             log_map_server(
-                f"   stdout: {stdout_info}",
+                f"{symbols.get('error', '❌')} Command `{cmd_executed_str}` failed (rc {e.returncode}).",
                 "error",
                 effective_logger,
                 app_settings,
             )
-        if stderr_info != "N/A":
-            log_map_server(
-                f"   stderr: {stderr_info}",
-                "error",
-                effective_logger,
-                app_settings,
-            )
+            if stdout_info != "N/A":
+                log_map_server(
+                    f"   stdout: {stdout_info}",
+                    "error",
+                    effective_logger,
+                    app_settings,
+                )
+            if stderr_info != "N/A":
+                log_map_server(
+                    f"   stderr: {stderr_info}",
+                    "error",
+                    effective_logger,
+                    app_settings,
+                )
         raise
     except FileNotFoundError as e:
-        log_map_server(
-            f"{symbols.get('error', '❌')} Command not found: {e.filename}. Ensure it's installed and in PATH.",
-            "error",
-            effective_logger,
-            app_settings,
-        )
+        if log_errors:
+            log_map_server(
+                f"{symbols.get('error', '❌')} Command not found: {e.filename}. Ensure it's installed and in PATH.",
+                "error",
+                effective_logger,
+                app_settings,
+            )
         raise
     except Exception as e:
-        log_map_server(
-            f"{symbols.get('error', '❌')} Unexpected error running command `{command_to_log_str}`: {e}",
-            "error",
-            effective_logger,
-            app_settings,
-            exc_info=True,
-        )
+        if log_errors:
+            log_map_server(
+                f"{symbols.get('error', '❌')} Unexpected error running command `{command_to_log_str}`: {e}",
+                "error",
+                effective_logger,
+                app_settings,
+                exc_info=True,
+            )
         raise
 
 
@@ -419,6 +424,7 @@ def check_package_installed(
     """
     Checks if a given package is installed on the system using the `dpkg-query`
     command. The function can also optionally log messages and use custom
+
     application settings while performing the check.
 
     Attributes or configuration details like application-specific symbols,
@@ -453,6 +459,7 @@ def check_package_installed(
             capture_output=True,
             text=True,
             current_logger=logger_to_use,
+            log_errors=False,  # Suppress errors for this check
         )
         return (
             result.returncode == 0 and "install ok installed" in result.stdout

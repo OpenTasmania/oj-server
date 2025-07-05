@@ -189,6 +189,48 @@ class DockerInstaller(BaseComponent):
 
         return True
 
+    def configure(self) -> bool:
+        """
+        Configure Docker Engine.
+
+        Docker configuration is handled during installation, so this method
+        just returns True to indicate success.
+
+        Returns:
+            True to indicate that Docker is considered configured.
+        """
+        self.logger.info(
+            "Docker configuration is handled during installation."
+        )
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Check if Docker Engine is configured.
+
+        Since Docker configuration is handled during installation,
+        this method just checks if Docker is installed.
+
+        Returns:
+            True if Docker is installed (and thus configured), False otherwise.
+        """
+        return self.is_installed()
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfigure Docker Engine.
+
+        Docker unconfiguration is handled during uninstallation, so this method
+        just returns True to indicate success.
+
+        Returns:
+            True to indicate that the operation was acknowledged.
+        """
+        self.logger.info(
+            "Docker unconfiguration is handled during uninstallation."
+        )
+        return True
+
     def _setup_docker_gpg_key(self) -> bool:
         """
         Set up the Docker GPG key.

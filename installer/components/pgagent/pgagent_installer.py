@@ -220,3 +220,25 @@ class PgAgentInstaller(BaseComponent):
                 all_installed = False
 
         return all_installed
+
+    def configure(self) -> bool:
+        """
+        Configuration is not needed for this component.
+        """
+        self.logger.info("pgAgent installer does not require configuration.")
+        return True
+
+    def unconfigure(self) -> bool:
+        """
+        Unconfiguration is not needed for this component.
+        """
+        self.logger.info(
+            "pgAgent installer does not require unconfiguration."
+        )
+        return True
+
+    def is_configured(self) -> bool:
+        """
+        Configuration status is not applicable for this component.
+        """
+        return False
