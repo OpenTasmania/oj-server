@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osrm-deployment
+  labels:
+    app: osrm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: osrm
+  template:
+    metadata:
+      labels:
+        app: osrm
+    spec:
+      containers:
+        - name: osrm
+          image: osrm # Kustomize will add the registry path
+          ports:
+            - containerPort: 5000
+          # The command will be to run osrm-routed with the data file
+          # The data file itself would be mounted from a persistent volume
+          # that is prepared by a separate data processing job.
+          command: [ "osrm-routed", "--algorithm", "mld", "/data/osm.osrm" ]
+          volumeMounts:
+            - name: osrm-data
+              mountPath: /data
+      volumes:
+        - name: osrm-data
+          persistentVolumeClaim:
+            claimName: osrm-pvc

@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pg-tileserv-deployment
+  labels:
+    app: pg-tileserv
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pg-tileserv
+  template:
+    metadata:
+      labels:
+        app: pg-tileserv
+    spec:
+      containers:
+        - name: pg-tileserv
+          image: pg_tileserv # Kustomize will add the registry path
+          ports:
+            - containerPort: 7800
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: DATABASE_URL # This assumes the secret has a DATABASE_URL key

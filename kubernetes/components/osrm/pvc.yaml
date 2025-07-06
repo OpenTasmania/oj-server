@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: osrm-pvc
+spec:
+  accessModes:
+    - ReadOnlyMany # OSRM data can be shared between multiple pods
+  resources:
+    requests:
+      storage: 10Gi

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carto-deployment
+  labels:
+    app: carto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: carto
+  template:
+    metadata:
+      labels:
+        app: carto
+    spec:
+      containers:
+        - name: carto
+          image: carto

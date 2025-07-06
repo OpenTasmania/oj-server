@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renderd-deployment
+  labels:
+    app: renderd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: renderd
+  template:
+    metadata:
+      labels:
+        app: renderd
+    spec:
+      containers:
+        - name: renderd
+          image: renderd # Kustomize will add the registry path
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: renderd-config
+              mountPath: /etc/renderd.conf
+              subPath: renderd.conf
+            - name: mapnik-style
+              mountPath: /etc/mapnik-style.xml
+              subPath: mapnik-style.xml
+      volumes:
+        - name: renderd-config
+          configMap:
+            name: renderd-config
+        - name: mapnik-style
+          configMap:
+            name: mapnik-style-config

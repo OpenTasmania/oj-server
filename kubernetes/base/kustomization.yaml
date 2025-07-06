@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: osm-osrm
+
+resources:
+  - namespace.yaml
+  - ../components/postgres
+  - ../components/osrm
+  - ../components/pg_tileserv
+  - ../components/renderd
+  - ../components/apache
+  - ../components/nginx
+  - ../components/carto
+  - ../components/nodejs
+  - ../components/certbot
+  - ../components/pgadmin
+  - ../components/pgagent
+  - ../components/data_processing
+  - ../components/py3gtfskit
+
+# Common labels to apply to all resources
+commonLabels:
+  app.kubernetes.io/name: osm-osrm-server

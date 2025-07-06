@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - ../../base
+
+namePrefix: prod-
+
+# Patch image paths to point to the production private registry (e.g., Harbor)
+images:
+  - name: postgres
+    newName: harbor.your-domain.com/osm-osrm/postgres
+  - name: osrm
+    newName: harbor.your-domain.com/osm-osrm/osrm
+  - name: pg_tileserv
+    newName: harbor.your-domain.com/osm-osrm/pg_tileserv
+  - name: renderd
+    newName: harbor.your-domain.com/osm-osrm/renderd
+  - name: apache
+    newName: harbor.your-domain.com/osm-osrm/apache
+  - name: nginx
+    newName: harbor.your-domain.com/osm-osrm/nginx
+  - name: carto
+    newName: harbor.your-domain.com/osm-osrm/carto
+  - name: nodejs
+    newName: harbor.your-domain.com/osm-osrm/nodejs
+  - name: certbot
+    newName: harbor.your-domain.com/osm-osrm/certbot
+  - name: pgadmin
+    newName: harbor.your-domain.com/osm-osrm/pgadmin
+  - name: pgagent
+    newName: harbor.your-domain.com/osm-osrm/pgagent
+  - name: data_processing
+    newName: harbor.your-domain.com/osm-osrm/data_processing
+  - name: py3gtfskit
+    newName: harbor.your-domain.com/osm-osrm/py3gtfskit
+
+# Patch deployments for higher availability
+patches:
+  - target:
+      kind: Deployment
+      name: osrm-deployment
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
