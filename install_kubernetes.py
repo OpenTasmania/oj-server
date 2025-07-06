@@ -19,7 +19,6 @@ _VERBOSE: bool = False
 _DEBUG: bool = False
 _IMAGE_OUTPUT_DIR: str = "images"
 
-# Determine the project root based on the script's location
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -47,17 +46,13 @@ def _build_and_register_images_for_local_env(kubectl: str) -> None:
             "It will attempt to push to 'localhost:32000', which might require 'docker login'."
         )
 
-    # Define standard images to pull and custom images to build
-    # For custom images, the value is the path to the Dockerfile relative to project root
     images_to_process = {
-        # Standard images from Docker Hub
         "postgres": "postgres:latest",
         "osrm": "osrm/osrm-backend:latest",
         "nginx": "nginx:latest",
         "nodejs": "node:latest",
         "certbot": "certbot/certbot:latest",
         "pgadmin": "dpage/pgadmin4:latest",
-        # Custom images to build from Dockerfiles
         "data_processing": "data_processor/Dockerfile",
         "apache": "kubernetes/components/apache/Dockerfile",
         "carto": "kubernetes/components/carto/Dockerfile",
@@ -67,7 +62,6 @@ def _build_and_register_images_for_local_env(kubectl: str) -> None:
         "renderd": "kubernetes/components/renderd/Dockerfile",
     }
 
-    # Create the Dockerfile for data_processor if it doesn't exist
     data_processor_dockerfile_path = os.path.join(
         PROJECT_ROOT, "data_processor", "Dockerfile"
     )
@@ -101,7 +95,7 @@ CMD ["python", "run.py"]
         print(f"\nProcessing image: {name}")
         local_image_tag = f"localhost:32000/{name}"
 
-        if source.endswith("Dockerfile"):  # Custom Image
+        if source.endswith("Dockerfile"):
             dockerfile_path = os.path.join(PROJECT_ROOT, source)
             if not os.path.exists(dockerfile_path):
                 print(
@@ -123,7 +117,7 @@ CMD ["python", "run.py"]
             ]
             run_command(build_command, check=True)
 
-        else:  # Standard Image
+        else:
             print(f"Pulling standard image '{source}'...")
             run_command(["docker", "pull", source], check=True)
             print(f"Retagging '{source}' to '{local_image_tag}'...")
@@ -133,8 +127,6 @@ CMD ["python", "run.py"]
 
         print(f"Importing '{local_image_tag}' into MicroK8s registry...")
 
-        # Using a pipe to send the image to microk8s
-        # Using a pipe to send the image to microk8s
         save_process = subprocess.Popen(
             ["docker", "save", local_image_tag], stdout=subprocess.PIPE
         )
@@ -152,11 +144,9 @@ CMD ["python", "run.py"]
             text=True,
         )
 
-        # Close the stdout pipe. We add a check to satisfy the type checker (mypy).
         if save_process.stdout:
             save_process.stdout.close()
 
-        # Wait for the save process to complete to clean up the process entry.
         save_process.wait()
 
         if import_process.returncode != 0:
@@ -190,7 +180,6 @@ def _create_stripped_installer_script() -> str:
     with open(original_script_path, "r") as f:
         content = f.read()
 
-    # Remove the create_debian_package function block
     content = re.sub(
         r"\ndef create_debian_package\(.*\?\):.*\?\n(?=\ndef|if __name__ == "
         "__main__"
@@ -200,7 +189,6 @@ def _create_stripped_installer_script() -> str:
         flags=re.DOTALL | re.MULTILINE,
     )
 
-    # Remove the create_debian_installer_amd64 function block
     content = re.sub(
         r"\ndef create_debian_installer_amd64\(.*\?\):.*\?\n(?=\ndef|if __name__ == "
         "__main__"
@@ -210,7 +198,6 @@ def _create_stripped_installer_script() -> str:
         flags=re.DOTALL | re.MULTILINE,
     )
 
-    # Remove the create_debian_installer_rpi64 function block
     content = re.sub(
         r"\ndef create_debian_installer_rpi64\(.*\?\):.*\?\n(?=\ndef|if __name__ == "
         "__main__"
@@ -220,7 +207,6 @@ def _create_stripped_installer_script() -> str:
         flags=re.DOTALL | re.MULTILINE,
     )
 
-    # Remove hashlib import
     content = re.sub(
         r"import hashlib\n",
         "",
@@ -228,7 +214,6 @@ def _create_stripped_installer_script() -> str:
         flags=re.DOTALL,
     )
 
-    # Remove 'build-deb' from choices in argparse
     content = re.sub(
         r"choices=\[(.*?),\s*\"build-deb\"\s*\]",
         r"choices=[\1]",
@@ -248,7 +233,6 @@ def _create_stripped_installer_script() -> str:
         flags=re.DOTALL,
     )
 
-    # Remove 'Create Debian Package' from menu
     content = re.sub(
         r"\s*print\('3\\. Create Debian Package'\)",
         "",
@@ -256,14 +240,12 @@ def _create_stripped_installer_script() -> str:
     )
     content = content.replace("4. Back to Main Menu", "3. Back to Main Menu")
 
-    # Remove the menu option for create_debian_package
     content = re.sub(
         r"\s*elif create_choice == \"3\":\n\s*create_debian_package\(\)",
         "",
         content,
     )
 
-    # Remove the CLI action for build-deb
     content = re.sub(
         r"\s*elif args.action == \"build-deb\":\n\s*create_debian_package\(\)\n\s*sys.exit\(0\)",
         "",
@@ -304,7 +286,6 @@ def _get_project_version_from_pyproject_toml() -> str:
     with open(pyproject_path, "r") as f:
         content = f.read()
 
-    # Regex to find the version under [project]
     match = re.search(
         r'\[project\]\s*\n[^\[]*?version\s*=\s*"([^"]*)"',
         content,
@@ -381,7 +362,6 @@ def run_command(
         "microk8s.kubectl",
     ]:
         if "-v" not in command and "--verbose" not in command:
-            # Insert verbose flag carefully
             insert_pos = 1
             if command[0] == "docker" and command[1] in ["build", "pull"]:
                 insert_pos = 2
@@ -406,50 +386,6 @@ def run_command(
             print(f"STDERR: {result.stderr}", file=sys.stderr)
         sys.exit(1)
     return result
-
-
-def get_apt_http_proxy() -> Optional[str]:
-    """
-    Retrieves the HTTP proxy configuration for APT (Advanced Package Tool) by
-    checking specific configuration files. Searches for `Acquire::http::Proxy`
-    directive in standard APT configuration paths.
-
-    Checks both individual files and directories containing configuration
-    files under predefined locations to find the proxy configuration.
-
-    Returns:
-        Optional[str]: A string representing the HTTP proxy URL if found,
-        otherwise None.
-    """
-    proxy: Optional[str] = None
-    apt_conf_dirs: List[str] = ["/etc/apt/apt.conf", "/etc/apt/apt.conf.d/"]
-
-    for conf_path in apt_conf_dirs:
-        if os.path.isfile(conf_path):
-            with open(conf_path, "r") as f:
-                content: str = f.read()
-                match: Optional[re.Match] = re.search(
-                    r'Acquire::http::Proxy\s+"([^"]+)";', content
-                )
-                if match:
-                    proxy = match.group(1)
-                    break
-        elif os.path.isdir(conf_path):
-            for root, _, files in os.walk(conf_path):
-                for file in files:
-                    if file.endswith(".conf"):
-                        full_path: str = os.path.join(root, file)
-                        with open(full_path, "r") as f:
-                            content = f.read()
-                            match = re.search(
-                                r'Acquire::http::Proxy\s+"([^"]+)";', content
-                            )
-                            if match:
-                                proxy = match.group(1)
-                                break
-                if proxy:
-                    break
-    return proxy
 
 
 def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
@@ -565,6 +501,50 @@ def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
         print(f"Error installing required tools: {e}", file=sys.stderr)
         print("Please install the listed packages manually.")
         return False
+
+
+def get_apt_http_proxy() -> Optional[str]:
+    """
+    Retrieves the HTTP proxy configuration for APT (Advanced Package Tool) by
+    checking specific configuration files. Searches for `Acquire::http::Proxy`
+    directive in standard APT configuration paths.
+
+    Checks both individual files and directories containing configuration
+    files under predefined locations to find the proxy configuration.
+
+    Returns:
+        Optional[str]: A string representing the HTTP proxy URL if found,
+        otherwise None.
+    """
+    proxy: Optional[str] = None
+    apt_conf_dirs: List[str] = ["/etc/apt/apt.conf", "/etc/apt/apt.conf.d/"]
+
+    for conf_path in apt_conf_dirs:
+        if os.path.isfile(conf_path):
+            with open(conf_path, "r") as f:
+                content: str = f.read()
+                match: Optional[re.Match] = re.search(
+                    r'Acquire::http::Proxy\s+"([^"]+)";', content
+                )
+                if match:
+                    proxy = match.group(1)
+                    break
+        elif os.path.isdir(conf_path):
+            for root, _, files in os.walk(conf_path):
+                for file in files:
+                    if file.endswith(".conf"):
+                        full_path: str = os.path.join(root, file)
+                        with open(full_path, "r") as f:
+                            content = f.read()
+                            match = re.search(
+                                r'Acquire::http::Proxy\s+"([^"]+)";', content
+                            )
+                            if match:
+                                proxy = match.group(1)
+                                break
+                if proxy:
+                    break
+    return proxy
 
 
 def get_kubectl_command() -> str:
@@ -778,267 +758,6 @@ Description: Open Journey Planner Server Kubernetes Configurations
     print("Temporary build directory cleaned up.")
 
 
-def create_debian_installer_amd64() -> None:
-    """
-    Creates a custom Debian installer ISO for AMD64 architecture.
-
-    This function downloads a Debian netinst ISO, verifies its checksum,
-    extracts its contents, injects a preseed file for unattended installation,
-    modifies the bootloader configuration, and rebuilds the ISO.
-    It requires `wget` and `xorriso` to be installed.
-    """
-    required_tools: List[Tuple[str, str, str]] = [
-        ("wget", "wget", "download the Debian ISO"),
-        ("xorriso", "xorriso", "extract and rebuild the ISO"),
-        ("isolinux", "isolinux", "provide bootloader files for ISO creation"),
-        (
-            "grub-efi-amd64-bin",
-            "grub-efi-amd64-bin",
-            "provide EFI boot support",
-        ),
-        ("dpkg-deb", "dpkg-dev", "build Debian packages"),
-    ]
-
-    print("Step 1/9: Checking and installing required tools...")
-    _pause_for_debug(
-        "Before checking and installing required tools for AMD64 installer."
-    )
-    if not check_and_install_tools(required_tools):
-        sys.exit(1)
-    print("Step 1/9: Required tools checked/installed.")
-
-    print("Creating Debian installer for amd64...")
-    create_debian_package()
-    stripped_script_path = _create_stripped_installer_script()
-    base_url: str = (
-        "https://cdimage.debian.org/cdimage/weekly-builds/amd64/iso-cd"
-    )
-    iso_filename: str = "debian-testing-amd64-netinst.iso"
-    iso_path: str = os.path.join(_IMAGE_OUTPUT_DIR, iso_filename)
-    iso_url: str = f"{base_url}/{iso_filename}"
-    new_iso_filename: str = os.path.join(
-        _IMAGE_OUTPUT_DIR, "debian-trixie-amd64-microk8s-unattended.iso"
-    )
-    build_dir: str = os.path.join(_IMAGE_OUTPUT_DIR, "build/debian_installer")
-
-    print(f"Step 2/9: Downloading Debian ISO from {iso_url}...")
-    if not os.path.exists(iso_path):
-        run_command(
-            ["wget", "-P", _IMAGE_OUTPUT_DIR, iso_url],
-            env=os.environ.copy(),
-            check=True,
-        )
-    print("Step 2/9: Debian ISO downloaded.")
-
-    print("Step 3/9: Downloading SHA512SUMS and verifying checksum...")
-    sha512sums_url: str = f"{base_url}/SHA512SUMS"
-    sha512sums_filename: str = "SHA512SUMS"
-    sha512sums_path: str = os.path.join(
-        _IMAGE_OUTPUT_DIR, sha512sums_filename
-    )
-    if not os.path.exists(sha512sums_path):
-        run_command(
-            ["wget", "-P", _IMAGE_OUTPUT_DIR, sha512sums_url],
-            env=os.environ.copy(),
-            check=True,
-        )
-
-    expected_checksum: str = ""
-    with open(sha512sums_path, "r") as f:
-        for line in f:
-            if iso_filename in line:
-                expected_checksum = line.split(" ")[0]
-                break
-
-    if not expected_checksum:
-        print(
-            f"Error: Could not find checksum for {iso_filename} in {sha512sums_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    with open(iso_path, "rb") as f:
-        calculated_checksum: str = hashlib.sha512(f.read()).hexdigest()
-
-    if calculated_checksum != expected_checksum:
-        print(f"Error: Checksum mismatch for {iso_filename}", file=sys.stderr)
-        print(f"Expected: {expected_checksum}", file=sys.stderr)
-        print(f"Calculated: {calculated_checksum}", file=sys.stderr)
-        sys.exit(1)
-    print("Step 3/9: Checksum verified successfully.")
-
-    print(f"Step 4/9: Creating build directory {build_dir}...")
-    os.makedirs(f"{build_dir}/EFI/BOOT", exist_ok=True)
-
-    # Copy EFI boot files
-    try:
-        shutil.copy2(
-            "/usr/lib/grub/x86_64-efi/monolithic/grubx64.efi",
-            f"{build_dir}/EFI/BOOT/bootx64.efi",
-        )
-        print(
-            "Copied grubx64.efi from monolithic path to EFI/BOOT/bootx64.efi"
-        )
-    except FileNotFoundError:
-        print(
-            "Warning: grubx64.efi not found in /usr/lib/grub/x86_64-efi/monolithic/. Attempting alternative location."
-        )
-        try:
-            shutil.copy2(
-                "/usr/lib/grub/x86_64-efi/grubx64.efi",
-                f"{build_dir}/EFI/BOOT/bootx64.efi",
-            )
-            print(
-                "Copied grubx64.efi from default path to EFI/BOOT/bootx64.efi"
-            )
-        except FileNotFoundError:
-            print(
-                "Warning: grubx64.efi not found in /usr/lib/grub/x86_64-efi/. Attempting another alternative location."
-            )
-            try:
-                shutil.copy2(
-                    "/usr/lib/grub-efi/x86_64-efi/grubx64.efi",
-                    f"{build_dir}/EFI/BOOT/bootx64.efi",
-                )
-                print(
-                    "Copied grubx64.efi from alternative location to EFI/BOOT/bootx64.efi"
-                )
-            except FileNotFoundError:
-                print(
-                    "Error: grubx64.efi not found in common locations. UEFI boot might fail.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-    print("Step 4/9: Build directory created and EFI files copied.")
-
-    print(f"Step 5/9: Extracting ISO to {build_dir}...")
-    run_command(
-        [
-            "sudo",
-            "xorriso",
-            "-osirrox",
-            "on",
-            "-indev",
-            iso_path,
-            "-extract",
-            "/",
-            build_dir,
-        ],
-        check=True,
-    )
-    print("Step 5/9: ISO extracted.")
-
-    # To generate a preseed.cfg file, you can extract the example file from
-    # the downloaded ISO. After this script has run step 5, the ISO contents
-    # will be available in the build directory. The example preseed file is
-    # located within the initrd.gz archive. To extract it, you can use the
-    # following commands from the project root directory:
-    #
-    # mkdir -p build/initrd_contents
-    # cd build/initrd_contents
-    # gzip -dc ../debian_installer/install.amd/initrd.gz | cpio -id
-    # cp preseed.cfg ../../
-    # cd ../..
-    #
-    # Once you have the preseed.cfg in your project root, you can customize it
-    # and then re-run this script to create the unattended installer.
-    preseed_file = "preseed.cfg"
-    if os.path.exists(preseed_file):
-        print(f"Step 6/9: Copying preseed file to {build_dir}/preseed.cfg...")
-        shutil.copy(preseed_file, f"{build_dir}/preseed.cfg")
-        with open(f"{build_dir}/preseed.cfg", "a") as f:
-            f.write(
-                "\nd-i preseed/late_command string cp /cdrom/ojp-server_"
-                + _get_project_version_from_pyproject_toml()
-                + "_all.deb /target/tmp/ && chroot /target /usr/bin/dpkg -i /tmp/ojp-server_"
-                + _get_project_version_from_pyproject_toml()
-                + "_all.deb && rm /target/tmp/ojp-server_"
-                + _get_project_version_from_pyproject_toml()
-                + "_all.deb\n"
-            )
-        print("Step 6/9: Added package installation command to preseed.cfg.")
-
-        isolinux_cfg_path: str = f"{build_dir}/isolinux/isolinux.cfg"
-        print(
-            f"Step 7/9: Modifying bootloader configuration in {isolinux_cfg_path}..."
-        )
-        with open(isolinux_cfg_path, "r") as f:
-            isolinux_cfg: str = f.read()
-
-        isolinux_cfg = isolinux_cfg.replace(
-            "append initrd=/install.amd/initrd.gz",
-            "append initrd=/install.amd/initrd.gz preseed/file=/cdrom/preseed.cfg",
-        )
-
-        with open(isolinux_cfg_path, "w") as f:
-            f.write(isolinux_cfg)
-        print("Step 7/9: Bootloader configuration modified.")
-    else:
-        print(
-            "Step 6/9: No preseed.cfg file found, skipping unattended installation."
-        )
-        print("Step 7/9: Bootloader configuration not modified.")
-
-    print(
-        "Step 8/9: Copying ojp-server.deb and stripped installer script to ISO build directory..."
-    )
-    shutil.copy(
-        os.path.join(
-            _IMAGE_OUTPUT_DIR,
-            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
-        ),
-        os.path.join(
-            build_dir,
-            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
-        ),
-    )
-    shutil.copy(stripped_script_path, f"{build_dir}/install_kubernetes.py")
-    print("Step 8/9: Files copied.")
-
-    print(f"Step 9/9: Rebuilding ISO as {new_iso_filename}...")
-    # Rebuild the ISO
-    run_command(
-        [
-            "xorriso",
-            "-as",
-            "mkisofs",
-            "-isohybrid-mbr",
-            "/usr/lib/ISOLINUX/isohdpfx.bin",
-            "-c",
-            "isolinux/boot.cat",
-            "-b",
-            "isolinux/isolinux.bin",
-            "-no-emul-boot",
-            "-boot-load-size",
-            "4",
-            "-boot-info-table",
-            "-eltorito-alt-boot",
-            "--efi-boot",
-            "EFI/boot/bootx64.efi",
-            "-no-emul-boot",
-            "-o",
-            new_iso_filename,
-            build_dir,
-        ],
-        check=True,
-    )
-    print("Step 8/9: ISO rebuilt.")
-    print(f"Step 9/9: Cleaning up temporary build directory {build_dir}...")
-    run_command(
-        [
-            "sudo",
-            "rm",
-            "-rf",
-            os.path.join(_IMAGE_OUTPUT_DIR, "build/debian_installer"),
-        ],
-        check=True,
-    )
-    os.remove(stripped_script_path)
-    print("Step 9/9: Temporary build directory cleaned up.")
-    print(f"Successfully created {new_iso_filename}.")
-
-
 def create_debian_installer_rpi64(model: int = 4) -> None:
     """
     Creates a custom Debian installer image for Raspberry Pi 64-bit.
@@ -1191,7 +910,6 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
     print(
         f"Step 10/14: Executing modified generate-recipe.py for model {model}..."
     )
-    # Execute the modified generate-recipe.py
     run_command(
         ["python3", "temp_generate-recipe.py", str(model), "trixie"],
         directory=rpi_image_specs_dir,
@@ -1233,6 +951,265 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
     os.remove(stripped_script_path)
 
     print(f"Successfully created {output_image}")
+
+
+def create_debian_installer_amd64() -> None:
+    """
+    Creates a custom Debian installer ISO for AMD64 architecture.
+
+    This function downloads a Debian netinst ISO, verifies its checksum,
+    extracts its contents, injects a preseed file for unattended installation,
+    modifies the bootloader configuration, and rebuilds the ISO.
+    It requires `wget` and `xorriso` to be installed.
+    """
+    required_tools: List[Tuple[str, str, str]] = [
+        ("wget", "wget", "download the Debian ISO"),
+        ("xorriso", "xorriso", "extract and rebuild the ISO"),
+        ("isolinux", "isolinux", "provide bootloader files for ISO creation"),
+        (
+            "grub-efi-amd64-bin",
+            "grub-efi-amd64-bin",
+            "provide EFI boot support",
+        ),
+        ("dpkg-deb", "dpkg-dev", "build Debian packages"),
+    ]
+
+    print("Step 1/9: Checking and installing required tools...")
+    _pause_for_debug(
+        "Before checking and installing required tools for AMD64 installer."
+    )
+    if not check_and_install_tools(required_tools):
+        sys.exit(1)
+    print("Step 1/9: Required tools checked/installed.")
+
+    print("Creating Debian installer for amd64...")
+    create_debian_package()
+    stripped_script_path = _create_stripped_installer_script()
+    base_url: str = (
+        "https://cdimage.debian.org/cdimage/weekly-builds/amd64/iso-cd"
+    )
+    iso_filename: str = "debian-testing-amd64-netinst.iso"
+    iso_path: str = os.path.join(_IMAGE_OUTPUT_DIR, iso_filename)
+    iso_url: str = f"{base_url}/{iso_filename}"
+    new_iso_filename: str = os.path.join(
+        _IMAGE_OUTPUT_DIR, "debian-trixie-amd64-microk8s-unattended.iso"
+    )
+    build_dir: str = os.path.join(_IMAGE_OUTPUT_DIR, "build/debian_installer")
+
+    print(f"Step 2/9: Downloading Debian ISO from {iso_url}...")
+    if not os.path.exists(iso_path):
+        run_command(
+            ["wget", "-P", _IMAGE_OUTPUT_DIR, iso_url],
+            env=os.environ.copy(),
+            check=True,
+        )
+    print("Step 2/9: Debian ISO downloaded.")
+
+    print("Step 3/9: Downloading SHA512SUMS and verifying checksum...")
+    sha512sums_url: str = f"{base_url}/SHA512SUMS"
+    sha512sums_filename: str = "SHA512SUMS"
+    sha512sums_path: str = os.path.join(
+        _IMAGE_OUTPUT_DIR, sha512sums_filename
+    )
+    if not os.path.exists(sha512sums_path):
+        run_command(
+            ["wget", "-P", _IMAGE_OUTPUT_DIR, sha512sums_url],
+            env=os.environ.copy(),
+            check=True,
+        )
+
+    expected_checksum: str = ""
+    with open(sha512sums_path, "r") as f:
+        for line in f:
+            if iso_filename in line:
+                expected_checksum = line.split(" ")[0]
+                break
+
+    if not expected_checksum:
+        print(
+            f"Error: Could not find checksum for {iso_filename} in {sha512sums_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    with open(iso_path, "rb") as f:
+        calculated_checksum: str = hashlib.sha512(f.read()).hexdigest()
+
+    if calculated_checksum != expected_checksum:
+        print(f"Error: Checksum mismatch for {iso_filename}", file=sys.stderr)
+        print(f"Expected: {expected_checksum}", file=sys.stderr)
+        print(f"Calculated: {calculated_checksum}", file=sys.stderr)
+        sys.exit(1)
+    print("Step 3/9: Checksum verified successfully.")
+
+    print(f"Step 4/9: Creating build directory {build_dir}...")
+    os.makedirs(f"{build_dir}/EFI/BOOT", exist_ok=True)
+
+    try:
+        shutil.copy2(
+            "/usr/lib/grub/x86_64-efi/monolithic/grubx64.efi",
+            f"{build_dir}/EFI/BOOT/bootx64.efi",
+        )
+        print(
+            "Copied grubx64.efi from monolithic path to EFI/BOOT/bootx64.efi"
+        )
+    except FileNotFoundError:
+        print(
+            "Warning: grubx64.efi not found in /usr/lib/grub/x86_64-efi/monolithic/. Attempting alternative location."
+        )
+        try:
+            shutil.copy2(
+                "/usr/lib/grub/x86_64-efi/grubx64.efi",
+                f"{build_dir}/EFI/BOOT/bootx64.efi",
+            )
+            print(
+                "Copied grubx64.efi from default path to EFI/BOOT/bootx64.efi"
+            )
+        except FileNotFoundError:
+            print(
+                "Warning: grubx64.efi not found in /usr/lib/grub/x86_64-efi/. Attempting another alternative location."
+            )
+            try:
+                shutil.copy2(
+                    "/usr/lib/grub-efi/x86_64-efi/grubx64.efi",
+                    f"{build_dir}/EFI/BOOT/bootx64.efi",
+                )
+                print(
+                    "Copied grubx64.efi from alternative location to EFI/BOOT/bootx64.efi"
+                )
+            except FileNotFoundError:
+                print(
+                    "Error: grubx64.efi not found in common locations. UEFI boot might fail.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+    print("Step 4/9: Build directory created and EFI files copied.")
+
+    print(f"Step 5/9: Extracting ISO to {build_dir}...")
+    run_command(
+        [
+            "sudo",
+            "xorriso",
+            "-osirrox",
+            "on",
+            "-indev",
+            iso_path,
+            "-extract",
+            "/",
+            build_dir,
+        ],
+        check=True,
+    )
+    print("Step 5/9: ISO extracted.")
+
+    # To generate a preseed.cfg file, you can extract the example file from
+    # the downloaded ISO. After this script has run step 5, the ISO contents
+    # will be available in the build directory. The example preseed file is
+    # located within the initrd.gz archive. To extract it, you can use the
+    # following commands from the project root directory:
+    #
+    # mkdir -p build/initrd_contents
+    # cd build/initrd_contents
+    # gzip -dc ../debian_installer/install.amd/initrd.gz | cpio -id
+    # cp preseed.cfg ../../
+    # cd ../..
+    #
+    # Once you have the preseed.cfg in your project root, you can customize it
+    # and then re-run this script to create the unattended installer.
+    preseed_file = "preseed.cfg"
+    if os.path.exists(preseed_file):
+        print(f"Step 6/9: Copying preseed file to {build_dir}/preseed.cfg...")
+        shutil.copy(preseed_file, f"{build_dir}/preseed.cfg")
+        with open(f"{build_dir}/preseed.cfg", "a") as f:
+            f.write(
+                "\nd-i preseed/late_command string cp /cdrom/ojp-server_"
+                + _get_project_version_from_pyproject_toml()
+                + "_all.deb /target/tmp/ && chroot /target /usr/bin/dpkg -i /tmp/ojp-server_"
+                + _get_project_version_from_pyproject_toml()
+                + "_all.deb && rm /target/tmp/ojp-server_"
+                + _get_project_version_from_pyproject_toml()
+                + "_all.deb\n"
+            )
+        print("Step 6/9: Added package installation command to preseed.cfg.")
+
+        isolinux_cfg_path: str = f"{build_dir}/isolinux/isolinux.cfg"
+        print(
+            f"Step 7/9: Modifying bootloader configuration in {isolinux_cfg_path}..."
+        )
+        with open(isolinux_cfg_path, "r") as f:
+            isolinux_cfg: str = f.read()
+
+        isolinux_cfg = isolinux_cfg.replace(
+            "append initrd=/install.amd/initrd.gz",
+            "append initrd=/install.amd/initrd.gz preseed/file=/cdrom/preseed.cfg",
+        )
+
+        with open(isolinux_cfg_path, "w") as f:
+            f.write(isolinux_cfg)
+        print("Step 7/9: Bootloader configuration modified.")
+    else:
+        print(
+            "Step 6/9: No preseed.cfg file found, skipping unattended installation."
+        )
+        print("Step 7/9: Bootloader configuration not modified.")
+
+    print(
+        "Step 8/9: Copying ojp-server.deb and stripped installer script to ISO build directory..."
+    )
+    shutil.copy(
+        os.path.join(
+            _IMAGE_OUTPUT_DIR,
+            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+        ),
+        os.path.join(
+            build_dir,
+            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+        ),
+    )
+    shutil.copy(stripped_script_path, f"{build_dir}/install_kubernetes.py")
+    print("Step 8/9: Files copied.")
+
+    print(f"Step 9/9: Rebuilding ISO as {new_iso_filename}...")
+    run_command(
+        [
+            "xorriso",
+            "-as",
+            "mkisofs",
+            "-isohybrid-mbr",
+            "/usr/lib/ISOLINUX/isohdpfx.bin",
+            "-c",
+            "isolinux/boot.cat",
+            "-b",
+            "isolinux/isolinux.bin",
+            "-no-emul-boot",
+            "-boot-load-size",
+            "4",
+            "-boot-info-table",
+            "-eltorito-alt-boot",
+            "--efi-boot",
+            "EFI/boot/bootx64.efi",
+            "-no-emul-boot",
+            "-o",
+            new_iso_filename,
+            build_dir,
+        ],
+        check=True,
+    )
+    print("Step 8/9: ISO rebuilt.")
+    print(f"Step 9/9: Cleaning up temporary build directory {build_dir}...")
+    run_command(
+        [
+            "sudo",
+            "rm",
+            "-rf",
+            os.path.join(_IMAGE_OUTPUT_DIR, "build/debian_installer"),
+        ],
+        check=True,
+    )
+    os.remove(stripped_script_path)
+    print("Step 9/9: Temporary build directory cleaned up.")
+    print(f"Successfully created {new_iso_filename}.")
 
 
 if __name__ == "__main__":
@@ -1277,12 +1254,11 @@ if __name__ == "__main__":
     if _DEBUG:
         _VERBOSE = True
 
-    # Create the images directory if it doesn't exist
     os.makedirs(_IMAGE_OUTPUT_DIR, exist_ok=True)
 
     script_path = os.path.abspath(__file__)
     is_installed_run = script_path.startswith("/opt/ojp-server")
-    package_name = "ojp-server"  # Standard package name
+    package_name = "ojp-server"
 
     if args.action == "deploy":
         kubectl_cmd = get_kubectl_command()
@@ -1374,7 +1350,7 @@ if __name__ == "__main__":
                             rpi_model_input: str = input(
                                 "Enter Raspberry Pi model (3 or 4, default: 4): "
                             )
-                            rpi_model_to_pass: int = 4  # Default value
+                            rpi_model_to_pass: int = 4
 
                             if rpi_model_input == "":
                                 create_debian_installer_rpi64(
