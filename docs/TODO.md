@@ -7,16 +7,8 @@ That have yet to be added to the board.
 ## Add validation for the most critical installer arguments
 * Extensively test incorrect arguments and produce quality errors
 
-## Refactor installer to be far more modular
-* Further splitting is needed so that when an install of any sections are called, only the needed system packages for
-  that are installed
-
-## Add interactive arguments to installer for sections, steps and commands
-* Need to leverage the exiting 'redo step' process so that we can set flags to prompt before executing any command, set
-  flags to redo any specific command, etc.
-
 ## Make install.py --status nicer
-* Use some sort of tree view to make `./installer.py --status` more intelligible
+* Note: Irrelevant with Kubernetes approach which uses native kubectl tools for status
 
 ## Make renderd pre-rendered tiles configurable
 * Take the hardcoded logic out of the configurator and put it into config yaml
@@ -36,5 +28,3 @@ That have yet to be added to the board.
 ## External file diffs
 
 ## Refactor installer to separate services out 
-
-##  Move from docker to CRI-O or docker

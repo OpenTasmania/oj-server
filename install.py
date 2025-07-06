@@ -533,4 +533,6 @@ def main(args: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    print("This installer is now deprecated. Use at own risk.")
+    sys.exit()
+    # sys.exit(main())

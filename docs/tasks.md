@@ -31,9 +31,6 @@ will depend on.
 
 ### **Installer & Code Quality**
 
-- [ ] **Task 4: Implement the Plugin-Based Installer**
-    - [ ] Create the core plugin registry system for the installer.
-    - [ ] Refactor the `postgres_installer` and `ufw_installer` as the first proof-of-concept plugins.
 - [ ] **Task 5: Improve Test Coverage and Documentation**
     - [ ] Write unit tests for all functions within the `common/` utility modules to reach >80% coverage.
     - [ ] Create and publish comprehensive architecture diagrams for the new Static and Real-time data pipelines
@@ -91,5 +88,6 @@ expansion and adding high-value features. The architecture now supports adding n
 - [ ] **Task 14: Implement Advanced Routing**
     - [ ] Add support for walking and cycling profiles to OSRM.
     - [ ] Begin research into integrating traffic-aware routing.
-- [ ] **Task 15: Create Web-Based Installation UI**
-    - [ ] Design and build a web-based interface to guide users through the initial server setup.
+- [x] **Task 15: Create easy to use installation UI**
+    - [x] Design and build a user-friendly interface to guide users through the initial server setup.
+    - [x] **Note**: Implemented via the interactive menu-driven interface in `install_kubernetes.py` which provides a guided installation experience.

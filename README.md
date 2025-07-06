@@ -31,10 +31,10 @@ The system is deployed on a GNU/Linux system with the following key components:
 
 * **Development Environment:** [Python](https://www.python.org/) package (`gtfs_processor`) managed with `uv` and
   defined by `pyproject.toml`, suitable for development in IDEs like [PyCharm](https://www.jetbrains.com/pycharm/).
-* **Database:** 
-  * PostgreSQL with PostGIS and HStore extensions for storing OSM and GTFS data.
-  * pgAdmin for database administration through a web interface. (Work in progress)
-  * pgAgent for scheduling and executing PostgreSQL jobs. (Work in progress)
+* **Database:**
+    * PostgreSQL with PostGIS and HStore extensions for storing OSM and GTFS data.
+    * pgAdmin for database administration through a web interface. (Work in progress)
+    * pgAgent for scheduling and executing PostgreSQL jobs. (Work in progress)
 * **Routing Engine:**
     * The `osrm/osrm-backend` [Docker](https://www.docker.com/) image is used, primarily due to dependency issues in
       development.
@@ -65,7 +65,13 @@ The system is deployed on a GNU/Linux system with the following key components:
 
 ### Quick Start
 
-1. Check for essential preqrequisites:
+#### Option 1: Traditional Installation (Deprecated)
+
+> **Note:** The traditional installation method using `install.py` is now deprecated in favor of the Kubernetes-based
+> deployment methods (Option 2 below). It is maintained for backward compatibility but will be removed in a future
+> release.
+
+1. Check for essential prerequisites:
     * Update the system package lists.
     * Upgrade the system if required to ensure the latest packages are installed.
     * Tests to see if basic python3 capability is available, and if not install it.
@@ -74,15 +80,15 @@ The system is deployed on a GNU/Linux system with the following key components:
 ```bash
 sudo apt --yes update
 sudo apt --yes upgrade
-if ! dpkg -s python3 > /dev/null 2>&1 || ! dpkg -s python3-dev > /dev/null 2>&1; then 
+if ! dpkg -s python3 >/dev/null 2>&1 || ! dpkg -s python3-dev >/dev/null 2>&1; then
   echo "python3 and/or python3-dev not found. Proceeding with installation..."
   sudo apt update && sudo apt --yes install python3 python3-dev
 else
-   echo "python3 and python3-dev are already installed."
+  echo "python3 and python3-dev are already installed."
 fi
 
 # Install python3-apt which is required for the AptManager
-if ! dpkg -s python3-apt > /dev/null 2>&1; then
+if ! dpkg -s python3-apt >/dev/null 2>&1; then
   echo "python3-apt not found. Proceeding with installation..."
   sudo apt --yes install python3-apt
 else
@@ -99,7 +105,67 @@ fi
 python3 install.py install postgres nginx apache osrm
 ```
 
-### Installer help
+#### Option 2: Kubernetes-Based Installation (Recommended)
+
+The recommended installation method is now using Kubernetes, either with MicroK8s for local development or a full
+Kubernetes cluster for production deployments.
+
+1. Install MicroK8s (for local development):
+
+```bash
+sudo snap install microk8s --classic
+sudo usermod -a -G microk8s $USER
+sudo chown -f -R $USER ~/.kube
+newgrp microk8s
+microk8s status --wait-ready
+microk8s enable dns storage ingress registry
+```
+
+2. Use the [Kubernetes installer](install_kubernetes.py) script.
+   regarding this method.
+
+```bash
+# Interactive menu
+python3 install_kubernetes.py
+
+# Or deploy directly
+python3 install_kubernetes.py deploy --env local
+```
+
+3. Creating Custom Installer Images:
+
+The Kubernetes installer can create custom Debian installer images with the OJP Server scripts pre-installed:
+
+- **AMD64 Installer Image**:
+  ```bash
+  python3 install_kubernetes.py build-amd64
+  ```
+  This creates a bootable ISO file (`debian-trixie-amd64-microk8s-unattended.iso`) that will automatically install
+  Debian with MicroK8s and the OJP Server Kubernetes configurations.
+
+- **Raspberry Pi Installer Image**:
+  ```bash
+  python3 install_kubernetes.py build-rpi64
+  ```
+  This creates a Raspberry Pi image file (`debian-trixie-rpi64-microk8s-unattended.img`) for Raspberry Pi 3 or 4 (
+  64-bit) with MicroK8s and OJP Server pre-installed.
+
+- **Debian Package**:
+  ```bash
+  python3 install_kubernetes.py build-deb
+  ```
+  This creates a standalone Debian package containing the Kubernetes configurations that can be installed on any
+  Debian-based system.
+
+All installer images are saved in the `images/` directory. These custom images provide a convenient way to deploy OJP
+Server on new systems without manual installation steps.
+
+For more details on the Kubernetes deployment and installer images, see
+the [Kubernetes documentation](docs/kubernetes.md).
+
+### Installer Help
+
+#### Traditional Installer (Deprecated)
 
 To obtain install configuration options and associated help text, use this command:
 
@@ -129,7 +195,7 @@ options:
 For more detailed help on a specific command, use:
 
 ```bash
-python3 install.py <command> --help
+python3 install.py <command >--help
 ```
 
 For example:
@@ -138,15 +204,42 @@ For example:
 python3 install.py install --help
 ```
 
-This will display help for the install command, showing what components can be installed.
+#### Kubernetes Installer (Recommended)
+
+For help with the Kubernetes installer:
+
+```bash
+python3 install_kubernetes.py --help
+```
+
+This will display help for the Kubernetes installer, showing available commands and options:
+
+```
+usage: install_kubernetes.py [-h] [--env ENV] [-v] [-d]
+                            {menu,deploy,destroy,build-amd64,build-rpi64,build-deb} ...
+
+Kubernetes deployment script for OJM.
+
+positional arguments:
+  {menu,deploy,destroy,build-amd64,build-rpi64,build-deb}
+                        The action to perform.
+
+options:
+  -h, --help            show this help message and exit
+  --env ENV             The environment to target (default: local).
+  -v, --verbose         Enable verbose output.
+  -d, --debug           Enable debug mode (implies --verbose and pauses before each step).
+```
 
 ---
 
-### Detailed Setup
+### Detailed Setup (Deprecated)
+
+**This is a description for the deprecated python system installer. Use the new Kubernetes installer**
 
 The setup process is designed to be followed sequentially.
 
-* **System Foundation - Debian 12**
+* **System Foundation - Debian 13**
     * Initial OS configuration, updates, and essential package installations (including all anticipated dependencies for
       subsequent services via a single `apt` command).
     * Firewall (`ufw`) setup.
@@ -169,14 +262,14 @@ The setup process is designed to be followed sequentially.
 
 ## 4. Project Structure
 
-1. [Installer](install.py)
-    * Modular installer framework for the Open Journey Planner Server.
-    * Installs and configures all components.
-    * Imports data from processors.
+1. Installers
+    * [Traditional Installer](install.py) (Deprecated) - Modular installer framework for the Open Journey Planner
+      Server.
+    * [Kubernetes Installer](install_kubernetes.py) (Recommended) - Deploys the system using Kubernetes/MicroK8s.
+    * Both installers configure components and import data from processors.
 2. Submodules
-    * [GTFS processor](installer/processors/plugins/importers/transit/gtfs) Python package to import GTFS data into the postgis
-      database on which
-      the mapping data exists.
+    * [GTFS processor](installer/processors/plugins/importers/transit/gtfs) Python package to import GTFS data into the
+      postgis database on which the mapping data exists.
 
 ## 5. History
 
@@ -195,8 +288,7 @@ intended to make use of Issues boards on a hosted git server, as well as continu
 ## 6. Future
 
 Theres a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
-Planned [enhancements](https://gitlab.com/opentasmania/ojp-server/-/issues/?label_name%5B%5D=Enhancement)
-can also be found on the Gitlab site.
+Planned [enhancements](https://gitlab.com/opentasmania/ojp-server/-/issues/?label_name%5B%5D=Enhancement) can also be found on the Gitlab site.
 
 ## 7. Support
 
@@ -210,4 +302,5 @@ Contributions welcome. Please see the [Contributions](docs/CONTRIBUTING.md) file
 
 ## 9. Developer Guidelines
 
-For detailed development guidelines, including build/configuration instructions, testing information, and additional development information, please see the [Developer Guidelines](.junie/guidelines.md) file.
+For detailed development guidelines, including build/configuration instructions, testing information, and additional
+development information, please see the [Developer Guidelines](.junie/guidelines.md) file.

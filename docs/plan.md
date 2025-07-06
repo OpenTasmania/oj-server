@@ -164,22 +164,30 @@ The project operates under the following constraints:
 
 ### **5.1 Installation Process**
 
-**Current State**: Installation is handled by a Python script with various options.
+**Current State**: Installation is now handled by two approaches:
+1. The traditional Python script (`install.py`) with various options (deprecated)
+2. The new Kubernetes-based installer (`install_kubernetes.py`) with interactive menu and command-line options (recommended)
 
-**Proposed Changes**:
+**Completed Changes**:
+
+* ✓ Implemented a Kubernetes-based deployment approach using Kustomize
+* ✓ Created an interactive menu-driven installation interface
+* ✓ Added support for different environments (local, production)
+* ✓ Implemented progress reporting and verbose/debug modes
+* ✓ Added ability to create custom Debian installer images for AMD64 and Raspberry Pi
+
+**Proposed Future Changes**:
 
 * Implement a rollback mechanism for failed installations
-* Create a web-based installation UI
-* Add support for non-Debian distributions
-* Implement progress reporting
-* **Rationale**: Improve user experience, reduce installation failures, and broaden the potential user base.
+* Create a full web-based installation UI
+* Add support for additional non-Debian distributions
+* **Rationale**: Further improve user experience, reduce installation failures, and broaden the potential user base.
 
 **Implementation Steps**:
 
-1. Design a transaction-based installation system
-2. Implement rollback functionality
-3. Create a web-based installation interface
-4. Add progress reporting to long-running tasks
+1. Enhance the Kubernetes installer with additional rollback capabilities
+2. Develop a web frontend for the existing Kubernetes installer
+3. Extend platform support beyond Debian-based systems
 
 ### **5.2 Transit Data Processing**
 
@@ -228,22 +236,28 @@ The project operates under the following constraints:
 
 ### **6.1 CI/CD Pipeline**
 
-**Current State**: Basic CI/CD is configured.
+**Current State**: Basic CI/CD is configured, and containerization support has been implemented through the Kubernetes installer.
 
-**Proposed Changes**:
+**Completed Changes**:
+
+* ✓ Implemented containerization support through the Kubernetes-based deployment
+* ✓ Added ability to build OCI-compliant container images
+* ✓ Created deployment automation through the Kubernetes installer
+
+**Proposed Future Changes**:
 
 * Implement automated testing in CI pipeline
 * Add static code analysis
-* Implement automated deployment
-* Create Docker images
-* **Rationale**: Improve code quality, reduce deployment errors, and make it easier to contribute to the project.
+* Enhance automated deployment with GitOps practices
+* Expand container registry integration
+* **Rationale**: Further improve code quality, reduce deployment errors, and make it easier to contribute to the project.
 
 **Implementation Steps**:
 
 1. Configure automated testing in CI
 2. Add static analysis tools
-3. Create deployment automation
-4. Build and publish Docker images
+3. Implement GitOps workflow for Kubernetes deployments
+4. Enhance container image building and publishing pipeline
 
 ### **6.2 Monitoring and Observability**
 
@@ -287,24 +301,31 @@ The project operates under the following constraints:
 
 ## **8. Performance Improvements**
 
-**Current State**: Performance optimizations may be incomplete.
+**Current State**: Performance optimizations may be incomplete, but the foundation for horizontal scaling has been established with the Kubernetes-based deployment.
 
-**Proposed Changes**:
+**Completed Changes**:
+
+* ✓ Added support for horizontal scaling through the Kubernetes architecture
+* ✓ Implemented containerization to enable better resource isolation and management
+* ✓ Created the foundation for distributed deployments across multiple nodes
+
+**Proposed Future Changes**:
 
 * Optimize database queries
-* Implement caching
+* Implement caching strategies
 * Optimize tile rendering
-* Implement parallel processing
-* Add support for horizontal scaling
-* **Rationale**: Improve user experience, reduce resource usage, and allow the system to handle larger datasets.
+* Implement parallel processing for data operations
+* Enhance Kubernetes resource management
+* **Rationale**: Further improve user experience, reduce resource usage, and allow the system to handle larger datasets.
 
 **Implementation Steps**:
 
-1. Identify performance bottlenecks
+1. Identify performance bottlenecks in the current deployment
 2. Optimize critical database queries
 3. Implement caching for frequently accessed data
 4. Add parallel processing for data imports
-5. Design horizontal scaling architecture
+5. Fine-tune Kubernetes resource requests and limits
+6. Implement horizontal pod autoscaling for key components
 
 ## **9. Implementation Roadmap**
 
@@ -314,8 +335,8 @@ The improvements outlined above should be prioritized as follows:
     * **Data Architecture (Static Pipeline Foundation)**: Define the Canonical Database Schema. Refactor the existing
       GTFS pipeline to function as the first plugin, loading data into the new canonical tables. Build the ETL
       orchestrator script to manage the process.
-    * **Installer & Code Quality**: Complete the plugin-based installer architecture, implement comprehensive testing,
-      improve documentation, and standardize code organization.
+    * **Installer & Code Quality** ✓: Implemented the Kubernetes-based installer architecture with `install_kubernetes.py`, 
+      providing a modular approach using Kustomize. Continue to improve testing, documentation, and code organization.
 
 2. **Medium-term (3-6 months)**
     * **Data Architecture (Real-time Service Foundation)**: Define and finalize the Canonical Data Model for real-time
@@ -332,9 +353,12 @@ The improvements outlined above should be prioritized as follows:
 3. **Long-term (6-12 months)**
     * **Data Architecture (Expansion)**: Iteratively develop and add new processor plugins for other data formats (SIRI,
       NeTEx, TransXchange, etc.) as required, for both the real-time and static data pipelines.
-    * **Feature & UI Development**: Develop advanced routing features and create the web-based installation UI.
-    * **Scalability**: Implement horizontal scaling.
-    * **Platform Support**: Add support for additional platforms.
+    * **Feature & UI Development**: Develop advanced routing features. ✓ Basic installation UI implemented via the 
+      interactive menu in `install_kubernetes.py`; continue to enhance with a full web-based interface.
+    * **Scalability** ✓: Implemented foundation for horizontal scaling through the Kubernetes architecture. Continue to 
+      enhance with fine-tuned resource management and autoscaling.
+    * **Platform Support** ✓: Added support for AMD64 and Raspberry Pi platforms through custom Debian installer images. 
+      Continue to expand to additional platforms.
 
 This roadmap balances immediate needs with long-term goals and considers the dependencies between different
 improvements.
