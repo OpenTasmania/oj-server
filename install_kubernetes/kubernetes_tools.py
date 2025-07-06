@@ -1,62 +1,14 @@
+# -*- coding: utf-8 -*-
+
 import os
 import shutil
 import subprocess
 import sys
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-_VERBOSE: bool = False
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+from install_kubernetes.common import run_command
 
-
-def run_command(
-    command: List[str],
-    directory: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,
-    check: bool = True,
-    capture_output: bool = False,
-) -> subprocess.CompletedProcess:
-    """
-    Executes a command as a subprocess and handles its behavior based on the specified parameters.
-    """
-    if _VERBOSE:
-        print(f"[VERBOSE] Executing: {' '.join(command)}")
-
-    if _VERBOSE and command[0] in [
-        "wget",
-        "vmdb2",
-        "dpkg",
-        "apt",
-        "apt-get",
-        "python3",
-        "docker",
-        "kubectl",
-        "microk8s.kubectl",
-    ]:
-        if "-v" not in command and "--verbose" not in command:
-            insert_pos = 1
-            if command[0] == "docker" and command[1] in ["build", "pull"]:
-                insert_pos = 2
-            command.insert(
-                insert_pos, "--verbose" if command[0] == "docker" else "-v"
-            )
-
-    result = subprocess.run(
-        command,
-        cwd=directory,
-        env=env,
-        capture_output=capture_output,
-        text=True,
-    )
-    if check and result.returncode != 0:
-        print(
-            f"Error: Command failed with exit code {result.returncode}",
-            file=sys.stderr,
-        )
-        if capture_output:
-            print(f"STDOUT: {result.stdout}", file=sys.stderr)
-            print(f"STDERR: {result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 def _build_and_register_images_for_local_env(kubectl: str) -> None:
@@ -100,7 +52,7 @@ def _build_and_register_images_for_local_env(kubectl: str) -> None:
     }
 
     data_processor_dockerfile_path = os.path.join(
-        PROJECT_ROOT, "..", "..", "data_processor", "Dockerfile"
+        PROJECT_ROOT,
     )
     os.makedirs(
         os.path.dirname(data_processor_dockerfile_path), exist_ok=True
@@ -262,7 +214,7 @@ def deploy(env: str, kubectl: str, is_installed: bool = False) -> None:
         kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
     else:
         kustomize_path = os.path.join(
-            PROJECT_ROOT, "..", "..", "kubernetes", "overlays", env
+            PROJECT_ROOT, "kubernetes", "overlays", env
         )
 
     if not os.path.isdir(kustomize_path):
@@ -285,7 +237,7 @@ def destroy(env: str, kubectl: str, is_installed: bool = False) -> None:
         kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
     else:
         kustomize_path = os.path.join(
-            PROJECT_ROOT, "..", "..", "kubernetes", "overlays", env
+            PROJECT_ROOT, "kubernetes", "overlays", env
         )
 
     if not os.path.isdir(kustomize_path):

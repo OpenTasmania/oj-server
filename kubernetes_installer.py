@@ -13,7 +13,7 @@ import sys
 from install_kubernetes.builders.amd64 import create_debian_installer_amd64
 from install_kubernetes.builders.rpi64 import create_debian_installer_rpi64
 from install_kubernetes.common import create_debian_package
-from install_kubernetes.tools import (
+from install_kubernetes.kubernetes_tools import (
     deploy,
     destroy,
     get_kubectl_command,

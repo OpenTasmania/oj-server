@@ -57,12 +57,32 @@ def run_command(
     env: Optional[Dict[str, str]] = None,
     check: bool = True,
     capture_output: bool = False,
+    verbose: bool = False,
 ) -> subprocess.CompletedProcess:
     """
-    Executes a command as a subprocess.
+    Executes a command as a subprocess and handles its behavior based on the specified parameters.
     """
-    if _VERBOSE:
+    if verbose:
         print(f"[VERBOSE] Executing: {' '.join(command)}")
+
+    if verbose and command[0] in [
+        "wget",
+        "vmdb2",
+        "dpkg",
+        "apt",
+        "apt-get",
+        "python3",
+        "docker",
+        "kubectl",
+        "microk8s.kubectl",
+    ]:
+        if "-v" not in command and "--verbose" not in command:
+            insert_pos = 1
+            if command[0] == "docker" and command[1] in ["build", "pull"]:
+                insert_pos = 2
+            command.insert(
+                insert_pos, "--verbose" if command[0] == "docker" else "-v"
+            )
 
     result = subprocess.run(
         command,
