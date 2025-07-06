@@ -13,7 +13,7 @@ certifi==2025.6.15 \
     --hash=sha256:2e0c7ce7cb5d8f8634ca55d2ba7e6ec2689a2fd6537d8dec1296a477a4910057 \
     --hash=sha256:d747aa5a8b9bbbb1bb8c22bb13e22bd1f18e9796defa16bab421f7f7a317323b
     # via
-    #   osm-osrm-server
+    #   ojp-server
     #   pyogrio
     #   pyproj
     #   requests
@@ -47,13 +47,13 @@ cython==3.1.2 \
     --hash=sha256:cc22e5f18af436c894b90c257130346930fdc860d7f42b924548c591672beeef \
     --hash=sha256:d23fd7ffd7457205f08571a42b108a3cf993e83a59fe4d72b42e6fc592cf2639 \
     --hash=sha256:eda6a43f1b78eae0d841698916eef661d15f8bc8439c266a964ea4c504f05612
-    # via osm-osrm-server
+    # via ojp-server
 folium==0.20.0 \
     --hash=sha256:a0d78b9d5a36ba7589ca9aedbd433e84e9fcab79cd6ac213adbcff922e454cb9 \
     --hash=sha256:f0bc2a92acde20bca56367aa5c1c376c433f450608d058daebab2fc9bf8198bf
     # via
     #   gtfs-kit
-    #   osm-osrm-server
+    #   ojp-server
 geopandas==1.1.0 \
     --hash=sha256:b19b18bdc736ee05b237f5e9184211c452768a4c883f7d7f8421b0cbe1da5875 \
     --hash=sha256:d176b084170539044ce7554a1219a4433fa1bfba94035b5a519c8986330e429e
@@ -61,7 +61,7 @@ geopandas==1.1.0 \
 gtfs-kit==10.3.1 \
     --hash=sha256:626d165b5c6dfcfa71932e7557bc0144919d10e2c0cef60d67f0135bff8afa38 \
     --hash=sha256:8749351aebbb4e6550d724f1976ca5647bdcbc501e062f88ed1cdd341687ef6f
-    # via osm-osrm-server
+    # via ojp-server
 idna==3.10 \
     --hash=sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9 \
     --hash=sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3
@@ -125,7 +125,7 @@ numpy==2.3.1 \
     # via
     #   folium
     #   geopandas
-    #   osm-osrm-server
+    #   ojp-server
     #   pandas
     #   pyogrio
     #   shapely
@@ -153,11 +153,11 @@ pandas==2.3.0 \
     # via
     #   geopandas
     #   gtfs-kit
-    #   osm-osrm-server
+    #   ojp-server
 psycopg==3.2.9 \
     --hash=sha256:01a8dadccdaac2123c916208c96e06631641c0566b22005493f09663c7a8d3b6 \
     --hash=sha256:2fbb46fcd17bc81f993f28c47f1ebea38d66ae97cc2dbc3cad73b37cefbff700
-    # via osm-osrm-server
+    # via ojp-server
 psycopg-c==3.2.9 ; implementation_name != 'pypy' \
     --hash=sha256:8c9f654f20c6c56bddc4543a3caab236741ee94b6732ab7090b95605502210e2
     # via psycopg
@@ -165,7 +165,7 @@ pydantic==2.11.7 \
     --hash=sha256:d989c3c6cb79469287b1569f7447a17848c998458d49ebe294e975b9baf0f0db \
     --hash=sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b
     # via
-    #   osm-osrm-server
+    #   ojp-server
     #   pydantic-settings
 pydantic-core==2.33.2 \
     --hash=sha256:04a1a413977ab517154eebb2d326da71638271477d6ad87a769102f7c2488c56 \
@@ -190,7 +190,7 @@ pydantic-core==2.33.2 \
 pydantic-settings==2.10.1 \
     --hash=sha256:06f0062169818d0f5524420a360d632d5857b83cffd4d42fe29597807a1614ee \
     --hash=sha256:a60952460b99cf661dc25c29c0ef171721f98bfcb52ef8d9ea4c943d7c8cc796
-    # via osm-osrm-server
+    # via ojp-server
 pyogrio==0.11.0 \
     --hash=sha256:0b39e34199460dcd6a606db184094e69bcba89d1babb9a76cee74a134b53b232 \
     --hash=sha256:373a29d56a9016978aff57b88a640b5a8c3024dba7be1c059ad5af4ba932b59e \
@@ -219,7 +219,7 @@ python-dotenv==1.1.0 \
     --hash=sha256:41f90bc6f5f177fb41f53e87666db362025010eb28f60a01c9143bfa33a2b2d5 \
     --hash=sha256:d7c01d9e2293916c18baf562d95698754b0dbbb5e74d457c45d4f6561fb9d55d
     # via
-    #   osm-osrm-server
+    #   ojp-server
     #   pydantic-settings
 pytz==2025.2 \
     --hash=sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3 \
@@ -236,14 +236,14 @@ pyyaml==6.0.2 \
     --hash=sha256:bc2fa7c6b47d6bc618dd7fb02ef6fdedb1090ec036abab80d4681424b84c1183 \
     --hash=sha256:d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e \
     --hash=sha256:efdca5630322a10774e8e98e1af481aad470dd62c3170801852d752aa7a783ba
-    # via osm-osrm-server
+    # via ojp-server
 requests==2.32.4 \
     --hash=sha256:27babd3cda2a6d50b30443204ee89830707d396671944c998b5975b031ac2b2c \
     --hash=sha256:27d0316682c8a29834d3264820024b62a36942083d52caf2f14c0591336d3422
     # via
     #   folium
     #   gtfs-kit
-    #   osm-osrm-server
+    #   ojp-server
 rtree==1.4.0 \
     --hash=sha256:0133d9c54ab3ffe874ba6d411dbe0254765c5e68d92da5b91362c370f16fd997 \
     --hash=sha256:20d5b3f9cf8bbbcc9fec42ab837c603c5dd86103ef29134300c8da2495c1248b \
@@ -307,7 +307,7 @@ urllib3==2.4.0 \
 urwid==3.0.2 \
     --hash=sha256:94ec1448d0178c881c01845c2b478cdc89f7b71bb65349466dbc99da1965eaac \
     --hash=sha256:e7cb70ba1e7ff45779a5a57e43c57581ee7de6ceefb56c432491a4a6ce81eb78
-    # via osm-osrm-server
+    # via ojp-server
 wcwidth==0.2.13 \
     --hash=sha256:3da69048e4540d84af32131829ff948f1e022c1c6bdb8d6102117aac784f6859 \
     --hash=sha256:72ea0c06399eb286d978fdedb6923a9eb47e1c486ce63e9b4e64fc18303972b5

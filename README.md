@@ -1,10 +1,10 @@
-# Open Street Map and Routing Machine Server
+# Open Journey Planner Server
 
-<img src="assets/artwork/logos/osm-osrm-server-logo-full.png" alt="OSM ORSM Server Logo" width="40%"/>
+<img src="assets/artwork/logos/ojp-logo-full.png" alt="Open Journey Planner Server Logo" width="40%"/>
 
-[![Latest Release](https://gitlab.com/opentasmania/osm-osrm-server/-/badges/release.svg)](https://gitlab.com/opentasmania/osm-osrm-server/-/releases)
+[![Latest Release](https://gitlab.com/opentasmania/ojp-server/-/badges/release.svg)](https://gitlab.com/opentasmania/ojp-server/-/releases)
 
-[![Latest Tag (SemVer)](https://img.shields.io/gitlab/v/tag/opentasmania/osm-osrm-server?sort=semver)](https://gitlab.com/opentasmania/osm-osrm-server/-/tags)
+[![Latest Tag (SemVer)](https://img.shields.io/gitlab/v/tag/opentasmania/ojp-server?sort=semver)](https://gitlab.com/opentasmania/ojp-server/-/tags)
 
 **Date:** 2025-06-26
 
@@ -111,7 +111,7 @@ This will display the following help text:
 
 ```
 usage: install.py [-h] [-v] {list,install,uninstall,status} ...
-Installer for OSM-OSRM Server
+Installer for Open Journey Planner Server
 
 positional arguments:
   {list,install,uninstall,status}
@@ -170,7 +170,7 @@ The setup process is designed to be followed sequentially.
 ## 4. Project Structure
 
 1. [Installer](install.py)
-    * Modular installer framework for the OSM-OSRM Server.
+    * Modular installer framework for the Open Journey Planner Server.
     * Installs and configures all components.
     * Imports data from processors.
 2. Submodules
@@ -195,12 +195,12 @@ intended to make use of Issues boards on a hosted git server, as well as continu
 ## 6. Future
 
 Theres a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
-Planned [enhancements](https://gitlab.com/opentasmania/osm-osrm-server/-/issues/?label_name%5B%5D=Enhancement)
+Planned [enhancements](https://gitlab.com/opentasmania/ojp-server/-/issues/?label_name%5B%5D=Enhancement)
 can also be found on the Gitlab site.
 
 ## 7. Support
 
-There's an [issues](https://gitlab.com/opentasmania/osm-osrm-server/-/issues) board where you can submit bugs.
+There's an [issues](https://gitlab.com/opentasmania/ojp-server/-/issues) board where you can submit bugs.
 A [Revolt server])(https://revolt.chat) is being worked on, but not yet launched. An FAQ is planned, as well
 as a Wiki.
 

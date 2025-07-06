@@ -1,5 +1,5 @@
 # /common/constants.yaml
-# Central constants file for the OSM-OSRM Server project
+# Central constants file for the Open Journey Planner Server project
 
 # Feature flags
 features:
@@ -12,7 +12,7 @@ defaults:
   gtfs_feed_url: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
   vm_ip_or_domain: "example.com"
   pg_tileserv_binary_location: "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
-  log_prefix: "[MAP-SETUP]"
+  log_prefix: "[OJP-SERVER-SETUP]"
 
   # Database defaults
   postgres:

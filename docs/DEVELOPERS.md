@@ -1,6 +1,6 @@
-# OSM-OSRM Server Development Guidelines
+# Open Journey Planner Server Development Guidelines
 
-This document provides essential information for developers working on the OSM-OSRM Server project. It includes
+This document provides essential information for developers working on the Open Journey Planner Server project. It includes
 build/configuration instructions, testing information, and additional development guidelines.
 
 ## Build/Configuration Instructions
@@ -14,8 +14,8 @@ build/configuration instructions, testing information, and additional developmen
 2. **Initial Setup**:
    ```bash
    # Clone the repository
-   git clone https://gitlab.com/opentasmania/osm-osrm-server.git
-   cd osm-osrm-server
+   git clone https://gitlab.com/opentasmania/ojp-server.git
+   cd ojp-server
 
    # Run the install script which will set up uv and create a virtual environment
    python3 install.py

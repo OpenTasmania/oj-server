@@ -8,31 +8,31 @@ namePrefix: prod-
 # Patch image paths to point to the production private registry (e.g., Harbor)
 images:
   - name: postgres
-    newName: harbor.your-domain.com/osm-osrm/postgres
+    newName: harbor.your-domain.com/ojp/postgres
   - name: osrm
-    newName: harbor.your-domain.com/osm-osrm/osrm
+    newName: harbor.your-domain.com/ojp/osrm
   - name: pg_tileserv
-    newName: harbor.your-domain.com/osm-osrm/pg_tileserv
+    newName: harbor.your-domain.com/ojp/pg_tileserv
   - name: renderd
-    newName: harbor.your-domain.com/osm-osrm/renderd
+    newName: harbor.your-domain.com/ojp/renderd
   - name: apache
-    newName: harbor.your-domain.com/osm-osrm/apache
+    newName: harbor.your-domain.com/ojp/apache
   - name: nginx
-    newName: harbor.your-domain.com/osm-osrm/nginx
+    newName: harbor.your-domain.com/ojp/nginx
   - name: carto
-    newName: harbor.your-domain.com/osm-osrm/carto
+    newName: harbor.your-domain.com/ojp/carto
   - name: nodejs
-    newName: harbor.your-domain.com/osm-osrm/nodejs
+    newName: harbor.your-domain.com/ojp/nodejs
   - name: certbot
-    newName: harbor.your-domain.com/osm-osrm/certbot
+    newName: harbor.your-domain.com/ojp/certbot
   - name: pgadmin
-    newName: harbor.your-domain.com/osm-osrm/pgadmin
+    newName: harbor.your-domain.com/ojp/pgadmin
   - name: pgagent
-    newName: harbor.your-domain.com/osm-osrm/pgagent
+    newName: harbor.your-domain.com/ojp/pgagent
   - name: data_processing
-    newName: harbor.your-domain.com/osm-osrm/data_processing
+    newName: harbor.your-domain.com/ojp/data_processing
   - name: py3gtfskit
-    newName: harbor.your-domain.com/osm-osrm/py3gtfskit
+    newName: harbor.your-domain.com/ojp/py3gtfskit
 
 # Patch deployments for higher availability
 patches:

@@ -1,8 +1,8 @@
 # !/usr/bin/env python3
-# filename: ot-osm-osrm-server/install.py
+# filename: ojp-server/install.py
 # -*- coding: utf-8 -*-
 """
-Entry point for the OSM-OSRM Server installer.
+Entry point for the Open Journey Planner Server installer.
 """
 
 # DO NOT MOVE OR REMOVE
@@ -97,7 +97,7 @@ def load_all_components(logger: logging.Logger):
 def setup_logging(verbose: bool = False) -> logging.Logger:
     """Set up logging for the installer."""
     log_level = logging.DEBUG if verbose else logging.INFO
-    logger = logging.getLogger("osm_osrm_installer")
+    logger = logging.getLogger("ojp_server_installer")
     logger.setLevel(log_level)
     if not logger.handlers:
         console_handler = logging.StreamHandler()
@@ -113,7 +113,7 @@ def setup_logging(verbose: bool = False) -> logging.Logger:
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Installer for OSM-OSRM Server"
+        description="Installer for Open Journey Planner Server"
     )
 
     # First, extract any global flags like -v that might appear anywhere in the command
@@ -218,7 +218,7 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main(args: Optional[List[str]] = None) -> int:
-    """Main entry point for the OSM-OSRM Server installer."""
+    """Main entry point for the Open Journey Planner Server installer."""
     # Handle 'help' command as a synonym for '--help'
     if args is None:
         if len(sys.argv) > 1 and sys.argv[1] == "help":

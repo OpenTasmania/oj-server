@@ -453,7 +453,7 @@ def deploy(env: str, kubectl: str) -> None:
         kubectl (str): The kubectl command to use (e.g., "kubectl" or "microk8s.kubectl").
     """
     print(f"Deploying '{env}' environment...")
-    kustomize_path: str = f"/opt/openjourneymapper/kubernetes/overlays/{env}"
+    kustomize_path: str = f"/opt/ojp-server/kubernetes/overlays/{env}"
     command: List[str] = [kubectl, "apply", "-k", kustomize_path]
     run_command(command)
 
@@ -471,12 +471,12 @@ def destroy(env: str, kubectl: str) -> None:
         kubectl (str): The kubectl command to use (e.g., "kubectl" or "microk8s.kubectl").
     """
     print(f"Destroying '{env}' environment...")
-    kustomize_path: str = f"/opt/openjourneymapper/kubernetes/overlays/{env}"
+    kustomize_path: str = f"/opt/ojp-server/kubernetes/overlays/{env}"
     command: List[str] = [kubectl, "delete", "-k", kustomize_path]
     run_command(command)
 
 
-def create_debian_package(package_name: str = "openjourneymapper") -> None:
+def create_debian_package(package_name: str = "ojp-server") -> None:
     """
     Creates a custom Debian package containing the Kubernetes configurations.
 
@@ -523,8 +523,8 @@ Section: base
 Priority: optional
 Architecture: all
 Maintainer: Your Name <debian@opentasmania.net>
-Description: Open Journey Mapper Kubernetes Configurations
- This package contains the Kubernetes configurations for Open Journey Mapper.
+Description: Open Journey Planner Server Kubernetes Configurations
+ This package contains the Kubernetes configurations for Open Journey Planner Server.
 """
     control_dir: str = f"{build_dir}/DEBIAN"
     os.makedirs(control_dir, exist_ok=True)
@@ -717,11 +717,11 @@ def create_debian_installer_amd64() -> None:
         shutil.copy(preseed_file, f"{build_dir}/preseed.cfg")
         with open(f"{build_dir}/preseed.cfg", "a") as f:
             f.write(
-                "\nd-i preseed/late_command string cp /cdrom/openjourneymapper_"
+                "\nd-i preseed/late_command string cp /cdrom/ojp-server_"
                 + _get_project_version_from_pyproject_toml()
-                + "_all.deb /target/tmp/ && chroot /target /usr/bin/dpkg -i /tmp/openjourneymapper_"
+                + "_all.deb /target/tmp/ && chroot /target /usr/bin/dpkg -i /tmp/ojp-server_"
                 + _get_project_version_from_pyproject_toml()
-                + "_all.deb && rm /target/tmp/openjourneymapper_"
+                + "_all.deb && rm /target/tmp/ojp-server_"
                 + _get_project_version_from_pyproject_toml()
                 + "_all.deb\n"
             )
@@ -749,16 +749,16 @@ def create_debian_installer_amd64() -> None:
         print("Step 7/9: Bootloader configuration not modified.")
 
     print(
-        "Step 8/9: Copying openjourneymapper.deb and stripped installer script to ISO build directory..."
+        "Step 8/9: Copying ojp-server.deb and stripped installer script to ISO build directory..."
     )
     shutil.copy(
         os.path.join(
             _IMAGE_OUTPUT_DIR,
-            f"openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb",
+            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
         ),
         os.path.join(
             build_dir,
-            f"openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb",
+            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
         ),
     )
     shutil.copy(stripped_script_path, f"{build_dir}/install_kubernetes.py")
@@ -886,17 +886,17 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
     print("Step 6/14: Repository cloned.")
 
     _pause_for_debug(
-        "Before copying openjourneymapper.deb and stripped installer script to RPi image build directory."
+        "Before copying ojp-server.deb and stripped installer script to RPi image build directory."
     )
     print(
-        "Step 7/14: Copying openjourneymapper.deb and stripped installer script to RPi image build directory..."
+        "Step 7/14: Copying ojp-server.deb and stripped installer script to RPi image build directory..."
     )
     shutil.copy(
         os.path.join(
             _IMAGE_OUTPUT_DIR,
-            f"openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb",
+            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
         ),
-        f"{rpi_image_specs_dir}/openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb",
+        f"{rpi_image_specs_dir}/ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
     )
     shutil.copy(
         stripped_script_path, f"{rpi_image_specs_dir}/install_kubernetes.py"
@@ -911,9 +911,9 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
         "snap install microk8s --classic",
         "usermod --append --groups microk8s user",
         "microk8s status --wait-ready",
-        f"cp /openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb /tmp/",
-        f"dpkg -i /tmp/openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb",
-        f"rm /tmp/openjourneymapper_{_get_project_version_from_pyproject_toml()}_all.deb",
+        f"cp /ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb /tmp/",
+        f"dpkg -i /tmp/ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+        f"rm /tmp/ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
     ]
     print(
         "Step 8/14: Modifying generate-recipe.py to include MicroK8s installation..."

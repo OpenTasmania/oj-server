@@ -1,4 +1,4 @@
-# ot-osm-osrm-server/setup/config_models.py
+# ojp-server/installer/config_models.py
 # -*- coding: utf-8 -*-
 """
 Pydantic models for application configuration.
@@ -26,7 +26,7 @@ VM_IP_OR_DOMAIN_DEFAULT: str = "example.com"
 PG_TILESERV_BINARY_LOCATION_DEFAULT: str = (
     "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
 )
-LOG_PREFIX_DEFAULT: str = "[MAP-SETUP]"
+LOG_PREFIX_DEFAULT: str = "[OJP-SERVER-SETUP]"
 
 PGHOST_DEFAULT: str = "127.0.0.1"
 PGPORT_DEFAULT: int = 5432

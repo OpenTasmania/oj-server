@@ -6,7 +6,7 @@ Refactor the Python-based installer framework by merging separate `installer` an
 
 **Project Context & Analysis:**
 
-The framework, located in `ot-osm-osrm-server/installer/components/`, contains numerous components that fall into two categories:
+The framework, located in `ojp-server/installer/components/`, contains numerous components that fall into two categories:
 
 1.  **Paired Components:** These components split their logic across two files: an `..._installer.py` file for installation methods (`install`, `uninstall`, `is_installed`) and a corresponding `..._configurator.py` file for configuration methods (`configure`, `unconfigure`, `is_configured`). This separation causes registration conflicts. The pairs to be merged are:
     * `apache`

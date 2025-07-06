@@ -10,7 +10,7 @@ gtfs_feed_url: "https://www.transport.act.gov.au/googletransit/google_transit.zi
 # If left as "example.com", the installer will error unless --dev-override is specified, in which case it will use the primary IP address.
 vm_ip_or_domain: "example.com"
 pg_tileserv_binary_location: "https://postgisftw.s3.amazonaws.com/pg_tileserv_latest_linux.zip"
-log_prefix: "[MAP-SETUP]" # Log prefix for the main installer script
+log_prefix: "[OJP-SERVER-SETUP]" # Log prefix for the main installer script
 
 # Developer Flags
 dev_override_unsafe_password: false # Set to true only for development to override safety checks, including allowing default DB password

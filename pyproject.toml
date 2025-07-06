@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "osm_osrm_server"
+name = "ojp_server"
 version = "0.9.0"
-description = "An Open Street Map and Open Source Routing Machine"
+description = "Open Journey Planner Server"
 readme = "README.md"
 authors = [
     { name = "Peter Lawler", email = "osmosrmserver@opentasmania.net" },
@@ -51,10 +51,10 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://opentasmania.net"
-Repository = "https://gitlab.com/opentasmania/osm-osrm-server"
+Repository = "https://gitlab.com/opentasmania/ojp-server"
 
 [project.scripts]
-install-map-server = "osm_osrm_server.install_map_server:main"
+install-map-server = "ojp_server.install_map_server:main"
 
 [project.optional-dependencies]
 dev = [
@@ -83,7 +83,7 @@ test = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["osm_osrm_server*"]
+include = ["ojp_server*"]
 exclude = ["tests*"]
 
 [tool.mypy]

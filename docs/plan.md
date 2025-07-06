@@ -1,8 +1,8 @@
-# **OSM-OSRM Server Improvement Plan**
+# **Open Journey Planner Server Improvement Plan**
 
 ## **1. Introduction**
 
-This document outlines a comprehensive improvement plan for the OSM-OSRM Server project based on an analysis of the
+This document outlines a comprehensive improvement plan for the Open Journey Planner Server project based on an analysis of the
 current codebase, architecture, and identified needs. The plan is organized by key areas of the system and includes
 rationale for each proposed change.
 
@@ -10,7 +10,7 @@ rationale for each proposed change.
 
 ### **2.1 Core Project Goals**
 
-The OSM-OSRM Server aims to:
+The Open Journey Planner Server aims to:
 
 1. Provide a complete self-hosted OpenStreetMap system
 2. Ingest and serve OpenStreetMap (OSM) data for base maps and routing networks
@@ -341,7 +341,7 @@ improvements.
 
 ## **10. Conclusion**
 
-The OSM-OSRM Server project has a solid foundation but can benefit significantly from the improvements outlined in this
+The Open Journey Planner Server project has a solid foundation but can benefit significantly from the improvements outlined in this
 plan. By focusing on a modular and canonical data architecture, while also improving code quality, features, DevOps,
 security, and performance, the project can become more robust, maintainable, and user-friendly.
 

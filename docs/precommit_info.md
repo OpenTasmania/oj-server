@@ -11,7 +11,7 @@
 # ID: 138fd403232d2ddd5efb44317e38bf03
 
 # start templated
-INSTALL_PYTHON=$HOME/Projects/ot-osm-osrm-server/.venv/bin/python3
+INSTALL_PYTHON=$HOME/Projects/ojp-server/.venv/bin/python3
 ARGS=(hook-impl --config=.pre-commit-config.yaml --hook-type=pre-commit)
 # end templated
 

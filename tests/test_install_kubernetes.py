@@ -218,7 +218,7 @@ def test_deploy_with_valid_environment_and_kubectl(mocker):
         kubectl,
         "apply",
         "-k",
-        f"/opt/openjourneymapper/kubernetes/overlays/{env}",
+        f"/opt/ojp-server/kubernetes/overlays/{env}",
     ]
     mock_run_command.assert_called_once_with(expected_command)
 
@@ -241,7 +241,7 @@ def test_destroy_with_valid_environment_and_kubectl(mocker):
         kubectl,
         "delete",
         "-k",
-        f"/opt/openjourneymapper/kubernetes/overlays/{env}",
+        f"/opt/ojp-server/kubernetes/overlays/{env}",
     ]
     mock_run_command.assert_called_once_with(expected_command)
 

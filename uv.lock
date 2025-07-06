@@ -350,7 +350,7 @@ wheels = [
 ]
 
 [[package]]
-name = "osm-osrm-server"
+name = "ojp-server"
 version = "0.9.0"
 source = { editable = "." }
 dependencies = [
