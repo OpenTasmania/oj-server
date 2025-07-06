@@ -1,11 +1,20 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: data-processing-job
+  name: gtfs-processing-job
+  namespace: ojp
 spec:
   template:
     spec:
       containers:
-        - name: data-processing
-          image: data_processing
+      - name: gtfs-processor
+        image: ojp/data-processor:latest
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ojp-config
       restartPolicy: Never
+  backoffLimit: 4

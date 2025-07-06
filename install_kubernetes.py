@@ -23,66 +23,168 @@ _IMAGE_OUTPUT_DIR: str = "images"
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
-def _pause_for_debug(message: str) -> None:
+def _build_and_register_images_for_local_env(kubectl: str) -> None:
     """
-    Pauses execution for debugging purposes by printing a debug message and waiting for user input.
-
-    This function is only invoked if the _DEBUG flag is set to True. It allows developers
-    to review specific debug messages and manually resume execution by pressing Enter.
-
-    Parameters:
-    message: str
-        The debug message to be printed before pausing.
-
-    Returns:
-    None
+    Builds custom Docker images and pulls standard ones, then registers them
+    with the local MicroK8s registry.
     """
-    if _DEBUG:
-        print(f"DEBUG PAUSE: {message}")
-        input("Press Enter to continue...")
-
-
-def _get_project_version_from_pyproject_toml() -> str:
-    """
-    Reads the project version from pyproject.toml.
-
-    Returns:
-        str: The version string.
-
-    Raises:
-        SystemExit: If pyproject.toml is not found or version cannot be extracted.
-    """
-    pyproject_path = os.path.join(PROJECT_ROOT, "pyproject.toml")
-    if not os.path.exists(pyproject_path):
-        print(
-            f"Error: {pyproject_path} not found. Cannot determine package version.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    with open(pyproject_path, "r") as f:
-        content = f.read()
-
-    # Regex to find the version under [project]
-    match = re.search(
-        r'\[project\]\s*\n[^\[]*?version\s*=\s*"([^"]*)"',
-        content,
-        re.MULTILINE,
+    print(
+        "\n--- Building and registering images for local MicroK8s environment ---"
     )
-    if match:
-        return match.group(1)
-    else:
+
+    if not shutil.which("docker"):
         print(
-            f"Error: Version not found in {pyproject_path} under [project].",
+            "Error: 'docker' command not found. Please install Docker.",
             file=sys.stderr,
         )
         sys.exit(1)
+
+    if not kubectl.startswith("microk8s"):
+        print(
+            "Warning: Not using 'microk8s.kubectl'. This function is designed for MicroK8s."
+        )
+        print(
+            "It will attempt to push to 'localhost:32000', which might require 'docker login'."
+        )
+
+    # Define standard images to pull and custom images to build
+    # For custom images, the value is the path to the Dockerfile relative to project root
+    images_to_process = {
+        # Standard images from Docker Hub
+        "postgres": "postgres:latest",
+        "osrm": "osrm/osrm-backend:latest",
+        "nginx": "nginx:latest",
+        "nodejs": "node:latest",
+        "certbot": "certbot/certbot:latest",
+        "pgadmin": "dpage/pgadmin4:latest",
+        # Custom images to build from Dockerfiles
+        "data_processing": "data_processor/Dockerfile",
+        "apache": "kubernetes/components/apache/Dockerfile",
+        "carto": "kubernetes/components/carto/Dockerfile",
+        "pgagent": "kubernetes/components/pgagent/Dockerfile",
+        "pg_tileserv": "kubernetes/components/pg_tileserv/Dockerfile",
+        "py3gtfskit": "kubernetes/components/py3gtfskit/Dockerfile",
+        "renderd": "kubernetes/components/renderd/Dockerfile",
+    }
+
+    # Create the Dockerfile for data_processor if it doesn't exist
+    data_processor_dockerfile_path = os.path.join(
+        PROJECT_ROOT, "data_processor", "Dockerfile"
+    )
+    os.makedirs(
+        os.path.dirname(data_processor_dockerfile_path), exist_ok=True
+    )
+    if not os.path.exists(data_processor_dockerfile_path):
+        print(
+            f"Creating Dockerfile for data_processor at {data_processor_dockerfile_path}"
+        )
+        with open(data_processor_dockerfile_path, "w") as f:
+            f.write("""# Use a slim Python base image
+FROM python:3.9-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the necessary application code
+COPY common/ ./common/
+COPY installer/processors/ ./installer/processors/
+COPY data_processor/run.py .
+
+CMD ["python", "run.py"]
+""")
+
+    for name, source in images_to_process.items():
+        print(f"\nProcessing image: {name}")
+        local_image_tag = f"localhost:32000/{name}"
+
+        if source.endswith("Dockerfile"):  # Custom Image
+            dockerfile_path = os.path.join(PROJECT_ROOT, source)
+            if not os.path.exists(dockerfile_path):
+                print(
+                    f"Warning: Dockerfile not found at '{dockerfile_path}' for '{name}'. Skipping."
+                )
+                continue
+
+            print(
+                f"Building custom image '{local_image_tag}' from '{dockerfile_path}'..."
+            )
+            build_command = [
+                "docker",
+                "build",
+                "-t",
+                local_image_tag,
+                "-f",
+                dockerfile_path,
+                PROJECT_ROOT,
+            ]
+            run_command(build_command, check=True)
+
+        else:  # Standard Image
+            print(f"Pulling standard image '{source}'...")
+            run_command(["docker", "pull", source], check=True)
+            print(f"Retagging '{source}' to '{local_image_tag}'...")
+            run_command(
+                ["docker", "tag", source, local_image_tag], check=True
+            )
+
+        print(f"Importing '{local_image_tag}' into MicroK8s registry...")
+
+        # Using a pipe to send the image to microk8s
+        # Using a pipe to send the image to microk8s
+        save_process = subprocess.Popen(
+            ["docker", "save", local_image_tag], stdout=subprocess.PIPE
+        )
+        import_command = [
+            kubectl.split(".")[0],
+            "ctr",
+            "image",
+            "import",
+            "-",
+        ]
+        import_process = subprocess.run(
+            import_command,
+            stdin=save_process.stdout,
+            capture_output=True,
+            text=True,
+        )
+
+        # Close the stdout pipe. We add a check to satisfy the type checker (mypy).
+        if save_process.stdout:
+            save_process.stdout.close()
+
+        # Wait for the save process to complete to clean up the process entry.
+        save_process.wait()
+
+        if import_process.returncode != 0:
+            print(
+                f"Error importing image '{local_image_tag}' into MicroK8s.",
+                file=sys.stderr,
+            )
+            print(f"STDERR: {import_process.stderr}", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Successfully processed image: {name}")
+
+    print("\n--- Image building and registration complete ---")
 
 
 def _create_stripped_installer_script() -> str:
     """
-    Creates a temporary version of this script with Debian package creation
-    functionality removed, for inclusion in installer images.
+    Generates a stripped version of the Kubernetes installer script by removing specific
+    functions, menu options, CLI actions, and unused imports. The stripped script is saved
+    with a new name in a temporary directory.
+
+    Returns:
+        str: The absolute path to the stripped installer script.
+
+    Raises:
+        OSError: If the source script file cannot be read or the stripped script file cannot
+            be written.
+        re.error: If there is an error in the regular expression operations.
     """
     original_script_path = os.path.abspath(__file__)
     with open(original_script_path, "r") as f:
@@ -179,62 +281,145 @@ def _create_stripped_installer_script() -> str:
     return temp_script_path
 
 
-def run_command(
-    command: List[str],
-    directory: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,
-) -> None:
+def _get_project_version_from_pyproject_toml() -> str:
     """
-    Runs a shell command and handles errors.
+    Extracts the project version from the pyproject.toml file.
 
-    If the global `_VERBOSE` flag is set, it prints the command being executed
-    and attempts to add a verbose flag (`-v`) to certain known commands.
-    If the command fails (returns a non-zero exit code), the script exits.
+    This function reads the pyproject.toml file located at the project's root directory
+    and attempts to extract the version number defined under the [project] section.
+    If the file does not exist or the version cannot be found, the function will terminate
+    the program with an error message.
 
-    Args:
-        command (List[str]): A list of strings representing the command and its arguments.
-        directory (Optional[str]): The directory in which to execute the command. Defaults to None (current working directory).
-        env (Optional[Dict[str, str]]): A dictionary of environment variables to set for the command. Defaults to None.
-
-    Raises:
-        SystemExit: If the executed command returns a non-zero exit code.
+    Returns:
+        str: The version number extracted from the pyproject.toml file.
     """
-    if _VERBOSE:
-        print(f"[VERBOSE] Executing: {' '.join(command)}")
-
-    if _VERBOSE:
-        if command[0] in [
-            "wget",
-            "vmdb2",
-            "dpkg",
-            "apt",
-            "apt-get",
-            "python3",
-        ]:
-            if "-v" not in command and "--verbose" not in command:
-                command.insert(1, "-v")
-
-    result: subprocess.CompletedProcess = subprocess.run(
-        command, stdout=sys.stdout, stderr=sys.stderr, cwd=directory, env=env
-    )
-    if result.returncode != 0:
+    pyproject_path = os.path.join(PROJECT_ROOT, "pyproject.toml")
+    if not os.path.exists(pyproject_path):
         print(
-            f"Error: Command failed with exit code {result.returncode}",
+            f"Error: {pyproject_path} not found. Cannot determine package version.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    with open(pyproject_path, "r") as f:
+        content = f.read()
+
+    # Regex to find the version under [project]
+    match = re.search(
+        r'\[project\]\s*\n[^\[]*?version\s*=\s*"([^"]*)"',
+        content,
+        re.MULTILINE,
+    )
+    if match:
+        return match.group(1)
+    else:
+        print(
+            f"Error: Version not found in {pyproject_path} under [project].",
             file=sys.stderr,
         )
         sys.exit(1)
 
 
-def get_apt_http_proxy() -> Optional[str]:
+def _pause_for_debug(message: str) -> None:
     """
-    Detects the APT HTTP proxy from system configuration files.
+    Pauses program execution for debugging purposes if debugging mode is enabled.
+    This function checks the `_DEBUG` flag and, if it is set to `True`, it
+    prints a provided message followed by a prompt to press Enter to continue.
 
-    This function searches common APT configuration paths for proxy settings.
-    It looks for `Acquire::http::Proxy` directives in `/etc/apt/apt.conf`
-    and files within `/etc/apt/apt.conf.d/`.
+    Args:
+        message (str): The message to display when debugging mode is active.
+    """
+    if _DEBUG:
+        print(f"DEBUG PAUSE: {message}")
+        input("Press Enter to continue...")
+
+
+def run_command(
+    command: List[str],
+    directory: Optional[str] = None,
+    env: Optional[Dict[str, str]] = None,
+    check: bool = True,
+    capture_output: bool = False,
+) -> subprocess.CompletedProcess:
+    """
+    Executes a command as a subprocess and handles its behavior based on the specified parameters.
+
+    This function provides flexible options for running shell commands, including the ability
+    to enable verbose output for supported commands, specify a working directory, supply
+    environment variables, capture output, and enforce checks on process exit codes.
+
+    Args:
+        command (List[str]): The command to execute as a list of strings. Example: ["ls", "-l"].
+        directory (Optional[str]): The working directory in which to execute the command.
+            If None, the current working directory is used.
+        env (Optional[Dict[str, str]]): A dictionary of environment variables to set for the subprocess.
+            If None, the current environment is passed to the subprocess.
+        check (bool): Whether to enforce a check on the process return code. If True, the function
+            will terminate execution if the command's exit code is non-zero. Defaults to True.
+        capture_output (bool): Determines whether the subprocess's output (stdout, stderr) should be
+            captured. If True, the output can be accessed in the returned object. Defaults to False.
 
     Returns:
-        Optional[str]: The detected APT HTTP proxy URL as a string, or None if no proxy is found.
+        subprocess.CompletedProcess: An instance of `subprocess.CompletedProcess` containing
+            information about the executed process, including the exit code, stdout, and stderr.
+
+    Raises:
+        SystemExit: Raised if `check` is True and the process exits with a non-zero return code.
+    """
+    if _VERBOSE:
+        print(f"[VERBOSE] Executing: {' '.join(command)}")
+
+    if _VERBOSE and command[0] in [
+        "wget",
+        "vmdb2",
+        "dpkg",
+        "apt",
+        "apt-get",
+        "python3",
+        "docker",
+        "kubectl",
+        "microk8s.kubectl",
+    ]:
+        if "-v" not in command and "--verbose" not in command:
+            # Insert verbose flag carefully
+            insert_pos = 1
+            if command[0] == "docker" and command[1] in ["build", "pull"]:
+                insert_pos = 2
+            command.insert(
+                insert_pos, "--verbose" if command[0] == "docker" else "-v"
+            )
+
+    result = subprocess.run(
+        command,
+        cwd=directory,
+        env=env,
+        capture_output=capture_output,
+        text=True,
+    )
+    if check and result.returncode != 0:
+        print(
+            f"Error: Command failed with exit code {result.returncode}",
+            file=sys.stderr,
+        )
+        if capture_output:
+            print(f"STDOUT: {result.stdout}", file=sys.stderr)
+            print(f"STDERR: {result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    return result
+
+
+def get_apt_http_proxy() -> Optional[str]:
+    """
+    Retrieves the HTTP proxy configuration for APT (Advanced Package Tool) by
+    checking specific configuration files. Searches for `Acquire::http::Proxy`
+    directive in standard APT configuration paths.
+
+    Checks both individual files and directories containing configuration
+    files under predefined locations to find the proxy configuration.
+
+    Returns:
+        Optional[str]: A string representing the HTTP proxy URL if found,
+        otherwise None.
     """
     proxy: Optional[str] = None
     apt_conf_dirs: List[str] = ["/etc/apt/apt.conf", "/etc/apt/apt.conf.d/"]
@@ -269,21 +454,17 @@ def get_apt_http_proxy() -> Optional[str]:
 
 def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
     """
-    Checks if required tools are installed and attempts to install missing ones using APT.
-
-    This function iterates through a list of tools, checking if their corresponding
-    Debian packages are installed using `dpkg`. If a tool is missing, it adds it
-    to a list of packages to be installed. It then attempts to install all missing
-    packages at once using `sudo apt install -y`.
+    Verifies the presence of required tools and attempts to install missing ones using the system's
+    package management tools. If a tool is missing, it prompts the user to manually install the tool
+    if automatic installation fails.
 
     Args:
-        tools (List[Tuple[str, str, str]]): A list of tuples, where each tuple contains:
-            - tool_name (str): The common name of the tool (e.g., "wget").
-            - package_name (str): The Debian package name for the tool (e.g., "wget").
-            - description (str): A brief description of the tool's purpose.
+        tools (List[Tuple[str, str, str]]): A list of required tools, where each tool is represented as a
+            tuple containing the tool name, the corresponding package name, and a description of the tool.
 
     Returns:
-        bool: True if all required tools are installed (or successfully installed), False otherwise.
+        bool: True if all required tools are present or successfully installed. False if some tools
+        could not be verified or installed.
     """
     missing_packages: List[Tuple[str, str, str]] = []
     for tool_name, package_name, description in tools:
@@ -376,7 +557,8 @@ def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
     ]
     try:
         run_command(
-            ["sudo", apt_cmd, "install", "-y"] + package_names_to_install
+            ["sudo", apt_cmd, "install", "-y"] + package_names_to_install,
+            check=True,
         )
         return True
     except Exception as e:
@@ -387,14 +569,20 @@ def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
 
 def get_kubectl_command() -> str:
     """
-    Determines which Kubernetes command-line tool (kubectl or microk8s.kubectl) to use.
+    Determines the appropriate 'kubectl' command based on system availability.
 
-    If both `microk8s` and `kubectl` are available, it prompts the user to choose.
-    If only one is available, it selects that one. If neither is found, it provides
-    installation instructions and exits.
+    This function checks if either 'microk8s' or 'kubectl' commands are available
+    on the system. If both are found, it prompts the user to choose one. If neither
+    are installed, it notifies the user and provides installation instructions
+    before terminating the program.
 
     Returns:
-        str: The command string for the chosen Kubernetes tool (e.g., "kubectl" or "microk8s.kubectl").
+        str: The determined 'kubectl' command to use, either "microk8s.kubectl" or
+        "kubectl".
+
+    Raises:
+        SystemExit: If neither 'microk8s' nor 'kubectl' are installed and the user
+        is provided with installation instructions.
     """
     has_microk8s: Optional[str] = shutil.which("microk8s")
     has_kubectl: Optional[str] = shutil.which("kubectl")
@@ -456,6 +644,9 @@ def deploy(env: str, kubectl: str, is_installed: bool = False) -> None:
                              installed location.
     """
     print(f"Deploying '{env}' environment...")
+    if env == "local":
+        _build_and_register_images_for_local_env(kubectl)
+
     if is_installed:
         kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
     else:
@@ -471,7 +662,7 @@ def deploy(env: str, kubectl: str, is_installed: bool = False) -> None:
         sys.exit(1)
 
     command: List[str] = [kubectl, "apply", "-k", kustomize_path]
-    run_command(command)
+    run_command(command, check=True)
 
 
 def destroy(env: str, kubectl: str, is_installed: bool = False) -> None:
@@ -502,7 +693,7 @@ def destroy(env: str, kubectl: str, is_installed: bool = False) -> None:
         sys.exit(1)
 
     command: List[str] = [kubectl, "delete", "-k", kustomize_path]
-    run_command(command)
+    run_command(command, check=True)
 
 
 def create_debian_package(package_name: str = "ojp-server") -> None:
@@ -567,13 +758,16 @@ Description: Open Journey Planner Server Kubernetes Configurations
     print("Step 4/5: DEBIAN/control file created.")
 
     print(f"Step 5/5: Building Debian package {package_output_name}...")
-    run_command([
-        "dpkg-deb",
-        "--root-owner-group",
-        "--build",
-        build_dir,
-        package_output_name,
-    ])
+    run_command(
+        [
+            "dpkg-deb",
+            "--root-owner-group",
+            "--build",
+            build_dir,
+            package_output_name,
+        ],
+        check=True,
+    )
     print("Step 5/5: Debian package built.")
 
     print(f"Successfully created Debian package: {package_output_name}")
@@ -630,7 +824,9 @@ def create_debian_installer_amd64() -> None:
     print(f"Step 2/9: Downloading Debian ISO from {iso_url}...")
     if not os.path.exists(iso_path):
         run_command(
-            ["wget", "-P", _IMAGE_OUTPUT_DIR, iso_url], env=os.environ.copy()
+            ["wget", "-P", _IMAGE_OUTPUT_DIR, iso_url],
+            env=os.environ.copy(),
+            check=True,
         )
     print("Step 2/9: Debian ISO downloaded.")
 
@@ -644,6 +840,7 @@ def create_debian_installer_amd64() -> None:
         run_command(
             ["wget", "-P", _IMAGE_OUTPUT_DIR, sha512sums_url],
             env=os.environ.copy(),
+            check=True,
         )
 
     expected_checksum: str = ""
@@ -716,17 +913,20 @@ def create_debian_installer_amd64() -> None:
     print("Step 4/9: Build directory created and EFI files copied.")
 
     print(f"Step 5/9: Extracting ISO to {build_dir}...")
-    run_command([
-        "sudo",
-        "xorriso",
-        "-osirrox",
-        "on",
-        "-indev",
-        iso_path,
-        "-extract",
-        "/",
-        build_dir,
-    ])
+    run_command(
+        [
+            "sudo",
+            "xorriso",
+            "-osirrox",
+            "on",
+            "-indev",
+            iso_path,
+            "-extract",
+            "/",
+            build_dir,
+        ],
+        check=True,
+    )
     print("Step 5/9: ISO extracted.")
 
     # To generate a preseed.cfg file, you can extract the example file from
@@ -798,36 +998,42 @@ def create_debian_installer_amd64() -> None:
 
     print(f"Step 9/9: Rebuilding ISO as {new_iso_filename}...")
     # Rebuild the ISO
-    run_command([
-        "xorriso",
-        "-as",
-        "mkisofs",
-        "-isohybrid-mbr",
-        "/usr/lib/ISOLINUX/isohdpfx.bin",
-        "-c",
-        "isolinux/boot.cat",
-        "-b",
-        "isolinux/isolinux.bin",
-        "-no-emul-boot",
-        "-boot-load-size",
-        "4",
-        "-boot-info-table",
-        "-eltorito-alt-boot",
-        "--efi-boot",
-        "EFI/boot/bootx64.efi",
-        "-no-emul-boot",
-        "-o",
-        new_iso_filename,
-        build_dir,
-    ])
+    run_command(
+        [
+            "xorriso",
+            "-as",
+            "mkisofs",
+            "-isohybrid-mbr",
+            "/usr/lib/ISOLINUX/isohdpfx.bin",
+            "-c",
+            "isolinux/boot.cat",
+            "-b",
+            "isolinux/isolinux.bin",
+            "-no-emul-boot",
+            "-boot-load-size",
+            "4",
+            "-boot-info-table",
+            "-eltorito-alt-boot",
+            "--efi-boot",
+            "EFI/boot/bootx64.efi",
+            "-no-emul-boot",
+            "-o",
+            new_iso_filename,
+            build_dir,
+        ],
+        check=True,
+    )
     print("Step 8/9: ISO rebuilt.")
     print(f"Step 9/9: Cleaning up temporary build directory {build_dir}...")
-    run_command([
-        "sudo",
-        "rm",
-        "-rf",
-        os.path.join(_IMAGE_OUTPUT_DIR, "build/debian_installer"),
-    ])
+    run_command(
+        [
+            "sudo",
+            "rm",
+            "-rf",
+            os.path.join(_IMAGE_OUTPUT_DIR, "build/debian_installer"),
+        ],
+        check=True,
+    )
     os.remove(stripped_script_path)
     print("Step 9/9: Temporary build directory cleaned up.")
     print(f"Successfully created {new_iso_filename}.")
@@ -883,13 +1089,17 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
         if find_spec("yaml") is None:
             _pause_for_debug("PyYAML not found, before installing.")
             print("PyYAML not found, installing...")
-            run_command([sys.executable, "-m", "pip", "install", "PyYAML"])
+            run_command(
+                [sys.executable, "-m", "pip", "install", "PyYAML"], check=True
+            )
     except ImportError:
         _pause_for_debug(
             "importlib.util not found, before installing PyYAML."
         )
         print("importlib.util not found, installing PyYAML directly...")
-        run_command([sys.executable, "-m", "pip", "install", "PyYAML"])
+        run_command(
+            [sys.executable, "-m", "pip", "install", "PyYAML"], check=True
+        )
     print("Step 4/14: PyYAML is available.")
 
     _pause_for_debug("Before setting up RPi image directories.")
@@ -908,13 +1118,16 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
         f"Step 5/14: Cloning Raspberry Pi image-specs repository to {rpi_image_specs_dir}..."
     )
     if not os.path.exists(rpi_image_specs_dir):
-        run_command([
-            "git",
-            "clone",
-            "--recursive",
-            "https://salsa.debian.org/raspi-team/image-specs.git",
-            rpi_image_specs_dir,
-        ])
+        run_command(
+            [
+                "git",
+                "clone",
+                "--recursive",
+                "https://salsa.debian.org/raspi-team/image-specs.git",
+                rpi_image_specs_dir,
+            ],
+            check=True,
+        )
     print("Step 6/14: Repository cloned.")
 
     _pause_for_debug(
@@ -982,6 +1195,7 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
     run_command(
         ["python3", "temp_generate-recipe.py", str(model), "trixie"],
         directory=rpi_image_specs_dir,
+        check=True,
     )
     print("Step 11/14: Image recipe generated.")
 
@@ -1009,7 +1223,7 @@ def create_debian_installer_rpi64(model: int = 4) -> None:
         print(
             "vmdb2 execution can take a very long time with very little feedback. Please use other tools to monitor progress,"
         )
-    run_command(vmdb2_command, directory=rpi_image_specs_dir)
+    run_command(vmdb2_command, directory=rpi_image_specs_dir, check=True)
     print("Step 13/14: RPi image built.")
 
     _pause_for_debug("Before cleaning up temporary files.")
@@ -1071,63 +1285,12 @@ if __name__ == "__main__":
     package_name = "ojp-server"  # Standard package name
 
     if args.action == "deploy":
-        if is_installed_run:
-            # PATH 1: We are running from /opt/ojp-server.
-            # This means we are the final step, so just run the deployment.
-            print("--- Running deployment from installed location ---")
-            kubectl_cmd = get_kubectl_command()
-            print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-            deploy(args.env, kubectl_cmd, is_installed=True)
-        else:
-            # PATH 2: We are running from the source repository.
-            # Orchestrate the build -> install -> execute sequence.
-            print("--- Orchestrating deployment from source ---")
-
-            # Step 1: Build the Debian package
-            print("\n--- Step 1/3: Building Debian package ---")
-            create_debian_package(package_name)
-            print("--- Build complete ---\n")
-
-            # Step 2: Install the Debian package
-            print("--- Step 2/3: Installing Debian package ---")
-            version = _get_project_version_from_pyproject_toml()
-            package_path = os.path.join(
-                _IMAGE_OUTPUT_DIR, f"{package_name}_{version}_all.deb"
-            )
-            if not os.path.exists(package_path):
-                print(
-                    f"Error: Debian package not found at '{package_path}'",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            install_command = ["sudo", "dpkg", "-i", package_path]
-            print(f"Running command: {' '.join(install_command)}")
-            run_command(install_command)
-            print("--- Installation complete ---\n")
-
-            # Step 3: Execute the installed script to deploy
-            print(
-                "--- Step 3/3: Executing deployment from installed script ---"
-            )
-            installed_script_path = (
-                f"/opt/{package_name}/install_kubernetes.py"
-            )
-            deploy_command = [
-                "python3",
-                installed_script_path,
-                "deploy",
-                "--env",
-                args.env,
-            ]
-            print(f"Running command: {' '.join(deploy_command)}")
-            run_command(deploy_command)
-            print("\n--- Deployment orchestration complete ---")
+        kubectl_cmd = get_kubectl_command()
+        print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
+        deploy(args.env, kubectl_cmd, is_installed=is_installed_run)
         sys.exit(0)
 
     elif args.action == "destroy":
-        # For destroy, we just run the action based on the current location.
-        # If you need to destroy a deployment, you can run the command from the
-        # installed location: /opt/ojp-server/install_kubernetes.py destroy
         kubectl_cmd = get_kubectl_command()
         destroy(args.env, kubectl_cmd, is_installed=is_installed_run)
         sys.exit(0)
@@ -1154,7 +1317,6 @@ if __name__ == "__main__":
             )
             sys.exit(1)
 
-        # The menu logic remains unchanged for source runs.
         while True:
             print("\n--- Kubernetes Deployment Script Menu ---")
             print("1. Deploy (apply Kustomize configuration)")
@@ -1170,18 +1332,17 @@ if __name__ == "__main__":
                     ).lower()
                     or "local"
                 )
-                # Re-parse args to trigger the deploy action logic
-                args.action = "deploy"
-                args.env = env_choice
-                # Exit the script to re-trigger with new args logic
                 main_script_path = os.path.abspath(__file__)
-                run_command([
-                    "python3",
-                    main_script_path,
-                    "deploy",
-                    "--env",
-                    env_choice,
-                ])
+                run_command(
+                    [
+                        "python3",
+                        main_script_path,
+                        "deploy",
+                        "--env",
+                        env_choice,
+                    ],
+                    check=True,
+                )
 
             elif choice == "2":
                 env_choice = (

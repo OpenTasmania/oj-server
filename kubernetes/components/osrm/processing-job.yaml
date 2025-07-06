@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: osrm-processing-job
+  namespace: ojp
+spec:
+  template:
+    spec:
+      containers:
+      - name: osrm-processor
+        image: osrm/osrm-backend:v5.27.0
+        command: ["/bin/sh", "-c"]
+        args:
+          - >
+            osrm-extract -p /opt/car.lua /data/region.osm.pbf &&
+            osrm-partition /data/region.osrm &&
+            osrm-customize /data/region.osrm
+        volumeMounts:
+        - name: osrm-data
+          mountPath: /data
+      restartPolicy: Never
+      volumes:
+      - name: osrm-data
+        persistentVolumeClaim:
+          claimName: osrm-pvc
+  backoffLimit: 4
