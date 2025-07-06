@@ -19,6 +19,9 @@ _VERBOSE: bool = False
 _DEBUG: bool = False
 _IMAGE_OUTPUT_DIR: str = "images"
 
+# Determine the project root based on the script's location
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 
 def _pause_for_debug(message: str) -> None:
     """
@@ -49,7 +52,7 @@ def _get_project_version_from_pyproject_toml() -> str:
     Raises:
         SystemExit: If pyproject.toml is not found or version cannot be extracted.
     """
-    pyproject_path = "pyproject.toml"
+    pyproject_path = os.path.join(PROJECT_ROOT, "pyproject.toml")
     if not os.path.exists(pyproject_path):
         print(
             f"Error: {pyproject_path} not found. Cannot determine package version.",
@@ -440,38 +443,64 @@ def get_kubectl_command() -> str:
             print("Invalid choice. Please enter '1' or '2'.")
 
 
-def deploy(env: str, kubectl: str) -> None:
+def deploy(env: str, kubectl: str, is_installed: bool = False) -> None:
     """
     Deploys the application using Kustomize.
 
-    This function applies a Kustomize configuration located in
-    `kubernetes/overlays/{env}` to the Kubernetes cluster.
+    This function applies a Kustomize configuration located in the Kubernetes overlays.
 
     Args:
-        env (str): The environment name (e.g., "local", "production") corresponding
-                   to a Kustomize overlay directory.
-        kubectl (str): The kubectl command to use (e.g., "kubectl" or "microk8s.kubectl").
+        env (str): The environment name (e.g., "local", "production").
+        kubectl (str): The kubectl command to use.
+        is_installed (bool): Flag to indicate if the script is running from an
+                             installed location.
     """
     print(f"Deploying '{env}' environment...")
-    kustomize_path: str = f"/opt/ojp-server/kubernetes/overlays/{env}"
+    if is_installed:
+        kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
+    else:
+        kustomize_path = os.path.join(
+            PROJECT_ROOT, "kubernetes", "overlays", env
+        )
+
+    if not os.path.isdir(kustomize_path):
+        print(
+            f"Error: Kustomize path not found at '{kustomize_path}'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     command: List[str] = [kubectl, "apply", "-k", kustomize_path]
     run_command(command)
 
 
-def destroy(env: str, kubectl: str) -> None:
+def destroy(env: str, kubectl: str, is_installed: bool = False) -> None:
     """
-    Destroys the application deployment.
+    Destroys the application deployment using Kustomize.
 
-    This function deletes a Kustomize configuration located in
-    `kubernetes/overlays/{env}` from the Kubernetes cluster.
+    This function deletes a Kustomize configuration from the Kubernetes cluster.
 
     Args:
-        env (str): The environment name (e.g., "local", "production") corresponding
-                   to a Kustomize overlay directory.
-        kubectl (str): The kubectl command to use (e.g., "kubectl" or "microk8s.kubectl").
+        env (str): The environment name (e.g., "local", "production").
+        kubectl (str): The kubectl command to use.
+        is_installed (bool): Flag to indicate if the script is running from an
+                             installed location.
     """
     print(f"Destroying '{env}' environment...")
-    kustomize_path: str = f"/opt/ojp-server/kubernetes/overlays/{env}"
+    if is_installed:
+        kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
+    else:
+        kustomize_path = os.path.join(
+            PROJECT_ROOT, "kubernetes", "overlays", env
+        )
+
+    if not os.path.isdir(kustomize_path):
+        print(
+            f"Error: Kustomize path not found at '{kustomize_path}'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     command: List[str] = [kubectl, "delete", "-k", kustomize_path]
     run_command(command)
 
@@ -511,11 +540,14 @@ def create_debian_package(package_name: str = "ojp-server") -> None:
         f"Step 3/5: Copying kubernetes installer and directory to {build_dir}/opt/{package_name}"
     )
     shutil.copytree(
-        "kubernetes",
+        os.path.join(PROJECT_ROOT, "kubernetes"),
         f"{build_dir}/opt/{package_name}/kubernetes",
         dirs_exist_ok=True,
     )
-    shutil.copy2("install_kubernetes.py", f"{build_dir}/opt/{package_name}/")
+    shutil.copy2(
+        os.path.join(PROJECT_ROOT, "install_kubernetes.py"),
+        f"{build_dir}/opt/{package_name}/",
+    )
     print("Step 3/5: Kubernetes installer directory copied.")
     control_file_content: str = f"""Package: {package_name}
 Version: {version}
@@ -1034,9 +1066,97 @@ if __name__ == "__main__":
     # Create the images directory if it doesn't exist
     os.makedirs(_IMAGE_OUTPUT_DIR, exist_ok=True)
 
-    if args.action == "menu":
+    script_path = os.path.abspath(__file__)
+    is_installed_run = script_path.startswith("/opt/ojp-server")
+    package_name = "ojp-server"  # Standard package name
+
+    if args.action == "deploy":
+        if is_installed_run:
+            # PATH 1: We are running from /opt/ojp-server.
+            # This means we are the final step, so just run the deployment.
+            print("--- Running deployment from installed location ---")
+            kubectl_cmd = get_kubectl_command()
+            print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
+            deploy(args.env, kubectl_cmd, is_installed=True)
+        else:
+            # PATH 2: We are running from the source repository.
+            # Orchestrate the build -> install -> execute sequence.
+            print("--- Orchestrating deployment from source ---")
+
+            # Step 1: Build the Debian package
+            print("\n--- Step 1/3: Building Debian package ---")
+            create_debian_package(package_name)
+            print("--- Build complete ---\n")
+
+            # Step 2: Install the Debian package
+            print("--- Step 2/3: Installing Debian package ---")
+            version = _get_project_version_from_pyproject_toml()
+            package_path = os.path.join(
+                _IMAGE_OUTPUT_DIR, f"{package_name}_{version}_all.deb"
+            )
+            if not os.path.exists(package_path):
+                print(
+                    f"Error: Debian package not found at '{package_path}'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            install_command = ["sudo", "dpkg", "-i", package_path]
+            print(f"Running command: {' '.join(install_command)}")
+            run_command(install_command)
+            print("--- Installation complete ---\n")
+
+            # Step 3: Execute the installed script to deploy
+            print(
+                "--- Step 3/3: Executing deployment from installed script ---"
+            )
+            installed_script_path = (
+                f"/opt/{package_name}/install_kubernetes.py"
+            )
+            deploy_command = [
+                "python3",
+                installed_script_path,
+                "deploy",
+                "--env",
+                args.env,
+            ]
+            print(f"Running command: {' '.join(deploy_command)}")
+            run_command(deploy_command)
+            print("\n--- Deployment orchestration complete ---")
+        sys.exit(0)
+
+    elif args.action == "destroy":
+        # For destroy, we just run the action based on the current location.
+        # If you need to destroy a deployment, you can run the command from the
+        # installed location: /opt/ojp-server/install_kubernetes.py destroy
+        kubectl_cmd = get_kubectl_command()
+        destroy(args.env, kubectl_cmd, is_installed=is_installed_run)
+        sys.exit(0)
+
+    elif args.action in ["build-amd64", "build-rpi64", "build-deb"]:
+        if is_installed_run:
+            print(
+                "Error: Build actions can only be run from the source repository.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if args.action == "build-amd64":
+            create_debian_installer_amd64()
+        elif args.action == "build-rpi64":
+            create_debian_installer_rpi64()
+        elif args.action == "build-deb":
+            create_debian_package()
+        sys.exit(0)
+
+    elif args.action == "menu":
+        if is_installed_run:
+            print(
+                "Menu is not available for the installed script. Please use command-line arguments (deploy, destroy)."
+            )
+            sys.exit(1)
+
+        # The menu logic remains unchanged for source runs.
         while True:
-            print("--- Kubernetes Deployment Script Menu ---")
+            print("\n--- Kubernetes Deployment Script Menu ---")
             print("1. Deploy (apply Kustomize configuration)")
             print("2. Destroy (delete Kustomize configuration)")
             print("3. Create (build custom Debian installer images)")
@@ -1050,9 +1170,19 @@ if __name__ == "__main__":
                     ).lower()
                     or "local"
                 )
-                kubectl_cmd: str = get_kubectl_command()
-                print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-                deploy(env_choice, kubectl_cmd)
+                # Re-parse args to trigger the deploy action logic
+                args.action = "deploy"
+                args.env = env_choice
+                # Exit the script to re-trigger with new args logic
+                main_script_path = os.path.abspath(__file__)
+                run_command([
+                    "python3",
+                    main_script_path,
+                    "deploy",
+                    "--env",
+                    env_choice,
+                ])
+
             elif choice == "2":
                 env_choice = (
                     input(
@@ -1062,7 +1192,9 @@ if __name__ == "__main__":
                 )
                 kubectl_cmd = get_kubectl_command()
                 print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-                destroy(env_choice, kubectl_cmd)
+                destroy(
+                    env_choice, kubectl_cmd, is_installed=is_installed_run
+                )
             elif choice == "3":
                 while True:
                     print("\n--- Create Installer Image Menu ---")
@@ -1117,20 +1249,3 @@ if __name__ == "__main__":
                 sys.exit(0)
             else:
                 print("Invalid choice. Please enter 1, 2, 3, or 4.")
-    elif args.action == "deploy":
-        kubectl_cmd = get_kubectl_command()
-        print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-        deploy(args.env, kubectl_cmd)
-    elif args.action == "destroy":
-        kubectl_cmd = get_kubectl_command()
-        print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-        destroy(args.env, kubectl_cmd)
-    elif args.action == "build-amd64":
-        create_debian_installer_amd64()
-        sys.exit(0)
-    elif args.action == "build-rpi64":
-        create_debian_installer_rpi64()
-        sys.exit(0)
-    elif args.action == "build-deb":
-        create_debian_package()
-        sys.exit(0)
