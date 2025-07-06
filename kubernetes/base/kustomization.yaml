@@ -4,21 +4,23 @@ kind: Kustomization
 namespace: ojp
 
 resources:
-  - namespace.yaml
-  - ../components/postgres
-  - ../components/osrm
-  - ../components/pg_tileserv
-  - ../components/renderd
-  - ../components/apache
-  - ../components/nginx
-  - ../components/carto
-  - ../components/nodejs
-  - ../components/certbot
-  - ../components/pgadmin
-  - ../components/pgagent
-  - ../components/data_processing
-  - ../components/py3gtfskit
+- namespace.yaml
+- ../components/postgres
+- ../components/osrm
+- ../components/pg_tileserv
+- ../components/renderd
+- ../components/apache
+- ../components/nginx
+- ../components/carto
+- ../components/nodejs
+- ../components/certbot
+- ../components/pgadmin
+- ../components/pgagent
+- ../components/data_processing
+- ../components/py3gtfskit
 
 # Common labels to apply to all resources
-commonLabels:
-  app.kubernetes.io/name: ojp-server
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: ojp-server
