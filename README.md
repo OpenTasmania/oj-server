@@ -81,7 +81,7 @@ microk8s status --wait-ready
 microk8s enable dns storage ingress registry
 ```
 
-2. Use the [Kubernetes installer](install_kubernetes.py) script.
+2. Use the [Kubernetes installer](kubernetes_installer.py) script.
 
 ```bash
 # Interactive menu
