@@ -65,50 +65,10 @@ The system is deployed on a GNU/Linux system with the following key components:
 
 ### Quick Start
 
-#### Option 1: Traditional Installation (Deprecated)
+#### Kubernetes-Based Installation
 
-> **Note:** The traditional installation method using `install.py` is now deprecated in favor of the Kubernetes-based
-> deployment methods (Option 2 below). It is maintained for backward compatibility but will be removed in a future
-> release.
-
-1. Check for essential prerequisites:
-    * Update the system package lists.
-    * Upgrade the system if required to ensure the latest packages are installed.
-    * Tests to see if basic python3 capability is available, and if not install it.
-    * Install python3-apt, which is required for the AptManager module.
-
-```bash
-sudo apt --yes update
-sudo apt --yes upgrade
-if ! dpkg -s python3 >/dev/null 2>&1 || ! dpkg -s python3-dev >/dev/null 2>&1; then
-  echo "python3 and/or python3-dev not found. Proceeding with installation..."
-  sudo apt update && sudo apt --yes install python3 python3-dev
-else
-  echo "python3 and python3-dev are already installed."
-fi
-
-# Install python3-apt which is required for the AptManager
-if ! dpkg -s python3-apt >/dev/null 2>&1; then
-  echo "python3-apt not found. Proceeding with installation..."
-  sudo apt --yes install python3-apt
-else
-  echo "python3-apt is already installed."
-fi
-```
-
-2. Run the installer
-    * Checks for required Python packages
-    * Prompts to install any missing packages using sudo apt install
-    * Uses the modular installer framework to install components
-
-```bash
-python3 install.py install postgres nginx apache osrm
-```
-
-#### Option 2: Kubernetes-Based Installation (Recommended)
-
-The recommended installation method is now using Kubernetes, either with MicroK8s for local development or a full
-Kubernetes cluster for production deployments.
+The installation method isusing Kubernetes, either with MicroK8s for local development or a full Kubernetes cluster for
+production deployments.
 
 1. Install MicroK8s (for local development):
 
@@ -122,7 +82,6 @@ microk8s enable dns storage ingress registry
 ```
 
 2. Use the [Kubernetes installer](install_kubernetes.py) script.
-   regarding this method.
 
 ```bash
 # Interactive menu
@@ -163,49 +122,6 @@ Server on new systems without manual installation steps.
 For more details on the Kubernetes deployment and installer images, see
 the [Kubernetes documentation](docs/kubernetes.md).
 
-### Installer Help
-
-#### Traditional Installer (Deprecated)
-
-To obtain install configuration options and associated help text, use this command:
-
-```bash
-python3 install.py --help
-```
-
-This will display the following help text:
-
-```
-usage: install.py [-h] [-v] {list,install,uninstall,status} ...
-Installer for Open Journey Planner Server
-
-positional arguments:
-  {list,install,uninstall,status}
-                        Command to execute
-    list                List available installers
-    install             Install components
-    uninstall           Uninstall components
-    status              Check installation status of components
-
-options:
-  -h, --help            show this help message and exit
-  -v, --verbose         Enable verbose output
-```
-
-For more detailed help on a specific command, use:
-
-```bash
-python3 install.py <command >--help
-```
-
-For example:
-
-```bash
-python3 install.py install --help
-```
-
-#### Kubernetes Installer (Recommended)
-
 For help with the Kubernetes installer:
 
 ```bash
@@ -233,45 +149,7 @@ options:
 
 ---
 
-### Detailed Setup (Deprecated)
-
-**This is a description for the deprecated python system installer. Use the new Kubernetes installer**
-
-The setup process is designed to be followed sequentially.
-
-* **System Foundation - Debian 13**
-    * Initial OS configuration, updates, and essential package installations (including all anticipated dependencies for
-      subsequent services via a single `apt` command).
-    * Firewall (`ufw`) setup.
-
-* **Service Installation & Configuration]**
-    * PostgreSQL and PostGIS.
-    * OSRM (Docker setup to be detailed here).
-    * `pg_tileserv` (Vector Tiles).
-    * Raster Tile Stack (Apache2, `mod_tile`, `renderd`, Mapnik, OpenStreetMap-Carto stylesheet).
-    * Nginx (Reverse Proxy).
-    * `systemd` service definitions.
-
-* **Initial Data Import, Processing & GTFS Automation**
-    * Downloading and importing OpenStreetMap (OSM) PBF data into PostGIS using `osm2pgsql`.
-    * Preprocessing the OSM PBF data for OSRM using the OSRM Docker image tools (`osrm-extract`, `osrm-partition`,
-      `osrm-customize`).
-    * Performing the initial GTFS data import using the Python package.
-    * Configuring the cron job for automated GTFS updates.
-    * (Optional) Pre-rendering raster tiles.
-
-## 4. Project Structure
-
-1. Installers
-    * [Traditional Installer](install.py) (Deprecated) - Modular installer framework for the Open Journey Planner
-      Server.
-    * [Kubernetes Installer](install_kubernetes.py) (Recommended) - Deploys the system using Kubernetes/MicroK8s.
-    * Both installers configure components and import data from processors.
-2. Submodules
-    * [GTFS processor](installer/processors/plugins/importers/transit/gtfs) Python package to import GTFS data into the
-      postgis database on which the mapping data exists.
-
-## 5. History
+## 4. History
 
 This project started out in late 2023 as a tool to help optimise travel patterns to purchase household goods
 after becoming dissatisfied with commercial offerings. While the publicly available OSM/OSRM could be usable, there
@@ -285,22 +163,23 @@ to the thoughts of having this run on Home Assistant for now the project intends
 In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release is
 intended to make use of Issues boards on a hosted git server, as well as continuous integration build testing.
 
-## 6. Future
+## 5. Future
 
 Theres a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
-Planned [enhancements](https://gitlab.com/opentasmania/ojp-server/-/issues/?label_name%5B%5D=Enhancement) can also be found on the Gitlab site.
+Planned [enhancements](https://gitlab.com/opentasmania/ojp-server/-/issues/?label_name%5B%5D=Enhancement) can also be
+found on the Gitlab site.
 
-## 7. Support
+## 6. Support
 
 There's an [issues](https://gitlab.com/opentasmania/ojp-server/-/issues) board where you can submit bugs.
 A [Revolt server])(https://revolt.chat) is being worked on, but not yet launched. An FAQ is planned, as well
 as a Wiki.
 
-## 8. Contributions
+## 7. Contributions
 
 Contributions welcome. Please see the [Contributions](docs/CONTRIBUTING.md) file for more details.
 
-## 9. Developer Guidelines
+## 8. Developer Guidelines
 
 For detailed development guidelines, including build/configuration instructions, testing information, and additional
 development information, please see the [Developer Guidelines](.junie/guidelines.md) file.
