@@ -32,7 +32,7 @@ The system is deployed on a GNU/Linux system with the following key components:
 * **Development Environment:** [Python](https://www.python.org/) package (`gtfs_processor`) managed with `uv` and
   defined by `pyproject.toml`, suitable for development in IDEs like [PyCharm](https://www.jetbrains.com/pycharm/).
 * **Database:**
-    * PostgreSQL with PostGIS and HStore extensions for storing OSM and GTFS data.
+    * PostGIS with HStore extensions for storing OSM and GTFS data.
     * pgAdmin for database administration through a web interface. (Work in progress)
     * pgAgent for scheduling and executing PostgreSQL jobs. (Work in progress)
 * **Routing Engine:**
@@ -48,8 +48,11 @@ The system is deployed on a GNU/Linux system with the following key components:
       `mod_tile` serving raster tiles with [Apache2](https://httpd.apache.org/), OpenStreetMap-Carto stylesheet for
       rendering. Runs as a `systemd` service (typically on port 8080 if Nginx is primary).
 * **Web Access:** [nginx](https://nginx.org/) as a reverse proxy for all services.
-* **SSL Certificate:** [Certbot](https://certbot.eff.org/) (typically on ports 80/443), routing requests to the
-  appropriate backend services (`pg_tileserv`, Apache/`mod_tile`, OSRM). Handles SSL termination.
+* **SSL Certificate:**
+    * **Production:** [Certbot](https://certbot.eff.org/) (typically on ports 80/443), routing requests to the
+      appropriate backend services (`pg_tileserv`, Apache/`mod_tile`, OSRM). Handles SSL termination.
+    * **Local/Development:** Self-signed certificates are automatically generated and used for HTTPS.
+
 * **GTFS Data Management:**
     * Automated download and import of GTFS static feeds into PostGIS.
     * Python-based [ETL pipeline](https://en.wikipedia.org/wiki/Extract,_transform,_load) for processing, validating,
@@ -131,20 +134,23 @@ python3 install_kubernetes.py --help
 This will display help for the Kubernetes installer, showing available commands and options:
 
 ```
-usage: install_kubernetes.py [-h] [--env ENV] [-v] [-d]
-                            {menu,deploy,destroy,build-amd64,build-rpi64,build-deb} ...
+usage: kubernetes_installer.py [-h] [--env ENV] [--images [IMAGES ...]] [-v] [-d] [--overwrite] [--production]
+                             {deploy,destroy,build-amd64,build-rpi64,build-deb,menu} ...
 
 Kubernetes deployment script for OJM.
 
 positional arguments:
-  {menu,deploy,destroy,build-amd64,build-rpi64,build-deb}
+  {deploy,destroy,build-amd64,build-rpi64,build-deb,menu}
                         The action to perform.
 
 options:
   -h, --help            show this help message and exit
-  --env ENV             The environment to target (default: local).
+  --env ENV             The environment to target (e.g., 'local', 'staging'). Cannot be used with --production.
+  --images [IMAGES ...] A space-delimited list of images to deploy or destroy. If not provided, all images will be processed.
   -v, --verbose         Enable verbose output.
   -d, --debug           Enable debug mode (implies --verbose and pauses before each step).
+  --overwrite           Force overwrite of existing Docker images in the local registry. Only valid with 'deploy' action.
+  --production          Target the production environment. Cannot be used with --env.
 ```
 
 ---
@@ -160,8 +166,11 @@ In 2024, reliance on microk8s was removed, and the code base cleaned and documen
 although some may linger in the dark recesses somewhere. While it's intended at some stage to bring back microk8s, due
 to the thoughts of having this run on Home Assistant for now the project intends to be dockerizing everything.
 
-In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release is
-intended to make use of Issues boards on a hosted git server, as well as continuous integration build testing.
+In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release was
+intended to make use of Issues boards on a hosted git server, as well as continuous integration build testing. This
+included a rewrite into python to help establish more formal documentation, and was never intended to be the final
+system. This code is now being removed in favour of the microk8s/kubernetes method as it provides far greater stability
+and scalability for a project with a large number of complex dependencies.
 
 ## 5. Future
 

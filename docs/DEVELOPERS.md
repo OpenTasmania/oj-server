@@ -5,68 +5,49 @@ build/configuration instructions, testing information, and additional developmen
 
 ## Build/Configuration Instructions
 
-### Environment Setup
+### Kubernetes-Based Deployment
 
-1. **Python Requirements**:
-    - Python 3.13 is required for this project
-    - The project uses `uv` for package management and virtual environment
+The primary method for deploying the OJP Server is via Kubernetes, using the `kubernetes_installer.py` script. This script handles the deployment of all necessary components, including PostgreSQL (PostGIS), OSRM, Nginx, and other services.
 
-2. **Initial Setup**:
-   ```bash
-   # Clone the repository
-   git clone https://gitlab.com/opentasmania/ojp-server.git
-   cd ojp-server
+1.  **Initial Setup**:
+    ```bash
+    # Clone the repository
+    git clone https://gitlab.com/opentasmania/ojp-server.git
+    cd ojp-server
+    ```
 
-   # Run the install script which will set up uv and create a virtual environment
-   python3 install.py
-   ```
+2.  **Deployment**:
+    *   **Local Development (MicroK8s)**:
+        ```bash
+        python3 kubernetes_installer.py deploy --env local
+        ```
+        This will deploy the system with self-signed SSL certificates for Nginx.
 
-3. **Configuration**:
-    - The main configuration file is `config.yaml` in the project root
-    - You can generate a preseed YAML configuration using:
-      ```bash
-      python3 install.py --generate-preseed-yaml
-      ```
+    *   **Production Environment**:
+        ```bash
+        python3 kubernetes_installer.py deploy --production
+        ```
+        This will deploy the system and configure Certbot for proper SSL certificate management.
 
-### Installation Process
+    For more details on the `kubernetes_installer.py` script and its options, refer to the main `README.md` and the [Kubernetes documentation](docs/kubernetes.md).
 
-The installation process is handled by the `install.py` script and the modules in the `installer` directory:
+### Configuration
 
-1. **Prerequisites Installation**:
-   ```bash
-   python3 install.py --prereqs
-   ```
-
-2. **Services Installation**:
-   ```bash
-   python3 install.py --services
-   ```
-
-3. **Data Preparation**:
-   ```bash
-   python3 install.py --data
-   ```
-
-4. **Full Installation**:
-   ```bash
-   python3 install.py --full -v your-domain.example.com
-   ```
+The main configuration for Kubernetes deployments is managed through Kustomize overlays located in `kubernetes/overlays/`. Specific application settings are defined in `config.yaml` (though many are now managed directly within Kubernetes manifests).
 
 ## Project Architecture
 
 The project is organized into several key directories:
 
 * `bootstrap/`: Contains the self-contained bootstrap process for the modular setup script.
-* `installer/`: Contains components (individual services)
-  * `components/`: Contains installer and configure code for a various component.
-  * `processors/`: Where our core data processing logic lives.
+* `installer/`: (Deprecated) Contains components for the legacy installation process. This directory will be removed in a future phase.
 * `common/`: Shared utilities and helper functions used across the project.
   * `common/debian/`: Contains Debian-specific utilities, including the AptManager.
 * `docs/`: Project documentation, including the plans and strategies that guide our work.
 
 ### Package Management with AptManager
 
-For Debian package management, we use the `AptManager` class located in `common/debian/apt_manager.py`. This provides a centralized, consistent interface for all apt operations.
+(Deprecated) For Debian package management, we use the `AptManager` class located in `common/debian/apt_manager.py`. This provides a centralized, consistent interface for all apt operations.
 
 **Important:** All apt package operations must be handled exclusively through the `AptManager` module. Direct calls to `apt-get` or similar commands should be avoided.
 
@@ -90,7 +71,7 @@ apt_manager.add_gpg_key_from_url("https://example.com/key.gpg", "/etc/apt/keyrin
 
 ### Installer Commands
 
-The `install.py` script provides several commands for managing the installation and configuration of components:
+(Deprecated) The `install.py` script provides several commands for managing the installation and configuration of components:
 
 #### Setup Command
 

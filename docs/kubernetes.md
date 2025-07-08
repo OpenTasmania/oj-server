@@ -1,6 +1,8 @@
 # Open Journey Planner Server - Kubernetes Installer Guide
 
-This document provides comprehensive instructions for using the `install_kubernetes.py` script to deploy and manage the Open Journey Planner Server using Kubernetes. The script offers a streamlined approach for both local development and production deployments.
+This document provides comprehensive instructions for using the `kubernetes_installer.py` script to deploy and manage
+the Open Journey Planner Server using Kubernetes. The script offers a streamlined approach for both local development
+and production deployments.
 
 ## Table of Contents
 
@@ -12,11 +14,13 @@ This document provides comprehensive instructions for using the `install_kuberne
 6. [Creating Installer Images](#creating-installer-images)
 7. [Advanced Options](#advanced-options)
 8. [Troubleshooting](#troubleshooting)
-9. [Project Structure](#project-structure)
+9. [Project Structure]
 
 ## Introduction
 
-The `install_kubernetes.py` script provides a comprehensive solution for deploying and managing the Open Journey Planner Server using Kubernetes. It supports both local development environments using MicroK8s and production deployments on full Kubernetes clusters.
+The `kubernetes_installer.py` script provides a comprehensive solution for deploying and managing the Open Journey
+Planner Server using Kubernetes. It supports both local development environments using MicroK8s and production
+deployments on full Kubernetes clusters.
 
 Key benefits of using the Kubernetes-based approach include:
 
@@ -28,11 +32,11 @@ Key benefits of using the Kubernetes-based approach include:
 
 ## Prerequisites
 
-Before using the `install_kubernetes.py` script, ensure you have the following prerequisites installed:
+Before using the `kubernetes_installer.py` script, ensure you have the following prerequisites installed:
 
 ### For All Environments
 
-- Python 3.8 or higher
+- Python 3.13 or higher
 - Basic understanding of Kubernetes concepts
 - Git (for cloning the repository)
 
@@ -61,6 +65,7 @@ Before using the `install_kubernetes.py` script, ensure you have the following p
 - Access to a Kubernetes cluster (self-hosted or cloud provider)
 - `kubectl` configured to access your cluster
 - Sufficient permissions to create namespaces and deploy resources
+- Cert-Manager installed and configured in your cluster (if using `--production` for SSL).
 
 ## Installation
 
@@ -77,14 +82,14 @@ Before using the `install_kubernetes.py` script, ensure you have the following p
 
 ## Basic Usage
 
-The `install_kubernetes.py` script can be used in two ways:
+The `kubernetes_installer.py` script can be used in two ways:
 
 ### Interactive Menu
 
 For a guided experience, run the script without arguments:
 
 ```bash
-./install_kubernetes.py
+./kubernetes_installer.py
 ```
 
 This will display the main menu with options for deployment, destruction, and creating installer images.
@@ -94,49 +99,73 @@ This will display the main menu with options for deployment, destruction, and cr
 For scripted or automated use, you can provide command-line arguments:
 
 ```bash
-./install_kubernetes.py [action] [options]
+./kubernetes_installer.py [action] [options]
 ```
 
 To see all available options:
 
 ```bash
-./install_kubernetes.py --help
+./kubernetes_installer.py --help
+```
+
+This will display help for the Kubernetes installer, showing available commands and options:
+
+```
+usage: kubernetes_installer.py [-h] [--env ENV] [--images [IMAGES ...]] [-v] [-d] [--overwrite] [--production]
+                             {deploy,destroy,build-amd64,build-rpi64,build-deb,menu} ...
+
+Kubernetes deployment script for OJM.
+
+positional arguments:
+  {deploy,destroy,build-amd64,build-rpi64,build-deb,menu}
+                        The action to perform.
+
+options:
+  -h, --help            show this help message and exit
+  --env ENV             The environment to target (e.g., 'local', 'staging'). Cannot be used with --production.
+  --images [IMAGES ...] A space-delimited list of images to deploy or destroy. If not provided, all images will be processed.
+  -v, --verbose         Enable verbose output.
+  -d, --debug           Enable debug mode (implies --verbose and pauses before each step).
+  --overwrite           Force overwrite of existing Docker images in the local registry. Only valid with 'deploy' action.
+  --production          Target the production environment. Cannot be used with --env.
 ```
 
 ## Deployment Management
 
-### Deploying to a Local Environment
+### Deploying to a Local Environment (Self-Signed Certificates)
 
-To deploy to a local MicroK8s environment:
-
-```bash
-./install_kubernetes.py deploy --env local
-```
-
-The script will automatically detect if you're using MicroK8s and use the appropriate kubectl command.
-
-### Deploying to a Production Environment
-
-To deploy to a production Kubernetes cluster:
+To deploy to a local MicroK8s environment with self-signed certificates for Nginx:
 
 ```bash
-./install_kubernetes.py deploy --env production
+./kubernetes_installer.py deploy --env local
 ```
 
-Ensure your kubectl is configured to point to your production cluster before running this command.
+The script will automatically detect if you're using MicroK8s and use the appropriate kubectl command. Nginx will be
+configured to use automatically generated self-signed certificates for HTTPS.
+
+### Deploying to a Production Environment (Certbot SSL)
+
+To deploy to a production Kubernetes cluster with Certbot for SSL certificate management:
+
+```bash
+./kubernetes_installer.py deploy --production
+```
+
+Ensure your kubectl is configured to point to your production cluster before running this command. This will deploy
+Certbot and configure Nginx to use certificates issued by Certbot.
 
 ### Destroying a Deployment
 
-To remove a deployment and all its resources:
+To remove a deployment and all its resources (deployments, jobs, statefulsets, daemonsets, and services):
 
 ```bash
-./install_kubernetes.py destroy --env local
+./kubernetes_installer.py destroy --env local
 ```
 
 or
 
 ```bash
-./install_kubernetes.py destroy --env production
+./kubernetes_installer.py destroy --production
 ```
 
 ### Checking Deployment Status
@@ -155,10 +184,10 @@ To view logs for a specific pod:
 
 ```bash
 # For MicroK8s
-microk8s.kubectl logs -f <pod-name> -n ojp
+microk8s.kubectl logs -f <pod-name >-n ojp
 
 # For standard Kubernetes
-kubectl logs -f <pod-name> -n ojp
+kubectl logs -f <pod-name >-n ojp
 ```
 
 ## Creating Installer Images
@@ -174,6 +203,7 @@ To create a custom Debian installer image for AMD64 architecture:
 ```
 
 This will:
+
 1. Download the latest Debian testing netinst ISO
 2. Verify its checksum
 3. Extract and modify the ISO to include the OJP Server Kubernetes configurations
@@ -207,7 +237,8 @@ To create a standalone Debian package containing the Kubernetes configurations:
 ./install_kubernetes.py build-deb
 ```
 
-This creates a `.deb` package that can be installed on any Debian-based system. The package will be saved in the `images/` directory.
+This creates a `.deb` package that can be installed on any Debian-based system. The package will be saved in the
+`images/` directory.
 
 ## Advanced Options
 
@@ -234,14 +265,14 @@ Debug mode automatically enables verbose mode and adds pauses before critical op
 The script supports different environment configurations through Kustomize overlays:
 
 1. **Local**: Optimized for local development with MicroK8s
-   - Uses NodePort for service exposure
-   - Configures minimal resource requirements
-   - Points to the local MicroK8s registry
+    - Uses NodePort for service exposure
+    - Configures minimal resource requirements
+    - Points to the local MicroK8s registry
 
 2. **Production**: Optimized for production deployments
-   - Uses LoadBalancer for service exposure
-   - Configures appropriate resource requests and limits
-   - Points to a production container registry
+    - Uses LoadBalancer for service exposure
+    - Configures appropriate resource requests and limits
+    - Points to a production container registry
 
 To create a custom environment, you can:
 
@@ -261,6 +292,7 @@ To create a custom environment, you can:
 **Symptom**: The script doesn't automatically detect MicroK8s.
 
 **Solution**: Ensure MicroK8s is installed and in your PATH:
+
 ```bash
 which microk8s
 microk8s status
@@ -271,6 +303,7 @@ microk8s status
 **Symptom**: You receive "Permission denied" errors when running the script.
 
 **Solution**: Make the script executable:
+
 ```bash
 chmod +x install_kubernetes.py
 ```
@@ -279,7 +312,9 @@ chmod +x install_kubernetes.py
 
 **Symptom**: The script reports missing tools or dependencies.
 
-**Solution**: The script will attempt to install missing dependencies automatically. If this fails, you can install them manually:
+**Solution**: The script will attempt to install missing dependencies automatically. If this fails, you can install them
+manually:
+
 ```bash
 sudo apt update
 sudo apt install python3 python3-pip wget xorriso isolinux grub-efi-amd64-bin dpkg-dev
@@ -290,6 +325,7 @@ sudo apt install python3 python3-pip wget xorriso isolinux grub-efi-amd64-bin dp
 **Symptom**: The deployment fails with Kubernetes errors.
 
 **Solution**:
+
 1. Check if your Kubernetes cluster is running:
    ```bash
    kubectl cluster-info
@@ -318,7 +354,8 @@ If you encounter issues not covered here:
    ./install_kubernetes.py deploy --env local -d
    ```
 
-2. Check the [GitLab issues page](https://gitlab.com/opentasmania/ojp-server/-/issues) for known issues or to report a new one.
+2. Check the [GitLab issues page](https://gitlab.com/opentasmania/ojp-server/-/issues) for known issues or to report a
+   new one.
 
 ## Project Structure
 
@@ -345,8 +382,11 @@ ojp-server/
 └── images/                     # Output directory for installer images
 ```
 
-This structure follows the Kustomize best practices for managing Kubernetes configurations across different environments.
+This structure follows the Kustomize best practices for managing Kubernetes configurations across different
+environments.
 
 ---
 
-By following this guide, you should be able to effectively use the `install_kubernetes.py` script to deploy and manage the Open Journey Planner Server using Kubernetes. The script provides a flexible and powerful way to handle both local development and production deployments.
+By following this guide, you should be able to effectively use the `install_kubernetes.py` script to deploy and manage
+the Open Journey Planner Server using Kubernetes. The script provides a flexible and powerful way to handle both local
+development and production deployments.

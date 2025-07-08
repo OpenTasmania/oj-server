@@ -16,7 +16,7 @@ will depend on.
     - [ ] Define the final tables, columns, and data types for core concepts like `transport_stops`, `transport_routes`,
       `transport_trips`, `transport_schedule`, and `transport_shapes`.
     - [ ] Establish foreign key relationships and constraints.
-    - [ ] Create the SQL script to deploy the new schema to PostgreSQL.
+    - [ ] Create the SQL script to deploy the new schema to PostGIS.
 - [ ] **Task 2: Refactor the GTFS Processor as the First Plugin**
     - [ ] Create a formal `ProcessorInterface` abstract base class that defines the required methods (`extract`,
       `transform`, `load`) for all future static processors.
@@ -90,4 +90,5 @@ expansion and adding high-value features. The architecture now supports adding n
     - [ ] Begin research into integrating traffic-aware routing.
 - [x] **Task 15: Create easy to use installation UI**
     - [x] Design and build a user-friendly interface to guide users through the initial server setup.
-    - [x] **Note**: Implemented via the interactive menu-driven interface in `install_kubernetes.py` which provides a guided installation experience.
+    - [x] **Note**: Implemented via the interactive menu-driven interface in `kubernetes_installer.py` which provides a
+      guided installation experience.

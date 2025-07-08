@@ -2,7 +2,8 @@
 
 ## **1. Introduction**
 
-This document outlines a comprehensive improvement plan for the Open Journey Planner Server project based on an analysis of the
+This document outlines a comprehensive improvement plan for the Open Journey Planner Server project based on an analysis
+of the
 current codebase, architecture, and identified needs. The plan is organized by key areas of the system and includes
 rationale for each proposed change.
 
@@ -17,7 +18,7 @@ The Open Journey Planner Server aims to:
 3. Serve both vector and raster map tiles
 4. Provide turn-by-turn routing via OSRM
 5. Support multiple data sources like GTFS, NexTex, TransXchange, GTFS-RT, SIRI
-6. Make all data queryable through PostgreSQL/PostGIS
+6. Make all data queryable through PostGIS
 7. Run on a dedicated Debian system with minimal setup complexity
 
 ### **2.2 Key Constraints**
@@ -87,7 +88,7 @@ The project operates under the following constraints:
 
 * **Static Data Pipeline**: Adopt a **Pluggable ETL Processor** architecture for static transit data (GTFS, NeTEx,
   etc.). All data will be transformed and loaded into a single, standardized, and format-agnostic **Canonical Database
-  Schema**. This creates a single source of truth for all static data within the PostgreSQL database.
+  Schema**. This creates a single source of truth for all static data within the PostGIS database.
 * **Real-time Data Service**: Implement a **Pluggable Processor Architecture** for real-time transit feeds (GTFS-RT,
   SIRI, etc.). A continuously running service will ingest data, where specialized plugins transform each format into a *
   *Canonical Data Model**. This standardized data is then cached and made available through an API.
@@ -164,30 +165,30 @@ The project operates under the following constraints:
 
 ### **5.1 Installation Process**
 
-**Current State**: Installation is now handled by two approaches:
-1. The traditional Python script (`install.py`) with various options (deprecated)
-2. The new Kubernetes-based installer (`install_kubernetes.py`) with interactive menu and command-line options (recommended)
+**Current State**: Installation is now handled by the Kubernetes-based installer (`kubernetes_installer.py`) with
+interactive menu and command-line options (recommended).
 
 **Completed Changes**:
 
-* ✓ Implemented a Kubernetes-based deployment approach using Kustomize
-* ✓ Created an interactive menu-driven installation interface
-* ✓ Added support for different environments (local, production)
-* ✓ Implemented progress reporting and verbose/debug modes
-* ✓ Added ability to create custom Debian installer images for AMD64 and Raspberry Pi
+* ✓ Implemented a Kubernetes-based deployment approach using Kustomize.
+* ✓ Created an interactive menu-driven installation interface.
+* ✓ Added support for different environments (local, production) with distinct SSL certificate handling (self-signed for
+  local, Certbot for production).
+* ✓ Implemented progress reporting and verbose/debug modes.
+* ✓ Added ability to create custom Debian installer images for AMD64 and Raspberry Pi.
 
 **Proposed Future Changes**:
 
-* Implement a rollback mechanism for failed installations
-* Create a full web-based installation UI
-* Add support for additional non-Debian distributions
+* Implement a rollback mechanism for failed installations.
+* Create a full web-based installation UI.
+* Add support for additional non-Debian distributions.
 * **Rationale**: Further improve user experience, reduce installation failures, and broaden the potential user base.
 
 **Implementation Steps**:
 
-1. Enhance the Kubernetes installer with additional rollback capabilities
-2. Develop a web frontend for the existing Kubernetes installer
-3. Extend platform support beyond Debian-based systems
+1. Enhance the Kubernetes installer with additional rollback capabilities.
+2. Develop a web frontend for the existing Kubernetes installer.
+3. Extend platform support beyond Debian-based systems.
 
 ### **5.2 Transit Data Processing**
 
@@ -236,7 +237,8 @@ The project operates under the following constraints:
 
 ### **6.1 CI/CD Pipeline**
 
-**Current State**: Basic CI/CD is configured, and containerization support has been implemented through the Kubernetes installer.
+**Current State**: Basic CI/CD is configured, and containerization support has been implemented through the Kubernetes
+installer.
 
 **Completed Changes**:
 
@@ -250,7 +252,8 @@ The project operates under the following constraints:
 * Add static code analysis
 * Enhance automated deployment with GitOps practices
 * Expand container registry integration
-* **Rationale**: Further improve code quality, reduce deployment errors, and make it easier to contribute to the project.
+* **Rationale**: Further improve code quality, reduce deployment errors, and make it easier to contribute to the
+  project.
 
 **Implementation Steps**:
 
@@ -301,7 +304,8 @@ The project operates under the following constraints:
 
 ## **8. Performance Improvements**
 
-**Current State**: Performance optimizations may be incomplete, but the foundation for horizontal scaling has been established with the Kubernetes-based deployment.
+**Current State**: Performance optimizations may be incomplete, but the foundation for horizontal scaling has been
+established with the Kubernetes-based deployment.
 
 **Completed Changes**:
 
@@ -335,7 +339,8 @@ The improvements outlined above should be prioritized as follows:
     * **Data Architecture (Static Pipeline Foundation)**: Define the Canonical Database Schema. Refactor the existing
       GTFS pipeline to function as the first plugin, loading data into the new canonical tables. Build the ETL
       orchestrator script to manage the process.
-    * **Installer & Code Quality** ✓: Implemented the Kubernetes-based installer architecture with `install_kubernetes.py`, 
+    * **Installer & Code Quality** ✓: Implemented the Kubernetes-based installer architecture with
+      `install_kubernetes.py`,
       providing a modular approach using Kustomize. Continue to improve testing, documentation, and code organization.
 
 2. **Medium-term (3-6 months)**
@@ -353,11 +358,11 @@ The improvements outlined above should be prioritized as follows:
 3. **Long-term (6-12 months)**
     * **Data Architecture (Expansion)**: Iteratively develop and add new processor plugins for other data formats (SIRI,
       NeTEx, TransXchange, etc.) as required, for both the real-time and static data pipelines.
-    * **Feature & UI Development**: Develop advanced routing features. ✓ Basic installation UI implemented via the 
+    * **Feature & UI Development**: Develop advanced routing features. ✓ Basic installation UI implemented via the
       interactive menu in `install_kubernetes.py`; continue to enhance with a full web-based interface.
-    * **Scalability** ✓: Implemented foundation for horizontal scaling through the Kubernetes architecture. Continue to 
+    * **Scalability** ✓: Implemented foundation for horizontal scaling through the Kubernetes architecture. Continue to
       enhance with fine-tuned resource management and autoscaling.
-    * **Platform Support** ✓: Added support for AMD64 and Raspberry Pi platforms through custom Debian installer images. 
+    * **Platform Support** ✓: Added support for AMD64 and Raspberry Pi platforms through custom Debian installer images.
       Continue to expand to additional platforms.
 
 This roadmap balances immediate needs with long-term goals and considers the dependencies between different
@@ -365,7 +370,8 @@ improvements.
 
 ## **10. Conclusion**
 
-The Open Journey Planner Server project has a solid foundation but can benefit significantly from the improvements outlined in this
+The Open Journey Planner Server project has a solid foundation but can benefit significantly from the improvements
+outlined in this
 plan. By focusing on a modular and canonical data architecture, while also improving code quality, features, DevOps,
 security, and performance, the project can become more robust, maintainable, and user-friendly.
 
