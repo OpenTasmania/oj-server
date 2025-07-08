@@ -29,10 +29,9 @@ if __name__ == "__main__":
     managed_images = get_managed_images()
     epilog_text = f"Managed images: {', '.join(managed_images)}"
 
-    # Manually parse action to handle flexible argument order
     actions = ["deploy", "destroy", "build-amd64", "build-rpi64", "build-deb"]
     args_list = sys.argv[1:]
-    action = "menu"  # Default action
+    action = "menu"
 
     for act in actions:
         if act in args_list:
@@ -109,7 +108,6 @@ if __name__ == "__main__":
         destroy(
             args.env,
             kubectl_cmd,
-            is_installed=is_installed_run,
             images=args.images,
         )
         sys.exit(0)
@@ -153,7 +151,11 @@ if __name__ == "__main__":
                 )
                 kubectl_cmd = get_kubectl_command()
                 print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-                deploy(env_choice, kubectl_cmd, is_installed=is_installed_run)
+                deploy(
+                    env=env_choice,
+                    kubectl=kubectl_cmd,
+                    is_installed=is_installed_run,
+                )
 
             elif choice == "2":
                 env_choice = (
@@ -164,9 +166,7 @@ if __name__ == "__main__":
                 )
                 kubectl_cmd = get_kubectl_command()
                 print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-                destroy(
-                    env_choice, kubectl_cmd, is_installed=is_installed_run
-                )
+                destroy(env=env_choice, kubectl=kubectl_cmd)
             elif choice == "3":
                 while True:
                     print("\n--- Create Installer Image Menu ---")

@@ -10,7 +10,6 @@ import yaml
 
 from install_kubernetes.common import run_command
 
-# PROJECT_ROOT is correctly defined as the root of the project source
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 ALL_IMAGES: Dict[str, str] = {
@@ -39,9 +38,24 @@ def _build_and_register_images_for_local_env(
     kubectl: str, images: Optional[List[str]] = None, overwrite: bool = False
 ) -> None:
     """
-    Builds custom Docker images and pulls standard ones, then registers them
-    with the local MicroK8s registry.
-    If a list of images is provided, only those images are processed.
+    Builds and registers Docker images for use in a local MicroK8s Kubernetes environment.
+
+    This function facilitates the building and importing of Docker images into the
+    local MicroK8s registry. It uses predefined or provided image configurations and
+    supports both custom Dockerfile-based images and standard images pulled from external
+    repositories. Additionally, the function validates requirements, manages overwrites,
+    and processes images efficiently.
+
+    If not already present, this function can create a data processor Dockerfile specifically
+    for the `data_processing` image, enhancing its utility in certain use cases.
+
+    Args:
+        kubectl (str): The kubectl command to interact with Kubernetes. Expected to be
+            compatible with 'microk8s.kubectl'.
+        images (Optional[List[str]]): A list of image names to process. If None, all
+            available images will be processed.
+        overwrite (bool): Flag to determine whether to overwrite existing images in the
+            local MicroK8s registry. Defaults to False.
     """
     print(
         "\n--- Building and registering images for local MicroK8s environment ---"
@@ -136,9 +150,6 @@ CMD ["python", "run.py"]
             print(
                 f"Building custom image '{local_image_tag}' from '{dockerfile_path}'..."
             )
-            # --- FIX ---
-            # The build context has been changed from os.path.join(PROJECT_ROOT, "..", "..")
-            # to just PROJECT_ROOT. This ensures Docker looks for files in the correct directory.
             build_command = [
                 "docker",
                 "build",
@@ -197,7 +208,16 @@ CMD ["python", "run.py"]
 
 def get_kubectl_command() -> str:
     """
-    Determines the appropriate 'kubectl' command based on system availability.
+    Determines and returns the appropriate `kubectl` command to use based on the availability
+    of `microk8s` and `kubectl` in the system. If neither is available, prompts the user to
+    choose an option and provides instructions for installing the selected tool.
+
+    Returns:
+        str: The determined `kubectl` command to use.
+
+    Raises:
+        SystemExit: If neither `microk8s` nor `kubectl` is available and the user decides
+        to exit after viewing installation instructions.
     """
     has_microk8s: Optional[str] = shutil.which("microk8s")
     has_kubectl: Optional[str] = shutil.which("kubectl")
@@ -254,8 +274,26 @@ def deploy(
     overwrite: bool = False,
 ) -> None:
     """
-    Deploys the application using Kustomize.
-    If a list of images is provided, only the corresponding components are deployed.
+    Deploys the specified environment using kustomize and kubectl.
+
+    This function handles the deployment process, allowing for optional
+    installation of specific images or entire components for a given
+    environment. It also processes local environment customizations
+    separately.
+
+    Args:
+        env (str): The environment to deploy (e.g., "local", "dev", "prod").
+        kubectl (str): The path to the `kubectl` command-line tool.
+        is_installed (bool, optional): Indicates whether the environment is
+            already installed. Defaults to False.
+        images (Optional[List[str]], optional): A list of images or components
+            to deploy. If None, all components are deployed. Defaults to None.
+        overwrite (bool, optional): Whether to overwrite existing image
+            registrations in a local environment. Defaults to False.
+
+    Raises:
+        SystemExit: If the specified kustomize path does not exist.
+
     """
     print(f"Deploying '{env}' environment...")
     if env == "local":
@@ -287,13 +325,23 @@ def deploy(
 def destroy(
     env: str,
     kubectl: str,
-    is_installed: bool = False,
     images: Optional[List[str]] = None,
 ) -> None:
     """
-    Destroys the application deployment by deleting deployments and jobs,
-    and purges the associated images from the local registry.
-    If a list of images is provided, only the corresponding components are destroyed.
+    Destroys specified resources in the given environment.
+
+    This function deletes specific Kubernetes resources managed in the provided
+    environment by determining their mapping from predefined resource names.
+    If no images are provided, it retrieves all managed images and deletes their
+    associated deployments, jobs, or other Kubernetes resources. Finally, it purges
+    the relevant images from the local registry.
+
+    Args:
+        env (str): The environment in which the resources are deployed.
+        kubectl (str): The command-line tool used to execute Kubernetes commands.
+        images (Optional[List[str]]): A list of images whose associated resources
+            need to be destroyed. If None, all managed images will be considered.
+
     """
     print(f"Destroying '{env}' environment...")
 
@@ -374,38 +422,46 @@ def _apply_or_delete_components(
     action: str, kubectl: str, kustomize_path: str, images: List[str]
 ) -> None:
     """
-    Helper function to apply or delete a filtered set of Kustomize components.
+    Applies or deletes Kubernetes components filtered by specific criteria based on the
+    resources' metadata or their association with specified images. Resources are processed
+    through kustomization and then the subset of matching resources is either applied to or
+    deleted from the Kubernetes cluster.
+
+    Args:
+        action (str): The action to perform, either 'apply' or 'delete', to manage the
+            resources in the cluster.
+        kubectl (str): Path to the `kubectl` command-line tool used for Kubernetes operations.
+        kustomize_path (str): Path to the Kustomize configuration directory containing the
+            Kubernetes manifests.
+        images (List[str]): List of image names used to filter resources based on whether
+            they are associated with these images.
+
+    Raises:
+        SystemExit: If the process to apply or delete resources fails.
+
     """
-    # Generate the full kustomized YAML
     kustomize_command = [kubectl, "kustomize", kustomize_path]
     kustomized_yaml_str = run_command(
         kustomize_command, check=True, capture_output=True
     ).stdout
 
-    # Parse the YAML into individual Kubernetes objects
-    # yaml.safe_load_all returns a generator, so convert to list
     all_resources = list(yaml.safe_load_all(kustomized_yaml_str))
 
     filtered_resources = []
     for resource in all_resources:
-        if resource is None:  # Skip empty documents
+        if resource is None:
             continue
 
-        # Check if the resource name or a part of its metadata matches any of the specified images
-        # This logic might need refinement based on how resources are named in your Kustomize
         resource_name = resource.get("metadata", {}).get("name", "")
 
-        # Simple check: if any image name is part of the resource name
         if any(image in resource_name for image in images):
             filtered_resources.append(resource)
-        # More specific check: if the resource is a deployment/job/statefulset related to the image
         elif resource.get("kind") in [
             "Deployment",
             "Job",
             "StatefulSet",
             "DaemonSet",
         ]:
-            # Check if the image name is in the containers' image names
             containers = (
                 resource.get("spec", {})
                 .get("template", {})
@@ -417,10 +473,7 @@ def _apply_or_delete_components(
                 for container in containers
             ):
                 filtered_resources.append(resource)
-        # Also include common resources like namespaces if they are not image-specific
-        elif (
-            resource.get("kind") == "Namespace" and resource_name == "ojp"
-        ):  # Assuming 'ojp' is your main namespace
+        elif resource.get("kind") == "Namespace" and resource_name == "ojp":
             filtered_resources.append(resource)
 
     if not filtered_resources:
@@ -430,7 +483,6 @@ def _apply_or_delete_components(
         )
         return
 
-    # Dump the filtered resources back to YAML
     filtered_yaml_str = ""
     for resource in filtered_resources:
         filtered_yaml_str += (
@@ -438,7 +490,6 @@ def _apply_or_delete_components(
             + "---\n"
         )
 
-    # Apply or delete the filtered YAML
     command = [kubectl, action, "-f", "-"]
     process = subprocess.Popen(
         command,
