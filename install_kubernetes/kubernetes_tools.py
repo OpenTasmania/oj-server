@@ -368,6 +368,7 @@ def destroy(
         resources = resource_mapping.get(image)
         if resources:
             for resource in resources:
+                print(f"Checking for {resource}")
                 resources_to_delete.append(f"{env}-{resource}")
 
     if not resources_to_delete:
@@ -382,6 +383,8 @@ def destroy(
             "--namespace",
             "ojp",
             "--ignore-not-found=true",
+            "-v",
+            "3",
         ]
         run_command(command, check=True)
 
@@ -492,6 +495,7 @@ def _apply_or_delete_components(
         )
 
     command = [kubectl, action, "-f", "-"]
+    print(f"Command: {command}")
     process = subprocess.Popen(
         command,
         stdin=subprocess.PIPE,
