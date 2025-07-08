@@ -318,6 +318,7 @@ def deploy(
     is_installed: bool = False,
     images: Optional[List[str]] = None,
     overwrite: bool = False,
+    production: bool = False,
 ) -> None:
     """
     Deploys the specified environment using kustomize and kubectl.
@@ -342,6 +343,11 @@ def deploy(
 
     """
     print(f"Deploying '{env}' environment...")
+
+    if production:
+        env = "production"
+    else:
+        env = "local"
     if env == "local":
         _build_and_register_images_for_local_env(kubectl, images, overwrite)
 

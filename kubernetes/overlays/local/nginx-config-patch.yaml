@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  transit_proxy.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        return 301 https://$host$request_uri;
+    }
+    server {
+        listen 443 ssl;
+        server_name localhost;
+
+        ssl_certificate /etc/nginx/certs/tls.crt;
+        ssl_certificate_key /etc/nginx/certs/tls.key;
+
+        access_log /var/log/nginx/transit_proxy.access.log;
+        error_log /var/log/nginx/transit_proxy.error.log;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+
+        location /vector/ {
+            proxy_pass http://pg-tileserv-service:7800;
+        }
+        location /raster/hot/ {
+            proxy_pass http://apache-service:8080/hot/;
+        }
+        location /route/v1/ {
+            proxy_pass http://osrm-service:5000/route/v1/;
+        }
+        location / {
+            root /var/www/html/map_test_page;
+            index index.html index.htm;
+            try_files $uri $uri/ /index.html =404;
+        }
+    }

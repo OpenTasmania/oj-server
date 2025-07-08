@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-generator-scripts
+  namespace: ojp
+data:
+  generate-cert.sh: |
+    #!/bin/bash
+    openssl req -x509 -newkey rsa:4096 -keyout tls.key -out tls.crt -sha256 -days 365 -nodes -subj "/CN=localhost"
+    kubectl create secret tls self-signed-cert --cert=tls.crt --key=tls.key --dry-run=client -o yaml > secret.yaml

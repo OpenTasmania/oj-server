@@ -1,45 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
-namePrefix: local-
-
-# Patch image paths to point to the MicroK8s local registry
-images:
-- name: postgres
-  newName: localhost:32000/postgres
-- name: osrm
-  newName: localhost:32000/osrm
-- name: pg_tileserv
-  newName: localhost:32000/pg_tileserv
-- name: renderd
-  newName: localhost:32000/renderd
-- name: apache
-  newName: localhost:32000/apache
-- name: nginx
-  newName: localhost:32000/nginx
-- name: carto
-  newName: localhost:32000/carto
-- name: nodejs
-  newName: localhost:32000/nodejs
-- name: certbot
-  newName: localhost:32000/certbot
-- name: pgadmin
-  newName: localhost:32000/pgadmin
-- name: pgagent
-  newName: localhost:32000/pgagent
-- name: data_processing
-  newName: localhost:32000/data_processing
-- name: py3gtfskit
-  newName: localhost:32000/py3gtfskit
-
-# Patch services to use NodePort for easy local access
-patches:
-- patch: |-
-    - op: replace
-      path: /spec/type
-      value: NodePort
-  target:
-    kind: Service
-    name: pg-tileserv-service
 resources:
-- ../../base
+  - ../../components/nginx
+  - ../../components/self-signed-certs
+patchesStrategicMerge:
+  - nginx-config-patch.yaml

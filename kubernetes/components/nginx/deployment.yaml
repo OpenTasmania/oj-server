@@ -26,6 +26,8 @@ spec:
             - name: nginx-proxy-config
               mountPath: /etc/nginx/conf.d/transit_proxy.conf
               subPath: transit_proxy.conf
+            - name: self-signed-cert
+              mountPath: /etc/nginx/certs
       volumes:
         - name: nginx-config
           configMap:
@@ -39,3 +41,6 @@ spec:
             items:
               - key: transit_proxy.conf
                 path: transit_proxy.conf
+        - name: self-signed-cert
+          secret:
+            secretName: self-signed-cert

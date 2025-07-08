@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: self-signed-cert-generator
+  namespace: ojp
+spec:
+  template:
+    spec:
+      containers:
+      - name: cert-generator
+        image: alpine
+        command: ["/bin/sh", "-c", "apk add --no-cache openssl kubectl && sh /app/generate-cert.sh"]
+        volumeMounts:
+        - name: cert-scripts
+          mountPath: /app
+      volumes:
+      - name: cert-scripts
+        configMap:
+          name: cert-generator-scripts
+          defaultMode: 0777
+      restartPolicy: Never
+  backoffLimit: 4

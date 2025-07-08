@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--env",
         default="local",
-        help="The environment to target (default: local).",
+        help="The environment to target (e.g., 'local', 'staging'). Cannot be used with --production.",
     )
     parser.add_argument(
         "--images",
@@ -75,18 +75,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--production",
         action="store_true",
-        help="Target the production environment. This is not yet implemented.",
+        help="Target the production environment. Cannot be used with --env.",
     )
     args: argparse.Namespace = parser.parse_args(args_list)
     args.action = action
+
+    if args.production and args.env != "local":
+        parser.error(
+            "Cannot use --env and --production flags simultaneously."
+        )
 
     if args.overwrite and args.action != "deploy":
         parser.error(
             "--overwrite is only available with the 'deploy' action."
         )
-
-    if args.production:
-        parser.error("--production is not yet implemented.")
 
     _VERBOSE = args.verbose
     _DEBUG = args.debug
@@ -108,6 +110,7 @@ if __name__ == "__main__":
             is_installed=is_installed_run,
             images=args.images,
             overwrite=args.overwrite,
+            production=args.production,
         )
         sys.exit(0)
 
