@@ -5,3 +5,4 @@ resources:
   - service.yaml
   - secret.yaml
   - pvc.yaml
+  - network-policy.yaml

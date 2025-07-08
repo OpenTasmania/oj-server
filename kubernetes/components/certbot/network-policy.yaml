@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: certbot-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: certbot
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nginx # Assuming nginx ingress controller handles http01 challenge
+      ports:
+        - protocol: TCP
+          port: 80 # For http01 challenge
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0 # Allow egress to external ACME server
+      ports:
+        - protocol: TCP
+          port: 443 # For HTTPS communication with ACME server

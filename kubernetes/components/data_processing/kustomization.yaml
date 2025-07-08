@@ -4,3 +4,4 @@ resources:
   - job.yaml
   - configmap.yaml
   - pvc.yaml
+  - network-policy.yaml

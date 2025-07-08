@@ -1,0 +1,26 @@
+# ojp-server/kubernetes/components/postgres/network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: ojp
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pg-tileserv
+        - podSelector:
+            matchLabels:
+              app: pgadmin
+        - podSelector:
+            matchLabels:
+              job-name: data-processing-job
+      ports:
+        - protocol: TCP
+          port: 5432

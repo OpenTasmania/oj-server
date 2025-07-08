@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {} # Allow all ingress traffic
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pg-tileserv
+      ports:
+        - protocol: TCP
+          port: 7800
+    - to:
+        - podSelector:
+            matchLabels:
+              app: apache
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: osrm
+      ports:
+        - protocol: TCP
+          port: 5000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: pgadmin
+      ports:
+        - protocol: TCP
+          port: 80

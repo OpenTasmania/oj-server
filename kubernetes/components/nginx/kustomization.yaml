@@ -4,5 +4,6 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
+  - network-policy.yaml
 # For production
 #  - ingress.yaml
