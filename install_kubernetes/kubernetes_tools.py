@@ -4,7 +4,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from typing import Dict, List, Optional
 
 import yaml
@@ -358,34 +357,85 @@ def _apply_or_delete_components(
     """
     Helper function to apply or delete a filtered set of Kustomize components.
     """
-    kustomization_file = os.path.join(kustomize_path, "kustomization.yaml")
-    if not os.path.exists(kustomization_file):
-        kustomization_file = os.path.join(kustomize_path, "kustomization.yml")
+    # Generate the full kustomized YAML
+    kustomize_command = [kubectl, "kustomize", kustomize_path]
+    kustomized_yaml_str = run_command(
+        kustomize_command, check=True, capture_output=True
+    ).stdout
 
-    if not os.path.exists(kustomization_file):
+    # Parse the YAML into individual Kubernetes objects
+    # yaml.safe_load_all returns a generator, so convert to list
+    all_resources = list(yaml.safe_load_all(kustomized_yaml_str))
+
+    filtered_resources = []
+    for resource in all_resources:
+        if resource is None:  # Skip empty documents
+            continue
+
+        # Check if the resource name or a part of its metadata matches any of the specified images
+        # This logic might need refinement based on how resources are named in your Kustomize
+        resource_name = resource.get("metadata", {}).get("name", "")
+
+        # Simple check: if any image name is part of the resource name
+        if any(image in resource_name for image in images):
+            filtered_resources.append(resource)
+        # More specific check: if the resource is a deployment/job/statefulset related to the image
+        elif resource.get("kind") in [
+            "Deployment",
+            "Job",
+            "StatefulSet",
+            "DaemonSet",
+        ]:
+            # Check if the image name is in the containers' image names
+            containers = (
+                resource.get("spec", {})
+                .get("template", {})
+                .get("spec", {})
+                .get("containers", [])
+            )
+            if any(
+                any(image in container.get("image", "") for image in images)
+                for container in containers
+            ):
+                filtered_resources.append(resource)
+        # Also include common resources like namespaces if they are not image-specific
+        elif (
+            resource.get("kind") == "Namespace" and resource_name == "ojp"
+        ):  # Assuming 'ojp' is your main namespace
+            filtered_resources.append(resource)
+
+    if not filtered_resources:
         print(
-            f"Error: kustomization.yaml or kustomization.yml not found in {kustomize_path}",
+            "No matching resources found for the specified images.",
+            file=sys.stderr,
+        )
+        return
+
+    # Dump the filtered resources back to YAML
+    filtered_yaml_str = ""
+    for resource in filtered_resources:
+        filtered_yaml_str += (
+            yaml.dump(resource, default_flow_style=False, sort_keys=False)
+            + "---\n"
+        )
+
+    # Apply or delete the filtered YAML
+    command = [kubectl, action, "-f", "-"]
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, stderr = process.communicate(
+        input=filtered_yaml_str.encode("utf-8")
+    )
+
+    if process.returncode != 0:
+        print(
+            f"Error applying/deleting components: {stderr.decode('utf-8')}",
             file=sys.stderr,
         )
         sys.exit(1)
-
-    with open(kustomization_file, "r") as f:
-        kustomization_data = yaml.safe_load(f)
-
-    filtered_resources = []
-    if "resources" in kustomization_data:
-        for resource in kustomization_data["resources"]:
-            if resource == "../../base" or any(
-                f"/{image}" in resource for image in images
-            ):
-                filtered_resources.append(resource)
-
-    kustomization_data["resources"] = filtered_resources
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_kustomization_file = os.path.join(tmpdir, "kustomization.yaml")
-        with open(tmp_kustomization_file, "w") as f:
-            yaml.dump(kustomization_data, f)
-
-        command = [kubectl, action, "-k", tmpdir]
-        run_command(command, check=True)
+    else:
+        print(stdout.decode("utf-8"))
