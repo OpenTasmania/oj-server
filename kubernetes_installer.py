@@ -17,6 +17,7 @@ from install_kubernetes.kubernetes_tools import (
     deploy,
     destroy,
     get_kubectl_command,
+    get_managed_images,
 )
 
 _VERBOSE: bool = False
@@ -25,27 +26,35 @@ _IMAGE_OUTPUT_DIR: str = "images"
 
 
 if __name__ == "__main__":
+    managed_images = get_managed_images()
+    epilog_text = f"Managed images: {', '.join(managed_images)}"
+
+    # Manually parse action to handle flexible argument order
+    actions = ["deploy", "destroy", "build-amd64", "build-rpi64", "build-deb"]
+    args_list = sys.argv[1:]
+    action = "menu"  # Default action
+
+    for act in actions:
+        if act in args_list:
+            action = act
+            args_list.remove(act)
+            break
+
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="Kubernetes deployment script for OJM."
-    )
-    parser.add_argument(
-        "action",
-        nargs="?",
-        default="menu",
-        choices=[
-            "menu",
-            "deploy",
-            "destroy",
-            "build-amd64",
-            "build-rpi64",
-            "build-deb",
-        ],
-        help="The action to perform.",
+        description="Kubernetes deployment script for OJM.",
+        epilog=epilog_text,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--env",
         default="local",
         help="The environment to target (default: local).",
+    )
+    parser.add_argument(
+        "--images",
+        nargs="*",
+        default=None,
+        help="A space-delimited list of images to deploy or destroy. If not provided, all images will be processed.",
     )
     parser.add_argument(
         "-v",
@@ -59,7 +68,18 @@ if __name__ == "__main__":
         action="store_true",
         help="Enable debug mode (implies --verbose and pauses before each step).",
     )
-    args: argparse.Namespace = parser.parse_args()
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force overwrite of existing Docker images in the local registry. Only valid with 'deploy' action.",
+    )
+    args: argparse.Namespace = parser.parse_args(args_list)
+    args.action = action
+
+    if args.overwrite and args.action != "deploy":
+        parser.error(
+            "--overwrite is only available with the 'deploy' action."
+        )
 
     _VERBOSE = args.verbose
     _DEBUG = args.debug
@@ -75,12 +95,23 @@ if __name__ == "__main__":
     if args.action == "deploy":
         kubectl_cmd = get_kubectl_command()
         print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-        deploy(args.env, kubectl_cmd, is_installed=is_installed_run)
+        deploy(
+            args.env,
+            kubectl_cmd,
+            is_installed=is_installed_run,
+            images=args.images,
+            overwrite=args.overwrite,
+        )
         sys.exit(0)
 
     elif args.action == "destroy":
         kubectl_cmd = get_kubectl_command()
-        destroy(args.env, kubectl_cmd, is_installed=is_installed_run)
+        destroy(
+            args.env,
+            kubectl_cmd,
+            is_installed=is_installed_run,
+            images=args.images,
+        )
         sys.exit(0)
 
     elif args.action in ["build-amd64", "build-rpi64", "build-deb"]:

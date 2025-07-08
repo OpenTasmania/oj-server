@@ -4,17 +4,44 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import List, Optional
+import tempfile
+from typing import Dict, List, Optional
+
+import yaml
 
 from install_kubernetes.common import run_command
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+ALL_IMAGES: Dict[str, str] = {
+    "postgres": "postgres:latest",
+    "osrm": "osrm/osrm-backend:latest",
+    "nginx": "nginx:latest",
+    "nodejs": "node:latest",
+    "certbot": "certbot/certbot:latest",
+    "pgadmin": "dpage/pgadmin4:latest",
+    "data_processing": "data_processor/Dockerfile",
+    "apache": "kubernetes/components/apache/Dockerfile",
+    "carto": "kubernetes/components/carto/Dockerfile",
+    "pgagent": "kubernetes/components/pgagent/Dockerfile",
+    "pg_tileserv": "kubernetes/components/pg_tileserv/Dockerfile",
+    "py3gtfskit": "kubernetes/components/py3gtfskit/Dockerfile",
+    "renderd": "kubernetes/components/renderd/Dockerfile",
+}
 
-def _build_and_register_images_for_local_env(kubectl: str) -> None:
+
+def get_managed_images() -> List[str]:
+    """Returns a list of all manageable image names."""
+    return list(ALL_IMAGES.keys())
+
+
+def _build_and_register_images_for_local_env(
+    kubectl: str, images: Optional[List[str]] = None, overwrite: bool = False
+) -> None:
     """
     Builds custom Docker images and pulls standard ones, then registers them
     with the local MicroK8s registry.
+    If a list of images is provided, only those images are processed.
     """
     print(
         "\n--- Building and registering images for local MicroK8s environment ---"
@@ -35,35 +62,40 @@ def _build_and_register_images_for_local_env(kubectl: str) -> None:
             "It will attempt to push to 'localhost:32000', which might require 'docker login'."
         )
 
-    images_to_process = {
-        "postgres": "postgres:latest",
-        "osrm": "osrm/osrm-backend:latest",
-        "nginx": "nginx:latest",
-        "nodejs": "node:latest",
-        "certbot": "certbot/certbot:latest",
-        "pgadmin": "dpage/pgadmin4:latest",
-        "data_processing": "data_processor/Dockerfile",
-        "apache": "kubernetes/components/apache/Dockerfile",
-        "carto": "kubernetes/components/carto/Dockerfile",
-        "pgagent": "kubernetes/components/pgagent/Dockerfile",
-        "pg_tileserv": "kubernetes/components/pg_tileserv/Dockerfile",
-        "py3gtfskit": "kubernetes/components/py3gtfskit/Dockerfile",
-        "renderd": "kubernetes/components/renderd/Dockerfile",
-    }
+    images_to_process = ALL_IMAGES
+    if images is not None:
+        images_to_process = {
+            name: source
+            for name, source in ALL_IMAGES.items()
+            if name in images
+        }
+        missing_images = set(images) - set(images_to_process.keys())
+        if missing_images:
+            print(
+                f"Warning: The following specified images are not defined and will be skipped: {', '.join(missing_images)}",
+                file=sys.stderr,
+            )
+
+    if not images_to_process:
+        print("No images selected to process.")
+        return
 
     data_processor_dockerfile_path = os.path.join(
-        PROJECT_ROOT,
+        PROJECT_ROOT, "data_processor", "Dockerfile"
     )
     os.makedirs(
         os.path.dirname(data_processor_dockerfile_path), exist_ok=True
     )
-    if not os.path.exists(data_processor_dockerfile_path):
+    if (
+        not os.path.exists(data_processor_dockerfile_path)
+        and "data_processing" in images_to_process
+    ):
         print(
             f"Creating Dockerfile for data_processor at {data_processor_dockerfile_path}"
         )
         with open(data_processor_dockerfile_path, "w") as f:
             f.write("""# Use a slim Python base image
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 # Set the working directory in the container
 WORKDIR /app
@@ -84,8 +116,17 @@ CMD ["python", "run.py"]
         print(f"\nProcessing image: {name}")
         local_image_tag = f"localhost:32000/{name}"
 
+        if not overwrite:
+            check_command = ["docker", "image", "inspect", local_image_tag]
+            result = run_command(
+                check_command, check=False, capture_output=True
+            )
+            if result.returncode == 0:
+                print(f"Image '{local_image_tag}' already exists. Skipping.")
+                continue
+
         if source.endswith("Dockerfile"):
-            dockerfile_path = os.path.join(PROJECT_ROOT, "..", "..", source)
+            dockerfile_path = os.path.join(PROJECT_ROOT, source)
             if not os.path.exists(dockerfile_path):
                 print(
                     f"Warning: Dockerfile not found at '{dockerfile_path}' for '{name}'. Skipping."
@@ -202,13 +243,20 @@ def get_kubectl_command() -> str:
             print("Invalid choice. Please enter '1' or '2'.")
 
 
-def deploy(env: str, kubectl: str, is_installed: bool = False) -> None:
+def deploy(
+    env: str,
+    kubectl: str,
+    is_installed: bool = False,
+    images: Optional[List[str]] = None,
+    overwrite: bool = False,
+) -> None:
     """
     Deploys the application using Kustomize.
+    If a list of images is provided, only the corresponding components are deployed.
     """
     print(f"Deploying '{env}' environment...")
     if env == "local":
-        _build_and_register_images_for_local_env(kubectl)
+        _build_and_register_images_for_local_env(kubectl, images, overwrite)
 
     if is_installed:
         kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
@@ -224,28 +272,120 @@ def deploy(env: str, kubectl: str, is_installed: bool = False) -> None:
         )
         sys.exit(1)
 
-    command: List[str] = [kubectl, "apply", "-k", kustomize_path]
-    run_command(command, check=True)
+    if images is not None:
+        print(f"Deploying specified components: {', '.join(images)}")
+        _apply_or_delete_components("apply", kubectl, kustomize_path, images)
+    else:
+        print("Deploying all components...")
+        command: List[str] = [kubectl, "apply", "-k", kustomize_path]
+        run_command(command, check=True)
 
 
-def destroy(env: str, kubectl: str, is_installed: bool = False) -> None:
+def destroy(
+    env: str,
+    kubectl: str,
+    is_installed: bool = False,
+    images: Optional[List[str]] = None,
+) -> None:
     """
-    Destroys the application deployment using Kustomize.
+    Destroys the application deployment by deleting deployments and jobs,
+    and purges the associated images from the local registry.
+    If a list of images is provided, only the corresponding components are destroyed.
     """
     print(f"Destroying '{env}' environment...")
-    if is_installed:
-        kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
-    else:
-        kustomize_path = os.path.join(
-            PROJECT_ROOT, "kubernetes", "overlays", env
-        )
 
-    if not os.path.isdir(kustomize_path):
+    resource_mapping = {
+        "postgres": "postgres-deployment",
+        "osrm": "osrm-deployment",
+        "nginx": "nginx-deployment",
+        "nodejs": "nodejs-deployment",
+        "certbot": "certbot-job",
+        "pgadmin": "pgadmin-deployment",
+        "data_processing": "gtfs-processing-job",
+        "apache": "apache-deployment",
+        "carto": "carto-deployment",
+        "pgagent": "pgagent-deployment",
+        "pg_tileserv": "pg-tileserv-deployment",
+        "py3gtfskit": "py3gtfskit-job",
+        "renderd": "renderd-deployment",
+    }
+
+    images_to_destroy = get_managed_images() if images is None else images
+
+    resources_to_delete = [
+        f"{env}-{resource_mapping.get(image)}"
+        for image in images_to_destroy
+        if resource_mapping.get(image)
+    ]
+
+    if not resources_to_delete:
+        print("No components specified to destroy.")
+    else:
+        print(f"Destroying resources: {', '.join(resources_to_delete)}")
+        command = [
+            kubectl,
+            "delete",
+            "deployments,jobs,statefulsets,daemonsets",
+            *resources_to_delete,
+            "--namespace",
+            "ojp",
+            "--ignore-not-found=true",
+        ]
+        run_command(command, check=True)
+
+    _purge_images_from_local_registry(images)
+
+
+def _purge_images_from_local_registry(
+    images: Optional[List[str]] = None,
+) -> None:
+    """
+    Removes specified Docker images from the local registry.
+    """
+    print("\n--- Purging images from local registry ---")
+
+    images_to_purge = get_managed_images() if images is None else images
+
+    for image_name in images_to_purge:
+        local_image_tag = f"localhost:32000/{image_name}"
+        print(f"Removing image '{local_image_tag}'...")
+        run_command(["docker", "rmi", local_image_tag], check=False)
+
+
+def _apply_or_delete_components(
+    action: str, kubectl: str, kustomize_path: str, images: List[str]
+) -> None:
+    """
+    Helper function to apply or delete a filtered set of Kustomize components.
+    """
+    kustomization_file = os.path.join(kustomize_path, "kustomization.yaml")
+    if not os.path.exists(kustomization_file):
+        kustomization_file = os.path.join(kustomize_path, "kustomization.yml")
+
+    if not os.path.exists(kustomization_file):
         print(
-            f"Error: Kustomize path not found at '{kustomize_path}'",
+            f"Error: kustomization.yaml or kustomization.yml not found in {kustomize_path}",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    command: List[str] = [kubectl, "delete", "-k", kustomize_path]
-    run_command(command, check=True)
+    with open(kustomization_file, "r") as f:
+        kustomization_data = yaml.safe_load(f)
+
+    filtered_resources = []
+    if "resources" in kustomization_data:
+        for resource in kustomization_data["resources"]:
+            if resource == "../../base" or any(
+                f"/{image}" in resource for image in images
+            ):
+                filtered_resources.append(resource)
+
+    kustomization_data["resources"] = filtered_resources
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_kustomization_file = os.path.join(tmpdir, "kustomization.yaml")
+        with open(tmp_kustomization_file, "w") as f:
+            yaml.dump(kustomization_data, f)
+
+        command = [kubectl, action, "-k", tmpdir]
+        run_command(command, check=True)
