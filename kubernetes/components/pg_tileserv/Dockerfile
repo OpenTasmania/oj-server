@@ -15,6 +15,15 @@ FROM alpine:latest
 # Copy the built binary from the builder stage
 COPY --from=builder /pg_tileserv /usr/local/bin/
 
+# Create a non-root user and group
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Create a directory for the application data
+RUN mkdir -p /var/lib/pg_tileserv && chown -R appuser:appgroup /var/lib/pg_tileserv
+
+# Switch to non-root user
+USER appuser
+
 # Expose the default pg_tileserv port
 EXPOSE 7800
 
