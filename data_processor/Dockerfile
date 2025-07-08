@@ -4,7 +4,6 @@ FROM python:3.13-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy and install Python dependencies
 COPY pyproject.toml .
 
 RUN apt-get update \
@@ -20,7 +19,7 @@ RUN pip install --no-cache-dir uv && \
 # Copy the necessary application code
 COPY common/ ./common/
 COPY installer/processors/ ./installer/processors/
-
-# The container will be executed by a run script
 COPY data_processor/run.py .
+
+# Set the command to run the application
 CMD ["python", "run.py"]

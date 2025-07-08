@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the renderd configuration. This will be mounted from a ConfigMap in Kubernetes.
-COPY renderd.conf /etc/renderd.conf
+COPY kubernetes/components/renderd/renderd.conf /etc/renderd.conf
 
 # Copy the map style. This could also be mounted from a ConfigMap or an init container.
-COPY mapnik-style.xml /etc/mapnik-style.xml
+COPY kubernetes/components/renderd/mapnik-style.xml /etc/mapnik-style.xml
 
 # Expose the Apache port
 EXPOSE 80

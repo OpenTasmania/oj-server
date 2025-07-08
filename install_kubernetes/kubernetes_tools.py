@@ -10,6 +10,7 @@ import yaml
 
 from install_kubernetes.common import run_command
 
+# PROJECT_ROOT is correctly defined as the root of the project source
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 ALL_IMAGES: Dict[str, str] = {
@@ -135,6 +136,9 @@ CMD ["python", "run.py"]
             print(
                 f"Building custom image '{local_image_tag}' from '{dockerfile_path}'..."
             )
+            # --- FIX ---
+            # The build context has been changed from os.path.join(PROJECT_ROOT, "..", "..")
+            # to just PROJECT_ROOT. This ensures Docker looks for files in the correct directory.
             build_command = [
                 "docker",
                 "build",
@@ -142,7 +146,7 @@ CMD ["python", "run.py"]
                 local_image_tag,
                 "-f",
                 dockerfile_path,
-                os.path.join(PROJECT_ROOT, "..", ".."),
+                PROJECT_ROOT,
             ]
             run_command(build_command, check=True)
 
