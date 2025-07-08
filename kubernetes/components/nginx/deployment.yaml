@@ -16,14 +16,26 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: nginx # Kustomize will add the registry path
+          image: nginx:latest
           ports:
             - containerPort: 80
           volumeMounts:
             - name: nginx-config
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
+            - name: nginx-proxy-config
+              mountPath: /etc/nginx/conf.d/transit_proxy.conf
+              subPath: transit_proxy.conf
       volumes:
         - name: nginx-config
           configMap:
             name: nginx-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: nginx-proxy-config
+          configMap:
+            name: nginx-config
+            items:
+              - key: transit_proxy.conf
+                path: transit_proxy.conf

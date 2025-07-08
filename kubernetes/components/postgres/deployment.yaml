@@ -16,16 +16,36 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres # Kustomize will add the registry path
+          image: postgres
           ports:
             - containerPort: 5432
           envFrom:
             - secretRef:
                 name: postgres-secret
+          command:
+            - "postgres"
+            - "-c"
+            - "config_file=/etc/postgres-config/postgresql.conf"
+            - "-c"
+            - "hba_file=/etc/postgres-config/pg_hba.conf"
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d/init-postgis.sh
+              subPath: init-postgis.sh
+            - name: postgres-config
+              mountPath: /etc/postgres-config
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: init-script
+          configMap:
+            name: postgres-config
+            items:
+              - key: init-postgis.sh
+                path: init-postgis.sh
+        - name: postgres-config
+          configMap:
+            name: postgres-config

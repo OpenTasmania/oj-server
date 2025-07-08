@@ -13,19 +13,19 @@ from install_kubernetes.common import run_command
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 ALL_IMAGES: Dict[str, str] = {
-    "postgres": "postgres:latest",
+    "nodejs": "node:latest",
+    "postgres": "postgis/postgis:16-3.4",
+    "carto": "kubernetes/components/carto/Dockerfile",
+    "apache": "kubernetes/components/apache/Dockerfile",
+    "renderd": "kubernetes/components/renderd/Dockerfile",
+    "pg_tileserv": "kubernetes/components/pg_tileserv/Dockerfile",
+    "data_processing": "data_processor/Dockerfile",
     "osrm": "osrm/osrm-backend:latest",
     "nginx": "nginx:latest",
-    "nodejs": "node:latest",
     "certbot": "certbot/certbot:latest",
     "pgadmin": "dpage/pgadmin4:latest",
-    "data_processing": "data_processor/Dockerfile",
-    "apache": "kubernetes/components/apache/Dockerfile",
-    "carto": "kubernetes/components/carto/Dockerfile",
     "pgagent": "kubernetes/components/pgagent/Dockerfile",
-    "pg_tileserv": "kubernetes/components/pg_tileserv/Dockerfile",
     "py3gtfskit": "kubernetes/components/py3gtfskit/Dockerfile",
-    "renderd": "kubernetes/components/renderd/Dockerfile",
 }
 
 
@@ -264,6 +264,52 @@ def get_kubectl_command() -> str:
                 )
                 sys.exit(1)
             print("Invalid choice. Please enter '1' or '2'.")
+
+
+# TODO: Use something like this when in Production mode
+def install_cert_manager(self):
+    """
+    Installs cert-manager into the cluster.
+    """
+    self.log_message("Installing cert-manager...")
+    cert_manager_url = "https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml"
+
+    # Command to apply the cert-manager manifest
+    install_command = ["kubectl", "apply", "-f", cert_manager_url]
+
+    # Command to wait for the cert-manager deployment to be ready
+    wait_command = [
+        "kubectl",
+        "wait",
+        "--for=condition=Available",
+        "deployment",
+        "-n",
+        "cert-manager",
+        "--all",
+        "--timeout=300s",
+    ]
+
+    try:
+        # First, apply the manifest
+        self.run_command(
+            install_command, "Failed to apply cert-manager manifest"
+        )
+        self.log_message("cert-manager manifest applied successfully.")
+
+        # Then, wait for the deployments to be available
+        self.log_message("Waiting for cert-manager pods to be ready...")
+        self.run_command(
+            wait_command,
+            "cert-manager deployment failed to become ready in time.",
+        )
+        self.log_message("cert-manager is installed and ready.")
+
+    except Exception as e:
+        self.log_message(
+            f"An error occurred during cert-manager installation: {e}",
+            "error",
+        )
+        raise
 
 
 def deploy(

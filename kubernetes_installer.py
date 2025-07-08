@@ -72,6 +72,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Force overwrite of existing Docker images in the local registry. Only valid with 'deploy' action.",
     )
+    parser.add_argument(
+        "--production",
+        action="store_true",
+        help="Target the production environment. This is not yet implemented.",
+    )
     args: argparse.Namespace = parser.parse_args(args_list)
     args.action = action
 
@@ -79,6 +84,9 @@ if __name__ == "__main__":
         parser.error(
             "--overwrite is only available with the 'deploy' action."
         )
+
+    if args.production:
+        parser.error("--production is not yet implemented.")
 
     _VERBOSE = args.verbose
     _DEBUG = args.debug

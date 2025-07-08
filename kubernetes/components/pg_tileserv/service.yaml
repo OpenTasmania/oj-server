@@ -9,4 +9,3 @@ spec:
     - protocol: TCP
       port: 7800
       targetPort: 7800
-  type: ClusterIP

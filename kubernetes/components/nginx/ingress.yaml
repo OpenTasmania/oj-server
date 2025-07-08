@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ojp-server-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    kubernetes.io/ingress.class: "nginx"
+    # This annotation is often needed to handle the rewrite for subpaths
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  tls:
+    - hosts:
+        - example.com
+      secretName: ojp-server-tls-secret
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - path: /pgadmin(/|$)(.*) # New rule for pgadmin
+            pathType: Prefix
+            backend:
+              service:
+                name: pgadmin-service
+                port:
+                  number: 80
+          - path: /vector
+            pathType: Prefix
+            backend:
+              service:
+                name: pg-tileserv-service
+                port:
+                  number: 7800
+          - path: /raster/hot
+            pathType: Prefix
+            backend:
+              service:
+                name: apache-service
+                port:
+                  number: 8080
+          - path: /route/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: osrm-service
+                port:
+                  number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx-service
+                port:
+                  number: 80

@@ -16,12 +16,17 @@ spec:
     spec:
       containers:
         - name: pg-tileserv
-          image: pg_tileserv # Kustomize will add the registry path
+          image: pg_tileserv
           ports:
             - containerPort: 7800
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: DATABASE_URL # This assumes the secret has a DATABASE_URL key
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pg_tileserv/config.toml
+              subPath: config.toml
+      volumes:
+        - name: config
+          configMap:
+            name: pg-tileserv-config

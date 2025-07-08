@@ -1,6 +1,5 @@
-# kubernetes/components/osrm/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 resources:
-  - pvc.yaml
   - deployment.yaml
   - service.yaml
-  - processing-job.yaml # <-- ADD THIS LINE

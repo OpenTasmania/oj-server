@@ -16,20 +16,27 @@ spec:
     spec:
       containers:
         - name: renderd
-          image: renderd # Kustomize will add the registry path
-          ports:
-            - containerPort: 80
+          image: renderd
           volumeMounts:
             - name: renderd-config
-              mountPath: /etc/renderd.conf
+              mountPath: /etc/renderd/renderd.conf
               subPath: renderd.conf
-            - name: mapnik-style
-              mountPath: /etc/mapnik-style.xml
-              subPath: mapnik-style.xml
+            - name: tile-cache
+              mountPath: /var/lib/mod_tile
+            - name: renderd-socket
+              mountPath: /var/run/renderd
+            - name: carto-styles
+              mountPath: /usr/local/share/maps/style/openstreetmap-carto
       volumes:
         - name: renderd-config
           configMap:
             name: renderd-config
-        - name: mapnik-style
-          configMap:
-            name: mapnik-style-config
+        - name: tile-cache
+          persistentVolumeClaim:
+            claimName: renderd-tile-cache-pvc
+        - name: renderd-socket
+          persistentVolumeClaim:
+            claimName: renderd-socket-pvc
+        - name: carto-styles
+          persistentVolumeClaim:
+            claimName: carto-style-pvc

@@ -4,4 +4,4 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
-  - mapnik-style-configmap.yaml
+  - pvc.yaml

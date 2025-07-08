@@ -519,7 +519,7 @@
         ```yaml
         # kubernetes/components/data_processing/kustomization.yaml
         resources:
-          - data_processing.yaml
+          - job.yaml
           - configmap.yaml
         ```
 

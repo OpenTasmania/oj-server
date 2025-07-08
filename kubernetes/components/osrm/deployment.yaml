@@ -16,17 +16,20 @@ spec:
     spec:
       containers:
         - name: osrm
-          image: osrm # Kustomize will add the registry path
+          image: osrm/osrm-backend:latest
           ports:
             - containerPort: 5000
-          # The command will be to run osrm-routed with the data file
-          # The data file itself would be mounted from a persistent volume
-          # that is prepared by a separate data processing job.
-          command: [ "osrm-routed", "--algorithm", "mld", "/data/osm.osrm" ]
+          args:
+            - "osrm-routed"
+            - "/data/australia-latest.osrm"
+            - "--algorithm"
+            - "MLD"
+            - "--max-matching-size"
+            - "2000"
           volumeMounts:
             - name: osrm-data
               mountPath: /data
       volumes:
         - name: osrm-data
           persistentVolumeClaim:
-            claimName: osrm-pvc
+            claimName: osrm-processed-data-pvc
