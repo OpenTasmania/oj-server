@@ -343,7 +343,17 @@ def _purge_images_from_local_registry(
     images: Optional[List[str]] = None,
 ) -> None:
     """
-    Removes specified Docker images from the local registry.
+    Purges the specified Docker images from the local registry or all managed images
+    if no specific images are provided. This function first checks if the images
+    exist in the local registry and removes them if found.
+
+    Args:
+        images (Optional[List[str]]): A list of image names to purge. If not
+            provided, all managed images are purged.
+
+    Raises:
+        SubprocessError: Raised if there are issues executing the Docker
+            commands for inspecting or removing images.
     """
     print("\n--- Purging images from local registry ---")
 
@@ -351,8 +361,13 @@ def _purge_images_from_local_registry(
 
     for image_name in images_to_purge:
         local_image_tag = f"localhost:32000/{image_name}"
-        print(f"Removing image '{local_image_tag}'...")
-        run_command(["docker", "rmi", local_image_tag], check=False)
+        check_command = ["docker", "image", "inspect", local_image_tag]
+        result = run_command(check_command, check=False, capture_output=True)
+        if result.returncode == 0:
+            print(f"Removing image '{local_image_tag}'...")
+            run_command(["docker", "rmi", local_image_tag], check=True)
+        else:
+            print(f"Image '{local_image_tag}' not found. Skipping removal.")
 
 
 def _apply_or_delete_components(
