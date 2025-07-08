@@ -346,28 +346,29 @@ def destroy(
     print(f"Destroying '{env}' environment...")
 
     resource_mapping = {
-        "postgres": "postgres-deployment",
-        "osrm": "osrm-deployment",
-        "nginx": "nginx-deployment",
-        "nodejs": "nodejs-deployment",
-        "certbot": "certbot-job",
-        "pgadmin": "pgadmin-deployment",
-        "data_processing": "gtfs-processing-job",
-        "apache": "apache-deployment",
-        "carto": "carto-deployment",
-        "pgagent": "pgagent-deployment",
-        "pg_tileserv": "pg-tileserv-deployment",
-        "py3gtfskit": "py3gtfskit-job",
-        "renderd": "renderd-deployment",
+        "postgres": ["postgres-deployment", "postgres-service"],
+        "osrm": ["osrm-deployment", "osrm-service"],
+        "nginx": ["nginx-deployment", "nginx-service"],
+        "nodejs": ["nodejs-deployment", "nodejs-service"],
+        "certbot": ["certbot-job"],
+        "pgadmin": ["pgadmin-deployment", "pgadmin-service"],
+        "data_processing": ["gtfs-processing-job"],
+        "apache": ["apache-deployment", "apache-service"],
+        "carto": ["carto-deployment", "carto-service"],
+        "pgagent": ["pgagent-deployment"],
+        "pg_tileserv": ["pg-tileserv-deployment", "pg-tileserv-service"],
+        "py3gtfskit": ["py3gtfskit-job"],
+        "renderd": ["renderd-deployment", "renderd-service"],
     }
 
     images_to_destroy = get_managed_images() if images is None else images
 
-    resources_to_delete = [
-        f"{env}-{resource_mapping.get(image)}"
-        for image in images_to_destroy
-        if resource_mapping.get(image)
-    ]
+    resources_to_delete = []
+    for image in images_to_destroy:
+        resources = resource_mapping.get(image)
+        if resources:
+            for resource in resources:
+                resources_to_delete.append(f"{env}-{resource}")
 
     if not resources_to_delete:
         print("No components specified to destroy.")
@@ -376,7 +377,7 @@ def destroy(
         command = [
             kubectl,
             "delete",
-            "deployments,jobs,statefulsets,daemonsets",
+            "deployments,jobs,statefulsets,daemonsets,services",
             *resources_to_delete,
             "--namespace",
             "ojp",
