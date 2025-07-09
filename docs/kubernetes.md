@@ -1,7 +1,7 @@
-# Open Journey Planner Server - Kubernetes Installer Guide
+# Open Journey Server - Kubernetes Installer Guide
 
 This document provides comprehensive instructions for using the `kubernetes_installer.py` script to deploy and manage
-the Open Journey Planner Server using Kubernetes. The script offers a streamlined approach for both local development
+the Open Journey Server using Kubernetes. The script offers a streamlined approach for both local development
 and production deployments.
 
 ## Table of Contents
@@ -71,8 +71,8 @@ Before using the `kubernetes_installer.py` script, ensure you have the following
 
 1. Clone the repository:
    ```bash
-   git clone https://gitlab.com/opentasmania/ojp-server.git
-   cd ojp-server
+   git clone https://gitlab.com/opentasmania/oj-server.git
+   cd oj-server
    ```
 
 2. Ensure the script is executable:
@@ -174,20 +174,20 @@ After deployment, you can check the status of your pods:
 
 ```bash
 # For MicroK8s
-microk8s.kubectl get pods -n ojp
+microk8s.kubectl get pods -n oj
 
 # For standard Kubernetes
-kubectl get pods -n ojp
+kubectl get pods -n oj
 ```
 
 To view logs for a specific pod:
 
 ```bash
 # For MicroK8s
-microk8s.kubectl logs -f <pod-name >-n ojp
+microk8s.kubectl logs -f <pod-name >-n oj
 
 # For standard Kubernetes
-kubectl logs -f <pod-name >-n ojp
+kubectl logs -f <pod-name >-n oj
 ```
 
 ## Creating Installer Images
@@ -206,14 +206,14 @@ This will:
 
 1. Download the latest Debian testing netinst ISO
 2. Verify its checksum
-3. Extract and modify the ISO to include the OJP Server Kubernetes configurations
-4. Create a new ISO that will automatically install OJP Server when used
+3. Extract and modify the ISO to include the OJ Server Kubernetes configurations
+4. Create a new ISO that will automatically install OJ Server when used
 
 The resulting image will be saved in the `images/` directory as `debian-trixie-amd64-microk8s-unattended.iso`.
 
 ### Creating a Raspberry Pi Installer Image
 
-To create a custom Debian installer image for Raspberry Pi 3 or 4 (64-bit):
+To create a custom Debian installer image for Raspberry Pi 3 or 4 (64-bit) with MicroK8s and OJ Server pre-installed.
 
 ```bash
 ./install_kubernetes.py build-rpi64
@@ -335,8 +335,8 @@ sudo apt install python3 python3-pip wget xorriso isolinux grub-efi-amd64-bin dp
 
 2. Check for detailed error messages in the pod logs:
    ```bash
-   kubectl get pods -n ojp
-   kubectl logs -f <pod-name> -n ojp
+   kubectl get pods -n oj
+   kubectl logs -f <pod-name> -n oj
    ```
 
 3. Try destroying and redeploying:
@@ -354,7 +354,7 @@ If you encounter issues not covered here:
    ./install_kubernetes.py deploy --env local -d
    ```
 
-2. Check the [GitLab issues page](https://gitlab.com/opentasmania/ojp-server/-/issues) for known issues or to report a
+2. Check the [GitLab issues page](https://gitlab.com/opentasmania/oj-server/-/issues) for known issues or to report a
    new one.
 
 ## Project Structure
@@ -362,7 +362,7 @@ If you encounter issues not covered here:
 The Kubernetes deployment uses the following directory structure:
 
 ```
-ojp-server/
+oj-server/
 ├── install_kubernetes.py       # Main installer script
 ├── kubernetes/                 # Kubernetes configuration files
 │   ├── base/                   # Base configurations (environment-agnostic)
@@ -388,5 +388,5 @@ environments.
 ---
 
 By following this guide, you should be able to effectively use the `install_kubernetes.py` script to deploy and manage
-the Open Journey Planner Server using Kubernetes. The script provides a flexible and powerful way to handle both local
+the Open Journey Server using Kubernetes. The script provides a flexible and powerful way to handle both local
 development and production deployments.

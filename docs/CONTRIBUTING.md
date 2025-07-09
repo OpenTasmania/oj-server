@@ -1,17 +1,17 @@
-# Contribution Guidelines for Open Journey Planner Server
+# Contribution Guidelines for Open Journey Server
 
-We welcome and appreciate contributions to the "Open Journey Planner Server" project! Your help can make this
+We welcome and appreciate contributions to the "Open Journey Server" project! Your help can make this
 project even better.
 
 ## How to Contribute
 
-This project is hosted on [GitLab](https://gitlab.com/opentasmania/ojp-server). We utilize GitLab's features for
+This project is hosted on [GitLab](https://gitlab.com/opentasmania/oj-server). We utilize GitLab's features for
 collaboration and issue tracking.
 
 ### 1. Reporting Issues
 
 If you find a bug, have a feature request, or notice any unexpected behavior, please report it on
-our [Issues board](https://gitlab.com/opentasmania/ojp-server/issues).
+our [Issues board](https://gitlab.com/opentasmania/oj-server/issues).
 
 When reporting an issue, please provide as much detail as possible, including:
 
@@ -25,7 +25,7 @@ When reporting an issue, please provide as much detail as possible, including:
 ### 2. Suggesting Enhancements
 
 If you have an idea for a new feature or an improvement to existing functionality, you can also propose it on
-the [Issues board](https://gitlab.com/opentasmania/ojp-server/issues). Please describe your suggestion clearly and
+the [Issues board](https://gitlab.com/opentasmania/oj-server/issues). Please describe your suggestion clearly and
 explain its benefits.
 
 ### 3. Submitting Code Contributions
@@ -35,8 +35,8 @@ We encourage code contributions! If you'd like to contribute code, please follow
 1. **Fork the repository:** Create your own fork of the project on GitLab.
 2. **Clone your fork:**
    ```bash
-   git clone https://gitlab.com/<your-username>/ojp-server.git
-   cd ojp-server
+   git clone https://gitlab.com/<your-username>/oj-server.git
+   cd oj-server
    ```
 3. **Create a new branch:** For each new feature or bug fix, create a separate branch. Use a descriptive name for your
    branch (e.g., `feature/add-gtfs-realtime`, `bugfix/fix-osrm-docker`).

@@ -1,7 +1,7 @@
 # modular_bootstrap/__init__.py
 # -*- coding: utf-8 -*-
 """
-Modular Bootstrap package for the Open Journey Planner Server.
+Modular Bootstrap package for the Open Journey Server.
 
 This package contains modules for ensuring that all prerequisites are met
 before the modular setup script is executed. It is a self-contained bootstrap

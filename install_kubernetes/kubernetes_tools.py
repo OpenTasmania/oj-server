@@ -352,7 +352,7 @@ def deploy(
         _build_and_register_images_for_local_env(kubectl, images, overwrite)
 
     if is_installed:
-        kustomize_path = f"/opt/ojp-server/kubernetes/overlays/{env}"
+        kustomize_path = f"/opt/oj-server/kubernetes/overlays/{env}"
     else:
         kustomize_path = os.path.join(
             PROJECT_ROOT, "kubernetes", "overlays", env
@@ -433,7 +433,7 @@ def destroy(
             "deployments,jobs,statefulsets,daemonsets,services",
             *resources_to_delete,
             "--namespace",
-            "ojp",
+            "oj",
             "--ignore-not-found=true",
             "-v",
             "3",
@@ -529,7 +529,7 @@ def _apply_or_delete_components(
                 for container in containers
             ):
                 filtered_resources.append(resource)
-        elif resource.get("kind") == "Namespace" and resource_name == "ojp":
+        elif resource.get("kind") == "Namespace" and resource_name == "oj":
             filtered_resources.append(resource)
 
     if not filtered_resources:

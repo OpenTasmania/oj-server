@@ -209,7 +209,7 @@ def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
         return False
 
 
-def create_debian_package(package_name: str = "ojp-server") -> None:
+def create_debian_package(package_name: str = "oj-server") -> None:
     """
     Creates a custom Debian package containing the Kubernetes configurations.
     """
@@ -256,8 +256,8 @@ Section: base
 Priority: optional
 Architecture: all
 Maintainer: Your Name <debian@opentasmania.net>
-Description: Open Journey Planner Server Kubernetes Configurations
- This package contains the Kubernetes configurations for Open Journey Planner Server.
+Description: Open Journey Server Kubernetes Configurations
+ This package contains the Kubernetes configurations for Open Journey Server.
 """
     control_dir: str = f"{build_dir}/DEBIAN"
     os.makedirs(control_dir, exist_ok=True)

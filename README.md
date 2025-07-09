@@ -1,10 +1,10 @@
-# Open Journey Planner Server
+# Open Journey Server
 
-<img src="assets/artwork/logos/ojp-logo-full.png" alt="Open Journey Planner Server Logo" width="40%"/>
+<img src="assets/artwork/logos/oj-logo-full.png" alt="Open Journey Server Logo" width="40%"/>
 
-[![Latest Release](https://gitlab.com/opentasmania/ojp-server/-/badges/release.svg)](https://gitlab.com/opentasmania/ojp-server/-/releases)
+[![Latest Release](https://gitlab.com/opentasmania/oj-server/-/badges/release.svg)](https://gitlab.com/opentasmania/oj-server/-/releases)
 
-[![Latest Tag (SemVer)](https://img.shields.io/gitlab/v/tag/opentasmania/ojp-server?sort=semver)](https://gitlab.com/opentasmania/ojp-server/-/tags)
+[![Latest Tag (SemVer)](https://img.shields.io/gitlab/v/tag/opentasmania/oj-server?sort=semver)](https://gitlab.com/opentasmania/oj-server/-/tags)
 
 **Date:** 2025-06-26
 
@@ -96,21 +96,21 @@ python3 install_kubernetes.py deploy --env local
 
 3. Creating Custom Installer Images:
 
-The Kubernetes installer can create custom Debian installer images with the OJP Server scripts pre-installed:
+The Kubernetes installer can create custom Debian installer images with the OJ Server scripts pre-installed:
 
 - **AMD64 Installer Image**:
   ```bash
   python3 install_kubernetes.py build-amd64
   ```
   This creates a bootable ISO file (`debian-trixie-amd64-microk8s-unattended.iso`) that will automatically install
-  Debian with MicroK8s and the OJP Server Kubernetes configurations.
+  Debian with MicroK8s and the OJ Server Kubernetes configurations.
 
 - **Raspberry Pi Installer Image**:
   ```bash
   python3 install_kubernetes.py build-rpi64
   ```
   This creates a Raspberry Pi image file (`debian-trixie-rpi64-microk8s-unattended.img`) for Raspberry Pi 3 or 4 (
-  64-bit) with MicroK8s and OJP Server pre-installed.
+  64-bit) with MicroK8s and OJ Server pre-installed.
 
 - **Debian Package**:
   ```bash
@@ -119,7 +119,7 @@ The Kubernetes installer can create custom Debian installer images with the OJP 
   This creates a standalone Debian package containing the Kubernetes configurations that can be installed on any
   Debian-based system.
 
-All installer images are saved in the `images/` directory. These custom images provide a convenient way to deploy OJP
+All installer images are saved in the `images/` directory. These custom images provide a convenient way to deploy OJ
 Server on new systems without manual installation steps.
 
 For more details on the Kubernetes deployment and installer images, see
@@ -175,12 +175,12 @@ and scalability for a project with a large number of complex dependencies.
 ## 5. Future
 
 Theres a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
-Planned [enhancements](https://gitlab.com/opentasmania/ojp-server/-/issues/?label_name%5B%5D=Enhancement) can also be
+Planned [enhancements](https://gitlab.com/opentasmania/oj-server/-/issues/?label_name%5B%5D=Enhancement) can also be
 found on the Gitlab site.
 
 ## 6. Support
 
-There's an [issues](https://gitlab.com/opentasmania/ojp-server/-/issues) board where you can submit bugs.
+There's an [issues](https://gitlab.com/opentasmania/oj-server/-/issues) board where you can submit bugs.
 A [Revolt server])(https://revolt.chat) is being worked on, but not yet launched. An FAQ is planned, as well
 as a Wiki.
 

@@ -98,17 +98,17 @@ def create_debian_installer_rpi64(
     print("Step 6/14: Repository cloned.")
 
     _pause_for_debug(
-        "Before copying ojp-server.deb and stripped installer script to RPi image build directory."
+        "Before copying oj-server.deb and stripped installer script to RPi image build directory."
     )
     print(
-        "Step 7/14: Copying ojp-server.deb and stripped installer script to RPi image build directory..."
+        "Step 7/14: Copying oj-server.deb and stripped installer script to RPi image build directory..."
     )
     shutil.copy(
         os.path.join(
             _IMAGE_OUTPUT_DIR,
-            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+            f"oj-server_{_get_project_version_from_pyproject_toml()}_all.deb",
         ),
-        f"{rpi_image_specs_dir}/ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+        f"{rpi_image_specs_dir}/oj-server_{_get_project_version_from_pyproject_toml()}_all.deb",
     )
     shutil.copy(
         stripped_script_path, f"{rpi_image_specs_dir}/install_kubernetes.py"
@@ -123,9 +123,9 @@ def create_debian_installer_rpi64(
         "snap install microk8s --classic",
         "usermod --append --groups microk8s user",
         "microk8s status --wait-ready",
-        f"cp /ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb /tmp/",
-        f"dpkg -i /tmp/ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
-        f"rm /tmp/ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+        f"cp /oj-server_{_get_project_version_from_pyproject_toml()}_all.deb /tmp/",
+        f"dpkg -i /tmp/oj-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+        f"rm /tmp/oj-server_{_get_project_version_from_pyproject_toml()}_all.deb",
     ]
     print(
         "Step 8/14: Modifying generate-recipe.py to include MicroK8s installation..."

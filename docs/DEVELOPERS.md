@@ -1,19 +1,19 @@
-# Open Journey Planner Server Development Guidelines
+# Open Journey Server Development Guidelines
 
-This document provides essential information for developers working on the Open Journey Planner Server project. It includes
+This document provides essential information for developers working on the Open Journey Server project. It includes
 build/configuration instructions, testing information, and additional development guidelines.
 
 ## Build/Configuration Instructions
 
 ### Kubernetes-Based Deployment
 
-The primary method for deploying the OJP Server is via Kubernetes, using the `kubernetes_installer.py` script. This script handles the deployment of all necessary components, including PostgreSQL (PostGIS), OSRM, Nginx, and other services.
+The primary method for deploying the OJ Server is via Kubernetes, using the `kubernetes_installer.py` script. This script handles the deployment of all necessary components, including PostgreSQL (PostGIS), OSRM, Nginx, and other services.
 
 1.  **Initial Setup**:
     ```bash
     # Clone the repository
-    git clone https://gitlab.com/opentasmania/ojp-server.git
-    cd ojp-server
+    git clone https://gitlab.com/opentasmania/oj-server.git
+    cd oj-server
     ```
 
 2.  **Deployment**:

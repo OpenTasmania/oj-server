@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides guidelines for developing components for the Open Journey Planner Server installer. Components are self-contained modules that handle the installation and configuration of specific services or features.
+This document provides guidelines for developing components for the Open Journey Server installer. Components are self-contained modules that handle the installation and configuration of specific services or features.
 
 ## Component Structure
 

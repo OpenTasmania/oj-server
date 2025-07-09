@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cert-generator-scripts
-  namespace: ojp
+  namespace: oj
 data:
   generate-cert.sh: |
     #!/bin/bash

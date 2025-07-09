@@ -98,8 +98,8 @@ if __name__ == "__main__":
     os.makedirs(_IMAGE_OUTPUT_DIR, exist_ok=True)
 
     script_path = os.path.abspath(__file__)
-    is_installed_run = script_path.startswith("/opt/ojp-server")
-    package_name = "ojp-server"
+    is_installed_run = script_path.startswith("/opt/oj-server")
+    package_name = "oj-server"
 
     if args.action == "deploy":
         kubectl_cmd = get_kubectl_command()

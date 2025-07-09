@@ -166,11 +166,11 @@ def create_debian_installer_amd64() -> None:
         shutil.copy(preseed_file, f"{build_dir}/preseed.cfg")
         with open(f"{build_dir}/preseed.cfg", "a") as f:
             f.write(
-                "\nd-i preseed/late_command string cp /cdrom/ojp-server_"
+                "\nd-i preseed/late_command string cp /cdrom/oj-server_"
                 + _get_project_version_from_pyproject_toml()
-                + "_all.deb /target/tmp/ && chroot /target /usr/bin/dpkg -i /tmp/ojp-server_"
+                + "_all.deb /target/tmp/ && chroot /target /usr/bin/dpkg -i /tmp/oj-server_"
                 + _get_project_version_from_pyproject_toml()
-                + "_all.deb && rm /target/tmp/ojp-server_"
+                + "_all.deb && rm /target/tmp/oj-server_"
                 + _get_project_version_from_pyproject_toml()
                 + "_all.deb\n"
             )
@@ -198,16 +198,16 @@ def create_debian_installer_amd64() -> None:
         print("Step 7/9: Bootloader configuration not modified.")
 
     print(
-        "Step 8/9: Copying ojp-server.deb and stripped installer script to ISO build directory..."
+        "Step 8/9: Copying oj-server.deb and stripped installer script to ISO build directory..."
     )
     shutil.copy(
         os.path.join(
             _IMAGE_OUTPUT_DIR,
-            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+            f"oj-server_{_get_project_version_from_pyproject_toml()}_all.deb",
         ),
         os.path.join(
             build_dir,
-            f"ojp-server_{_get_project_version_from_pyproject_toml()}_all.deb",
+            f"oj-server_{_get_project_version_from_pyproject_toml()}_all.deb",
         ),
     )
     shutil.copy(stripped_script_path, f"{build_dir}/install_kubernetes.py")
