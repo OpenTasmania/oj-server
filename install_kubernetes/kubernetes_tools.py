@@ -115,8 +115,9 @@ FROM python:3.13-slim
 WORKDIR /app
 
 # Copy and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY uv.lock .
+RUN pip install --no-cache-dir uv
+RUN uv pip install --no-cache-dir .[dev]
 
 # Copy the necessary application code
 COPY common/ ./common/
