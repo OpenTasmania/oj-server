@@ -7,9 +7,6 @@ RUN apt-get update \
     && apt-get clean \
     && apt-get --purge autoremove
 
-COPY kubernetes/components/apache/httpd.conf /usr/local/apache2/conf/httpd.conf
-COPY kubernetes/components/apache/mod_tile.conf /usr/local/apache2/conf/mod_tile.conf
-
 # Create a non-root user and group
 RUN groupadd -r apacheuser && useradd -r -g apacheuser apacheuser
 

@@ -25,6 +25,10 @@ spec:
               subPath: httpd.conf
             - name: apache-config-extra
               mountPath: /usr/local/apache2/conf/extra/
+            - name: tile-cache
+              mountPath: /var/lib/mod_tile
+            - name: renderd-socket
+              mountPath: /var/run/renderd
       volumes:
         - name: apache-config
           configMap:
@@ -40,3 +44,9 @@ spec:
                 path: mod_tile.conf
               - key: tile-site.conf
                 path: tile-site.conf
+        - name: tile-cache
+          persistentVolumeClaim:
+            claimName: renderd-tile-cache-pvc
+        - name: renderd-socket
+          persistentVolumeClaim:
+            claimName: renderd-socket-pvc

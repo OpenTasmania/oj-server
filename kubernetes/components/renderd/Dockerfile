@@ -1,40 +1,31 @@
 # Use a Debian base image
 FROM debian:bullseye-slim
 
-# Install dependencies for renderd, mapnik, and apache
+# Install dependencies for renderd and mapnik
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    apache2 \
-    libapache2-mod-tile \
+    renderd \
     mapnik-utils \
     osm2pgsql \
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the renderd configuration. This will be mounted from a ConfigMap in Kubernetes.
-COPY kubernetes/components/renderd/renderd.conf /etc/renderd.conf
-
-# Copy the map style. This could also be mounted from a ConfigMap or an init container.
-COPY kubernetes/components/renderd/mapnik-style.xml /etc/mapnik-style.xml
-
-# Create a non-root user and group
+# Create a non-root user and group for running renderd
 RUN groupadd -r renderuser && useradd -r -g renderuser renderuser
 
-# Set ownership and permissions for Apache and renderd directories
-RUN chown -R renderuser:renderuser /var/www/html \
-    && chown -R renderuser:renderuser /var/log/apache2 \
-    && chown -R renderuser:renderuser /var/run/apache2 \
-    && chmod -R 755 /var/log/apache2 \
-    && chmod -R 755 /var/run/apache2
-
-# Configure Apache to run on a non-privileged port
-RUN sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf \
-    && sed -i 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf
+# Create directories for renderd socket and tile cache, and set ownership
+# These directories will be mounted over by persistent volumes in Kubernetes,
+# but creating them here ensures the image is runnable standalone and has correct permissions.
+RUN mkdir -p /var/run/renderd /var/lib/mod_tile && \
+    chown -R renderuser:renderuser /var/run/renderd /var/lib/mod_tile
 
 # Switch to non-root user
 USER renderuser
 
-# Expose the Apache port
-EXPOSE 8080
+# Expose the default renderd port (optional, for clarity)
+# Note: Communication will be via a shared socket volume, not typically TCP.
+EXPOSE 7653
 
-# Start Apache and renderd
-CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
+# Start renderd in the foreground
+# The -f flag keeps it from daemonizing, which is standard for container entrypoints.
+# The configuration will be mounted from a ConfigMap in the Kubernetes deployment.
+CMD ["/usr/bin/renderd", "-f", "-c", "/etc/renderd.conf"]
