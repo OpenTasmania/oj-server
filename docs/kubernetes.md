@@ -19,8 +19,8 @@ and production deployments.
 ## Introduction
 
 The `kubernetes_installer.py` script provides a comprehensive solution for deploying and managing the Open Journey
-Planner Server using Kubernetes. It supports both local development environments using MicroK8s and production
-deployments on full Kubernetes clusters.
+Server using Kubernetes. It supports both local development environments using MicroK8s and production deployments on
+full Kubernetes clusters.
 
 Key benefits of using the Kubernetes-based approach include:
 
