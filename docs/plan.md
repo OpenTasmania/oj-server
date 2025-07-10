@@ -2,8 +2,7 @@
 
 ## **1. Introduction**
 
-This document outlines a comprehensive improvement plan for the Open Journey Server project based on an analysis
-of the
+This document outlines a comprehensive improvement plan for the Open Journey Server project based on an analysis of the
 current codebase, architecture, and identified needs. The plan is organized by key areas of the system and includes
 rationale for each proposed change.
 
@@ -359,7 +358,7 @@ The improvements outlined above should be prioritized as follows:
     * **Data Architecture (Expansion)**: Iteratively develop and add new processor plugins for other data formats (SIRI,
       NeTEx, TransXchange, etc.) as required, for both the real-time and static data pipelines.
     * **Feature & UI Development**: Develop advanced routing features. ✓ Basic installation UI implemented via the
-      interactive menu in `install_kubernetes.py`; continue to enhance with a full web-based interface.
+      interactive menu in `kubernetes_installer.py`; continue to enhance with a full web-based interface.
     * **Scalability** ✓: Implemented foundation for horizontal scaling through the Kubernetes architecture. Continue to
       enhance with fine-tuned resource management and autoscaling.
     * **Platform Support** ✓: Added support for AMD64 and Raspberry Pi platforms through custom Debian installer images.

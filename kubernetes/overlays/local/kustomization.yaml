@@ -3,5 +3,8 @@ kind: Kustomization
 resources:
   - ../../components/nginx
   - ../../components/self-signed-certs
-patchesStrategicMerge:
-  - nginx-config-patch.yaml
+patches:
+  - path: nginx-config-patch.yaml
+    target:
+      kind: ConfigMap
+      name: nginx-config

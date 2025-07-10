@@ -22,16 +22,363 @@ ALL_IMAGES: Dict[str, str] = {
     "data_processing": "data_processor/Dockerfile",
     "osrm": "osrm/osrm-backend:latest",
     "nginx": "nginx:latest",
-    "certbot": "certbot/certbot:latest",
     "pgadmin": "dpage/pgadmin4:latest",
     "pgagent": "kubernetes/components/pgagent/Dockerfile",
     "py3gtfskit": "kubernetes/components/py3gtfskit/Dockerfile",
 }
 
 
-def get_managed_images() -> List[str]:
-    """Returns a list of all manageable image names."""
-    return list(ALL_IMAGES.keys())
+def _purge_images_from_local_registry(
+    images: Optional[List[str]] = None,
+) -> None:
+    """
+    Purges the specified Docker images from the local registry or all managed images
+    if no specific images are provided. This function first checks if the images
+    exist in the local registry and removes them if found.
+
+    Args:
+        images (Optional[List[str]]): A list of image names to purge. If not
+            provided, all managed images are purged.
+
+    Raises:
+        SubprocessError: Raised if there are issues executing the Docker
+            commands for inspecting or removing images.
+    """
+    print("\n--- Purging images from local registry ---")
+
+    images_to_purge = get_managed_images() if images is None else images
+
+    for image_name in images_to_purge:
+        local_image_tag = f"localhost:32000/{image_name}"
+        check_command = ["docker", "image", "inspect", local_image_tag]
+        result = run_command(check_command, check=False, capture_output=True)
+        if result.returncode == 0:
+            print(f"Removing image '{local_image_tag}'...")
+            run_command(["docker", "rmi", local_image_tag], check=True)
+        else:
+            print(f"Image '{local_image_tag}' not found. Skipping removal.")
+
+
+def _apply_or_delete_components(
+    action: str, kubectl: str, kustomize_path: str, images: List[str]
+) -> None:
+    """
+    Applies or deletes Kubernetes components filtered by specific criteria based on the
+    resources' metadata or their association with specified images. Resources are processed
+    through kustomization and then the subset of matching resources is either applied to or
+    deleted from the Kubernetes cluster.
+
+    Args:
+        action (str): The action to perform, either 'apply' or 'delete', to manage the
+            resources in the cluster.
+        kubectl (str): Path to the `kubectl` command-line tool used for Kubernetes operations.
+        kustomize_path (str): Path to the Kustomize configuration directory containing the
+            Kubernetes manifests.
+        images (List[str]): List of image names used to filter resources based on whether
+            they are associated with these images.
+
+    Raises:
+        SystemExit: If the process to apply or delete resources fails.
+
+    """
+    kustomize_command = [kubectl, "kustomize", kustomize_path]
+    kustomized_yaml_str = run_command(
+        kustomize_command, check=True, capture_output=True
+    ).stdout
+
+    all_resources = list(yaml.safe_load_all(kustomized_yaml_str))
+
+    filtered_resources = []
+    for resource in all_resources:
+        if resource is None:
+            continue
+
+        resource_name = resource.get("metadata", {}).get("name", "")
+
+        if any(image in resource_name for image in images):
+            filtered_resources.append(resource)
+        elif resource.get("kind") in [
+            "Deployment",
+            "Job",
+            "StatefulSet",
+            "DaemonSet",
+        ]:
+            containers = (
+                resource.get("spec", {})
+                .get("template", {})
+                .get("spec", {})
+                .get("containers", [])
+            )
+            if any(
+                any(image in container.get("image", "") for image in images)
+                for container in containers
+            ):
+                filtered_resources.append(resource)
+        elif resource.get("kind") == "Namespace":
+            filtered_resources.append(resource)
+
+    if not filtered_resources:
+        print(
+            "No matching resources found for the specified images.",
+            file=sys.stderr,
+        )
+        return
+
+    filtered_yaml_str = ""
+    for resource in filtered_resources:
+        filtered_yaml_str += (
+            yaml.dump(resource, default_flow_style=False, sort_keys=False)
+            + "---\n"
+        )
+
+    command = [kubectl, action, "-f", "-"]
+    print(f"Command: {command}")
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, stderr = process.communicate(
+        input=filtered_yaml_str.encode("utf-8")
+    )
+
+    if process.returncode != 0:
+        print(
+            f"Error applying/deleting components: {stderr.decode('utf-8')}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    else:
+        print(stdout.decode("utf-8"))
+
+
+def _setup_dashboard(kubectl: str):
+    """
+    Enables the MicroK8s dashboard, generates a token, saves it, and sets up port forwarding.
+    """
+    print("\n--- Setting up Kubernetes Dashboard ---")
+
+    # 1. Enable Dashboard Addon
+    print("--- Enabling dashboard addon... ---")
+    run_command([kubectl.split(".")[0], "enable", "dashboard"], check=True)
+
+    print(
+        "--- Waiting for Kubernetes Dashboard deployment to be ready... ---"
+    )
+    run_command(
+        [
+            kubectl,
+            "wait",
+            "--for=condition=available",
+            "deployment/dashboard-metrics-scraper",
+            "-n",
+            "kube-system",
+            "--timeout=300s",
+        ],
+        check=True,
+    )
+    run_command(
+        [
+            kubectl,
+            "wait",
+            "--for=condition=available",
+            "deployment/kubernetes-dashboard",
+            "-n",
+            "kube-system",
+            "--timeout=300s",
+        ],
+        check=True,
+    )
+
+    print("--- Generating dashboard access token... ---")
+    try:
+        dashboard_token = run_command(
+            [kubectl, "create", "token", "default", "-n", "kube-system"],
+            check=True,
+            capture_output=True,
+        ).stdout.strip()
+
+        token_file_path = os.path.join(PROJECT_ROOT, "kubernetes-token.txt")
+        with open(file=token_file_path, mode="w", buffering=1) as f:
+            f.write(dashboard_token + "\n")
+        print(f"Dashboard token saved to {token_file_path}")
+
+    except Exception as e:
+        print(
+            f"Error generating or saving dashboard token: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    _manage_dashboard_port_forward_service(kubectl)
+    print("Dashboard setup complete. Use the token above to log in.")
+
+
+def _manage_dashboard_port_forward_service(kubectl: str):
+    """
+    Manages the systemd service for Kubernetes Dashboard port forwarding.
+    Checks if the service exists, is enabled, and is active. If not, it creates,
+    enables, and starts the service.
+    """
+    print("\n--- Managing Kubernetes Dashboard Port Forward Service ---")
+
+    service_name = "microk8s-dashboard-port-forward.service"
+    service_file_path = f"/etc/systemd/system/{service_name}"
+    current_user = os.environ.get("USER", "root")
+
+    service_content = f"""[Unit]
+Description=MicroK8s Kubernetes Dashboard Port Forward
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/snap/bin/microk8s.kubectl port-forward -n kube-system service/kubernetes-dashboard 10443:443
+Restart=on-failure
+User={current_user}
+Group={current_user}
+WorkingDirectory={PROJECT_ROOT}
+
+[Install]
+WantedBy=multi-user.target
+"""
+    service_exists = os.path.exists(service_file_path)
+    is_enabled = False
+    is_active = False
+
+    if service_exists:
+        print(
+            f"Service file {service_file_path} already exists. Checking status..."
+        )
+        # Check if enabled
+        enabled_result = run_command(
+            ["systemctl", "is-enabled", service_name],
+            check=False,
+            capture_output=True,
+        )
+        if enabled_result.returncode == 0:
+            is_enabled = True
+            print(f"Service {service_name} is enabled.")
+        else:
+            print(f"Service {service_name} is not enabled.")
+
+        # Check if active
+        active_result = run_command(
+            ["systemctl", "is-active", service_name],
+            check=False,
+            capture_output=True,
+        )
+        if active_result.returncode == 0:
+            is_active = True
+            print(f"Service {service_name} is active.")
+        else:
+            print(f"Service {service_name} is not active.")
+
+    if not service_exists or not is_enabled or not is_active:
+        print(f"Creating/Updating and starting {service_name}...")
+        try:
+            # Write the service file
+            run_command(
+                [
+                    "sudo",
+                    "bash",
+                    "-c",
+                    f"echo '{service_content}' > {service_file_path}",
+                ],
+                check=True,
+            )
+            print(f"Service file written to {service_file_path}.")
+
+            # Reload systemd daemon
+            run_command(["sudo", "systemctl", "daemon-reload"], check=True)
+            print("Systemd daemon reloaded.")
+
+            # Enable the service
+            run_command(
+                ["sudo", "systemctl", "enable", service_name], check=True
+            )
+            print(f"Service {service_name} enabled.")
+
+            # Start the service
+            run_command(
+                ["sudo", "systemctl", "start", service_name], check=True
+            )
+            print(f"Service {service_name} started.")
+            print("Dashboard port-forwarding is managed by systemd.")
+        except Exception as e:
+            print(
+                f"Error managing systemd service for dashboard port-forward: {e}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    else:
+        print(
+            f"Dashboard port-forward service {service_name} is already enabled and active."
+        )
+        print("Access at https://localhost:10443")
+
+
+def _check_microk8s_addons():
+    """
+    Checks if the required MicroK8s addons are enabled and exits if they are not.
+    """
+    print("\n--- Checking MicroK8s addon status ---")
+    try:
+        status_output = run_command(
+            ["microk8s", "status", "--format=yaml"],
+            check=True,
+            capture_output=True,
+        )
+        status_data = yaml.safe_load(status_output.stdout)
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+        yaml.YAMLError,
+    ) as e:
+        print(f"Error getting MicroK8s status: {e}", file=sys.stderr)
+        print(
+            "Could not verify addon status. Please ensure MicroK8s is running correctly.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    required_addons = {
+        "dns",
+        "storage",
+        "registry",
+        "ingress",
+        "hostpath-storage",
+    }
+    enabled_addons = set()
+
+    for addon in status_data.get("addons", []):
+        if (
+            addon.get("name") in required_addons
+            and addon.get("status") == "enabled"
+        ):
+            enabled_addons.add(addon["name"])
+
+    missing_addons = required_addons - enabled_addons
+    if missing_addons:
+        print(
+            "The following required MicroK8s addons are not enabled. Attempting to enable them:",
+            file=sys.stderr,
+        )
+        for addon in sorted(missing_addons):
+            print(f"  - {addon}", file=sys.stderr)
+            try:
+                run_command(["microk8s", "enable", addon], check=True)
+                print(f"Successfully enabled {addon}.")
+            except subprocess.CalledProcessError as e:
+                print(
+                    f"Error: Failed to enable MicroK8s addon '{addon}'. It might be missing or there's a system issue.",
+                    file=sys.stderr,
+                )
+                print(f"Details: {e}", file=sys.stderr)
+                sys.exit(1)
+        print("All previously missing MicroK8s addons are now enabled.")
+
+    print("All required MicroK8s addons are enabled.")
 
 
 def _build_and_register_images_for_local_env(
@@ -209,108 +556,133 @@ CMD ["python", "run.py"]
 
 def get_kubectl_command() -> str:
     """
-    Determines and returns the appropriate `kubectl` command to use based on the availability
-    of `microk8s` and `kubectl` in the system. If neither is available, prompts the user to
-    choose an option and provides instructions for installing the selected tool.
+    Determines the appropriate kubectl command for MicroK8s usage.
+
+    If MicroK8s is not found on the system, attempts to detect the operating system and install MicroK8s
+    via Snap if applicable. The function ensures MicroK8s is properly initialized and attempts to
+    configure the current user for interaction with MicroK8s, including adding the user to the
+    appropriate user group if necessary. Users may need to log out and back in after the script makes
+    certain changes.
 
     Returns:
-        str: The determined `kubectl` command to use.
+        str: The command to use for kubectl within MicroK8s.
 
     Raises:
-        SystemExit: If neither `microk8s` nor `kubectl` is available and the user decides
-        to exit after viewing installation instructions.
+        SystemExit: If MicroK8s is not found and cannot be installed, or if it fails to properly initialize.
     """
-    has_microk8s: Optional[str] = shutil.which("microk8s")
-    has_kubectl: Optional[str] = shutil.which("kubectl")
-
-    if has_microk8s and has_kubectl:
-        while True:
+    if not shutil.which("microk8s"):
+        if sys.platform == "linux" and shutil.which("snap"):
             print(
-                "Both 'microk8s' and 'kubectl' are available. Which one would you like to use?"
+                "MicroK8s not found, but Snap is installed. Attempting to install MicroK8s...",
+                file=sys.stderr,
             )
-            print("1. microk8s")
-            print("2. kubectl")
-            choice: str = input("Please enter your choice (1/2): ")
-            if choice == "1":
-                return "microk8s.kubectl"
-            elif choice == "2":
-                return "kubectl"
-            print("Invalid choice. Please enter '1' or '2'.")
-    elif has_microk8s:
-        return "microk8s.kubectl"
-    elif has_kubectl:
-        return "kubectl"
-    else:
-        while True:
+            try:
+                print("Attempting to install MicroK8s...")
+                run_command(
+                    ["sudo", "snap", "install", "microk8s", "--classic"],
+                    check=True,
+                )
+
+                print("Waiting for MicroK8s to settle...")
+                max_attempts = 30
+                for i in range(max_attempts):
+                    command_to_run = [
+                        "sudo",
+                        "/snap/bin/microk8s",
+                        "status",
+                        "--wait-ready",
+                    ]
+                    status_result = run_command(
+                        command_to_run, check=False, capture_output=True
+                    )
+                    if "microk8s is running" in status_result.stdout.lower():
+                        print("MicroK8s is running and settled.")
+                        break
+                    print(
+                        f"MicroK8s not yet ready (attempt {i + 1}/{max_attempts})... Waiting 10 seconds."
+                    )
+                    import time
+
+                    time.sleep(10)
+                else:
+                    print(
+                        "Error: MicroK8s did not become ready within the expected time.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+
+                current_user = os.environ.get("USER", "")
+                if current_user:
+                    groups_output = run_command(
+                        ["id", "-Gn", current_user],
+                        check=True,
+                        capture_output=True,
+                    ).stdout.strip()
+                    if "microk8s" not in groups_output.split():
+                        print(
+                            f"Adding user '{current_user}' to 'microk8s' group..."
+                        )
+                        run_command(
+                            [
+                                "sudo",
+                                "usermod",
+                                "-a",
+                                "-G",
+                                "microk8s",
+                                current_user,
+                            ],
+                            check=True,
+                        )
+                        print("User added to microk8s group.")
+                        print(
+                            "MicroK8s installed. Please log out and log back in for group changes to take effect, then re-run this script.",
+                            file=sys.stderr,
+                        )
+                        sys.exit(1)
+                    else:
+                        print(
+                            f"User '{current_user}' is already in 'microk8s' group."
+                        )
+                else:
+                    print(
+                        "Warning: Could not determine current user to add to microk8s group.",
+                        file=sys.stderr,
+                    )
+
+                run_command(
+                    [
+                        "sudo",
+                        "chown",
+                        "-f",
+                        "-R",
+                        os.environ.get("USER", ""),
+                        os.path.expanduser("~/.kube"),
+                    ],
+                    check=True,
+                )
+            except Exception as e:
+                print(f"Error installing MicroK8s: {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
             print(
-                "Neither 'microk8s' nor 'kubectl' were found. Which would you like to install?"
+                "Error: 'microk8s' command not found.",
+                file=sys.stderr,
             )
-            print("1. microk8s")
-            print("2. kubectl")
-            choice = input("Please enter your choice (1/2): ")
-            if choice == "1":
-                print(
-                    "MicroK8s is a lightweight, single-node Kubernetes distribution."
-                )
-                print(
-                    "Installation instructions: https://microk8s.io/docs/getting-started"
-                )
-                sys.exit(1)
-            elif choice == "2":
-                print(
-                    "kubectl is the command-line tool for interacting with a Kubernetes cluster."
-                )
-                print(
-                    "Installation instructions: https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"
-                )
-                sys.exit(1)
-            print("Invalid choice. Please enter '1' or '2'.")
+            print(
+                "This script is designed for a MicroK8s environment. Please install MicroK8s.",
+                file=sys.stderr,
+            )
+            print(
+                "Installation instructions: https://microk8s.io/docs/getting-started",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    return "microk8s.kubectl"
 
 
-# TODO: Use something like this when in Production mode
-def install_cert_manager(self):
-    """
-    Installs cert-manager into the cluster.
-    """
-    self.log_message("Installing cert-manager...")
-    cert_manager_url = "https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml"
-
-    # Command to apply the cert-manager manifest
-    install_command = ["kubectl", "apply", "-f", cert_manager_url]
-
-    # Command to wait for the cert-manager deployment to be ready
-    wait_command = [
-        "kubectl",
-        "wait",
-        "--for=condition=Available",
-        "deployment",
-        "-n",
-        "cert-manager",
-        "--all",
-        "--timeout=300s",
-    ]
-
-    try:
-        # First, apply the manifest
-        self.run_command(
-            install_command, "Failed to apply cert-manager manifest"
-        )
-        self.log_message("cert-manager manifest applied successfully.")
-
-        # Then, wait for the deployments to be available
-        self.log_message("Waiting for cert-manager pods to be ready...")
-        self.run_command(
-            wait_command,
-            "cert-manager deployment failed to become ready in time.",
-        )
-        self.log_message("cert-manager is installed and ready.")
-
-    except Exception as e:
-        self.log_message(
-            f"An error occurred during cert-manager installation: {e}",
-            "error",
-        )
-        raise
+def get_managed_images() -> List[str]:
+    """Returns a list of all manageable image names."""
+    return list(ALL_IMAGES.keys())
 
 
 def deploy(
@@ -344,6 +716,9 @@ def deploy(
 
     """
     print(f"Deploying '{env}' environment...")
+
+    _check_microk8s_addons()
+    _setup_dashboard(kubectl)
 
     if production:
         env = "production"
@@ -403,7 +778,6 @@ def destroy(
         "osrm": ["osrm-deployment", "osrm-service"],
         "nginx": ["nginx-deployment", "nginx-service"],
         "nodejs": ["nodejs-deployment", "nodejs-service"],
-        "certbot": ["certbot-job"],
         "pgadmin": ["pgadmin-deployment", "pgadmin-service"],
         "data_processing": ["gtfs-processing-job"],
         "apache": ["apache-deployment", "apache-service"],
@@ -433,137 +807,8 @@ def destroy(
             "delete",
             "deployments,jobs,statefulsets,daemonsets,services",
             *resources_to_delete,
-            "--namespace",
-            "oj",
             "--ignore-not-found=true",
-            "-v",
-            "3",
         ]
         run_command(command, check=True)
 
     _purge_images_from_local_registry(images)
-
-
-def _purge_images_from_local_registry(
-    images: Optional[List[str]] = None,
-) -> None:
-    """
-    Purges the specified Docker images from the local registry or all managed images
-    if no specific images are provided. This function first checks if the images
-    exist in the local registry and removes them if found.
-
-    Args:
-        images (Optional[List[str]]): A list of image names to purge. If not
-            provided, all managed images are purged.
-
-    Raises:
-        SubprocessError: Raised if there are issues executing the Docker
-            commands for inspecting or removing images.
-    """
-    print("\n--- Purging images from local registry ---")
-
-    images_to_purge = get_managed_images() if images is None else images
-
-    for image_name in images_to_purge:
-        local_image_tag = f"localhost:32000/{image_name}"
-        check_command = ["docker", "image", "inspect", local_image_tag]
-        result = run_command(check_command, check=False, capture_output=True)
-        if result.returncode == 0:
-            print(f"Removing image '{local_image_tag}'...")
-            run_command(["docker", "rmi", local_image_tag], check=True)
-        else:
-            print(f"Image '{local_image_tag}' not found. Skipping removal.")
-
-
-def _apply_or_delete_components(
-    action: str, kubectl: str, kustomize_path: str, images: List[str]
-) -> None:
-    """
-    Applies or deletes Kubernetes components filtered by specific criteria based on the
-    resources' metadata or their association with specified images. Resources are processed
-    through kustomization and then the subset of matching resources is either applied to or
-    deleted from the Kubernetes cluster.
-
-    Args:
-        action (str): The action to perform, either 'apply' or 'delete', to manage the
-            resources in the cluster.
-        kubectl (str): Path to the `kubectl` command-line tool used for Kubernetes operations.
-        kustomize_path (str): Path to the Kustomize configuration directory containing the
-            Kubernetes manifests.
-        images (List[str]): List of image names used to filter resources based on whether
-            they are associated with these images.
-
-    Raises:
-        SystemExit: If the process to apply or delete resources fails.
-
-    """
-    kustomize_command = [kubectl, "kustomize", kustomize_path]
-    kustomized_yaml_str = run_command(
-        kustomize_command, check=True, capture_output=True
-    ).stdout
-
-    all_resources = list(yaml.safe_load_all(kustomized_yaml_str))
-
-    filtered_resources = []
-    for resource in all_resources:
-        if resource is None:
-            continue
-
-        resource_name = resource.get("metadata", {}).get("name", "")
-
-        if any(image in resource_name for image in images):
-            filtered_resources.append(resource)
-        elif resource.get("kind") in [
-            "Deployment",
-            "Job",
-            "StatefulSet",
-            "DaemonSet",
-        ]:
-            containers = (
-                resource.get("spec", {})
-                .get("template", {})
-                .get("spec", {})
-                .get("containers", [])
-            )
-            if any(
-                any(image in container.get("image", "") for image in images)
-                for container in containers
-            ):
-                filtered_resources.append(resource)
-        elif resource.get("kind") == "Namespace" and resource_name == "oj":
-            filtered_resources.append(resource)
-
-    if not filtered_resources:
-        print(
-            "No matching resources found for the specified images.",
-            file=sys.stderr,
-        )
-        return
-
-    filtered_yaml_str = ""
-    for resource in filtered_resources:
-        filtered_yaml_str += (
-            yaml.dump(resource, default_flow_style=False, sort_keys=False)
-            + "---\n"
-        )
-
-    command = [kubectl, action, "-f", "-"]
-    print(f"Command: {command}")
-    process = subprocess.Popen(
-        command,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    stdout, stderr = process.communicate(
-        input=filtered_yaml_str.encode("utf-8")
-    )
-
-    if process.returncode != 0:
-        print(
-            f"Error applying/deleting components: {stderr.decode('utf-8')}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    else:
-        print(stdout.decode("utf-8"))

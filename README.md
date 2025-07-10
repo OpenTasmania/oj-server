@@ -6,7 +6,7 @@
 
 [![Latest Tag (SemVer)](https://img.shields.io/gitlab/v/tag/opentasmania/oj-server?sort=semver)](https://gitlab.com/opentasmania/oj-server/-/tags)
 
-**Date:** 2025-06-26
+**Date:** 2025-07-10
 
 **Primary Maintainer:** [Peter Lawler (relwalretep@gmail.com)](mailto:relwalretep@gmail.com)]
 
@@ -16,122 +16,82 @@
 
 ## 1. Overview
 
-This project provides a complete self-hosted OpenStreetMap system. It
-ingests [OpenStreetMap](https://www.openstreetmap.org/) (OSM) data for base maps and routing networks. The system serves
-map tiles (both vector and raster), provides turn-by-turn routing (including for routes
-via [OSRM](https://project-osrm.org/)). It adds [GTFS](https://gtfs.org/) data as an example of additional data that can
-be ingested and makes this data queryable through
-a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/) database.
+This project provides a complete, self-hosted OpenStreetMap and public transport system, designed for deployment on
+Kubernetes. It ingests [OpenStreetMap](https://www.openstreetmap.org/) (OSM) data for base maps and routing networks,
+and it can process public transport data in formats like [GTFS](https://gtfs.org/).
 
-The entire stack is designed to run on a dedicated [Debian 13 "Trixie"](http://debian.org/) system.
+The system serves map tiles (vector and raster), provides turn-by-turn routing via [OSRM](https://project-osrm.org/),
+and makes all data queryable through a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/)
+database.
+
+The entire stack is designed to run within a [Kubernetes](https://kubernetes.io/) cluster,
+with [Debian 13 "Trixie"](http://debian.org/) as the base for its container images.
 
 ## 2. System Architecture
 
-The system is deployed on a GNU/Linux system with the following key components:
+The system is deployed as a collection of containerized services orchestrated by Kubernetes. Key components include:
 
-* **Development Environment:** [Python](https://www.python.org/) package (`gtfs_processor`) managed with `uv` and
-  defined by `pyproject.toml`, suitable for development in IDEs like [PyCharm](https://www.jetbrains.com/pycharm/).
-* **Database:**
-    * PostGIS with HStore extensions for storing OSM and GTFS data.
-    * pgAdmin for database administration through a web interface. (Work in progress)
-    * pgAgent for scheduling and executing PostgreSQL jobs. (Work in progress)
-* **Routing Engine:**
-    * The `osrm/osrm-backend` [Docker](https://www.docker.com/) image is used, primarily due to dependency issues in
-      development.
-    * [OSM PBF](https://wiki.openstreetmap.org/wiki/PBF_Format) data is preprocessed using tools within the Docker
-      image.
-    * `osrm-routed` runs inside a Docker container managed by a `systemd` service, exposing port 5000 locally.
+* **Container Orchestration:** [Kubernetes](https://kubernetes.io/) manages the deployment, scaling, and networking of
+  all application components. The system is optimized for [MicroK8s](https://microk8s.io/) for local development.
+* **Database:** A [PostGIS](https://postgis.net/)-enabled PostgreSQL database stores all OSM and transport data. It is
+  deployed as a stateful workload within the cluster.
+* **Routing Engine:** [OSRM](http.project-osrm.org/) runs in a dedicated container, providing high-performance
+  turn-by-turn routing services.
 * **Map Tile Serving:**
-    * Vector Tiles via [pg_tileserv](https://github.com/CrunchyData/pg_tileserv) serving vector tiles directly from
-      PostGIS. Runs as a `systemd` service.
-    * Raster Tiles via a classic OpenStreetMap stack ([Mapnik](https://mapnik.org/), `renderd` tile rendering daemon,
-      `mod_tile` serving raster tiles with [Apache2](https://httpd.apache.org/), OpenStreetMap-Carto stylesheet for
-      rendering. Runs as a `systemd` service (typically on port 8080 if Nginx is primary).
-* **Web Access:** [nginx](https://nginx.org/) as a reverse proxy for all services.
-* **SSL Certificate:**
-    * **Production:** [Certbot](https://certbot.eff.org/) (typically on ports 80/443), routing requests to the
-      appropriate backend services (`pg_tileserv`, Apache/`mod_tile`, OSRM). Handles SSL termination.
-    * **Local/Development:** Self-signed certificates are automatically generated and used for HTTPS.
-
-* **GTFS Data Management:**
-    * Automated download and import of GTFS static feeds into PostGIS.
-    * Python-based [ETL pipeline](https://en.wikipedia.org/wiki/Extract,_transform,_load) for processing, validating,
-      cleaning GTFS data, and handling problematic records via
-      [Dead-Letter Queues](https://en.wikipedia.org/wiki/Dead_letter_queue) (DLQ).
-    * A cron job triggers updates.
-    * (Future) GTFS-Realtime processing.
-* **UFW (Uncomplicated Firewall):** Configured for basic security.
-* **Other Data Sources**
-    * Investigate using other file formats for known routing paths.
+    * **Vector Tiles:** [pg_tileserv](https://github.com/CrunchyData/pg_tileserv) serves vector tiles directly from the
+      PostGIS database.
+    * **Raster Tiles:** A classic OpenStreetMap stack (`renderd`, `mod_tile`, `mapnik`) provides raster imagery.
+* **Web Access & SSL:** [Nginx](https://nginx.org/) acts as a reverse proxy for all services. In
+  production, [Certbot](https://certbot.eff.org/) is used for automated SSL certificate management, while self-signed
+  certificates are used for local development.
+* **Data Processing:** A Python-based ETL pipeline handles the ingestion, validation, and processing of transit data
+  feeds.
 
 ## 3. Setup Instructions
 
-### Quick Start
+### Quick Start: Kubernetes Deployment
 
-#### Kubernetes-Based Installation
+The primary installation method uses the `kubernetes_installer.py` script to deploy the entire stack to a Kubernetes
+cluster.
 
-The installation method isusing Kubernetes, either with MicroK8s for local development or a full Kubernetes cluster for
-production deployments.
+1. **Prerequisites:** Ensure you have a running Kubernetes cluster. For local development, we
+   recommend [MicroK8s](httpss://microk8s.io/).
+    * **Install MicroK8s (for local development):**
+      ```bash
+      sudo snap install microk8s --classic
+      sudo usermod -a -G microk8s $USER
+      sudo chown -f -R $USER ~/.kube
+      newgrp microk8s
+      microk8s status --wait-ready
+      microk8s enable dns storage ingress registry
+      ```
 
-1. Install MicroK8s (for local development):
+2. **Deploy the Application:** Use the `kubernetes_installer.py` script to deploy. You can use its interactive menu or
+   run a direct command.
+    * **Interactive Menu:**
+      ```bash
+      ./kubernetes_installer.py
+      ```
+    * **Direct Command (for local environment):**
+      ```bash
+      ./kubernetes_installer.py deploy --env local
+      ```
 
-```bash
-sudo snap install microk8s --classic
-sudo usermod -a -G microk8s $USER
-sudo chown -f -R $USER ~/.kube
-newgrp microk8s
-microk8s status --wait-ready
-microk8s enable dns storage ingress registry
-```
+3. **Accessing the System:** Once deployed, the services will be accessible through the Nginx Ingress controller in your
+   cluster.
 
-2. Use the [Kubernetes installer](kubernetes_installer.py) script.
+For more detailed instructions on deployment, creating custom OS images for nodes, and advanced configuration, please
+see the [Kubernetes Installer Guide](docs/kubernetes.md).
 
-```bash
-# Interactive menu
-python3 install_kubernetes.py
+### `kubernetes_installer.py` Help
 
-# Or deploy directly
-python3 install_kubernetes.py deploy --env local
-```
-
-3. Creating Custom Installer Images:
-
-The Kubernetes installer can create custom Debian installer images with the OJ Server scripts pre-installed:
-
-- **AMD64 Installer Image**:
-  ```bash
-  python3 install_kubernetes.py build-amd64
-  ```
-  This creates a bootable ISO file (`debian-trixie-amd64-microk8s-unattended.iso`) that will automatically install
-  Debian with MicroK8s and the OJ Server Kubernetes configurations.
-
-- **Raspberry Pi Installer Image**:
-  ```bash
-  python3 install_kubernetes.py build-rpi64
-  ```
-  This creates a Raspberry Pi image file (`debian-trixie-rpi64-microk8s-unattended.img`) for Raspberry Pi 3 or 4 (
-  64-bit) with MicroK8s and OJ Server pre-installed.
-
-- **Debian Package**:
-  ```bash
-  python3 install_kubernetes.py build-deb
-  ```
-  This creates a standalone Debian package containing the Kubernetes configurations that can be installed on any
-  Debian-based system.
-
-All installer images are saved in the `images/` directory. These custom images provide a convenient way to deploy OJ
-Server on new systems without manual installation steps.
-
-For more details on the Kubernetes deployment and installer images, see
-the [Kubernetes documentation](docs/kubernetes.md).
-
-For help with the Kubernetes installer:
+For a full list of commands and options available in the installer script, run:
 
 ```bash
-python3 install_kubernetes.py --help
+./kubernetes_installer.py --help
 ```
 
-This will display help for the Kubernetes installer, showing available commands and options:
+This will display the following information:
 
 ```
 usage: kubernetes_installer.py [-h] [--env ENV] [--images [IMAGES ...]] [-v] [-d] [--overwrite] [--production]
@@ -153,24 +113,17 @@ options:
   --production          Target the production environment. Cannot be used with --env.
 ```
 
----
-
 ## 4. History
 
-This project started out in late 2023 as a tool to help optimise travel patterns to purchase household goods
-after becoming dissatisfied with commercial offerings. While the publicly available OSM/OSRM could be usable, there
-was consideration given to how it might be useful in [Home Assistant](https://home-assistant.io). It became increasingly
-clear a lot of data verification could be handled by python libraries and the system moved to docker.
+This project started in late 2023 to optimize travel patterns. It initially relied on shell scripts and direct
+installation on bare-metal servers.
 
-In 2024, reliance on microk8s was removed, and the code base cleaned and documentation for such was removed -
-although some may linger in the dark recesses somewhere. While it's intended at some stage to bring back microk8s, due
-to the thoughts of having this run on Home Assistant for now the project intends to be dockerizing everything.
+In 2024, the project began migrating towards a container-based architecture to improve stability and simplify
+dependencies.
 
-In 2025, the reliance on shell scripting was reduced to the point where it was removed in early May. Initial release was
-intended to make use of Issues boards on a hosted git server, as well as continuous integration build testing. This
-included a rewrite into python to help establish more formal documentation, and was never intended to be the final
-system. This code is now being removed in favour of the microk8s/kubernetes method as it provides far greater stability
-and scalability for a project with a large number of complex dependencies.
+In 2025, the architecture was fully redesigned to be Kubernetes-native. The legacy `install.py` script and bare-metal
+installation process were deprecated and removed in favor of the `kubernetes_installer.py`, which provides a more
+robust, scalable, and maintainable solution for deploying the entire Open Journey Server stack.
 
 ## 5. Future
 
@@ -181,8 +134,7 @@ found on the Gitlab site.
 ## 6. Support
 
 There's an [issues](https://gitlab.com/opentasmania/oj-server/-/issues) board where you can submit bugs.
-A [Revolt server])(https://revolt.chat) is being worked on, but not yet launched. An FAQ is planned, as well
-as a Wiki.
+A [Revolt server])(https://revolt.chat) is being worked on, but not yet launched. An FAQ is planned, as well as a Wiki.
 
 ## 7. Contributions
 

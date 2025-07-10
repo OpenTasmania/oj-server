@@ -88,7 +88,3 @@ expansion and adding high-value features. The architecture now supports adding n
 - [ ] **Task 14: Implement Advanced Routing**
     - [ ] Add support for walking and cycling profiles to OSRM.
     - [ ] Begin research into integrating traffic-aware routing.
-- [x] **Task 15: Create easy to use installation UI**
-    - [x] Design and build a user-friendly interface to guide users through the initial server setup.
-    - [x] **Note**: Implemented via the interactive menu-driven interface in `kubernetes_installer.py` which provides a
-      guided installation experience.
