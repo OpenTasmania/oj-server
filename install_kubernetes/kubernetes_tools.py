@@ -811,11 +811,54 @@ def destroy(
                     f"{plugin_name}-service",
                 ]
 
-                # Check if the plugin has a custom resource mapping
+                # Check if the plugin has a kustomization.yaml file
+                kustomization_file = os.path.join(
+                    plugin_path, "kubernetes", "kustomization.yaml"
+                )
+
+                # For backward compatibility, also check for resource_mapping.py
                 mapping_file = os.path.join(
                     plugin_path, "kubernetes", "resource_mapping.py"
                 )
-                if os.path.exists(mapping_file):
+
+                if os.path.exists(kustomization_file):
+                    try:
+                        # Parse the kustomization.yaml file to extract resources
+                        with open(kustomization_file, "r") as f:
+                            kustomization = yaml.safe_load(f)
+
+                        # Extract resources from the kustomization file
+                        resources = []
+
+                        # Get resources from the 'resources' field
+                        if "resources" in kustomization and isinstance(
+                            kustomization["resources"], list
+                        ):
+                            for resource in kustomization["resources"]:
+                                # Extract the base name without extension and add appropriate suffixes
+                                base_name = os.path.splitext(resource)[0]
+                                if "deployment" in base_name.lower():
+                                    resources.append(f"{base_name}")
+                                elif "service" in base_name.lower():
+                                    resources.append(f"{base_name}")
+                                elif "job" in base_name.lower():
+                                    resources.append(f"{base_name}")
+                                elif "statefulset" in base_name.lower():
+                                    resources.append(f"{base_name}")
+                                elif "daemonset" in base_name.lower():
+                                    resources.append(f"{base_name}")
+                                else:
+                                    # For other resources, assume they follow the pattern: <name>-<kind>
+                                    resources.append(f"{base_name}")
+
+                        if resources:
+                            resource_mapping[plugin_name] = resources
+                    except Exception as e:
+                        print(
+                            f"Warning: Failed to load kustomization.yaml for plugin {plugin_name}: {e}"
+                        )
+                        # Keep the default mapping
+                elif os.path.exists(mapping_file):
                     try:
                         # Use a subprocess to safely extract the resource mapping from the plugin
                         import importlib.util
@@ -847,7 +890,7 @@ def destroy(
 
     resources_to_delete = []
     for image in images_to_destroy:
-        resources = resource_mapping.get(image)
+        resources = resource_mapping.get(image, [])
         if resources:
             for resource in resources:
                 print(f"Checking for {resource}")
