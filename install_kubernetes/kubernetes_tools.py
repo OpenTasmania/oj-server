@@ -27,6 +27,17 @@ ALL_IMAGES: Dict[str, str] = {
     "py3gtfskit": "kubernetes/components/py3gtfskit/Dockerfile",
 }
 
+# Scan plugins directory for additional tools to install
+PLUGINS_DIR = os.path.join(PROJECT_ROOT, "plugins")
+if os.path.exists(PLUGINS_DIR) and os.path.isdir(PLUGINS_DIR):
+    for plugin_name in os.listdir(PLUGINS_DIR):
+        plugin_path = os.path.join(PLUGINS_DIR, plugin_name)
+        if os.path.isdir(plugin_path):
+            dockerfile_path = os.path.join(plugin_path, "Dockerfile")
+            if os.path.exists(dockerfile_path):
+                ALL_IMAGES[plugin_name] = f"plugins/{plugin_name}/Dockerfile"
+                print(f"Found plugin: {plugin_name}")
+
 
 def _purge_images_from_local_registry(
     images: Optional[List[str]] = None,
@@ -787,6 +798,50 @@ def destroy(
         "py3gtfskit": ["py3gtfskit-job"],
         "renderd": ["renderd-deployment", "renderd-service"],
     }
+
+    # Add resource mappings for plugins
+    PLUGINS_DIR = os.path.join(PROJECT_ROOT, "plugins")
+    if os.path.exists(PLUGINS_DIR) and os.path.isdir(PLUGINS_DIR):
+        for plugin_name in os.listdir(PLUGINS_DIR):
+            plugin_path = os.path.join(PLUGINS_DIR, plugin_name)
+            if os.path.isdir(plugin_path):
+                # Default resource mapping for plugins: deployment and service with the plugin name
+                resource_mapping[plugin_name] = [
+                    f"{plugin_name}-deployment",
+                    f"{plugin_name}-service",
+                ]
+
+                # Check if the plugin has a custom resource mapping
+                mapping_file = os.path.join(
+                    plugin_path, "kubernetes", "resource_mapping.py"
+                )
+                if os.path.exists(mapping_file):
+                    try:
+                        # Use a subprocess to safely extract the resource mapping from the plugin
+                        import importlib.util
+
+                        module = None
+                        spec = importlib.util.spec_from_file_location(
+                            "resource_mapping", mapping_file
+                        )
+                        if spec is not None:
+                            module = importlib.util.module_from_spec(spec)
+                            if spec.loader is not None:
+                                spec.loader.exec_module(module)
+
+                        if (
+                            module is not None
+                            and hasattr(module, "RESOURCE_MAPPING")
+                            and isinstance(module.RESOURCE_MAPPING, list)
+                        ):
+                            resource_mapping[plugin_name] = (
+                                module.RESOURCE_MAPPING
+                            )
+                    except Exception as e:
+                        print(
+                            f"Warning: Failed to load resource mapping for plugin {plugin_name}: {e}"
+                        )
+                        # Keep the default mapping
 
     images_to_destroy = get_managed_images() if images is None else images
 

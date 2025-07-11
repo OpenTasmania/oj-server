@@ -4,6 +4,9 @@
 This script provides utilities for deploying Kubernetes configurations,
 and creating custom Debian installer images for both AMD64 and Raspberry Pi 64-bit architectures.
 It supports both interactive menu-driven operation and command-line arguments.
+
+The script also supports a plugin system, where plugins can be added to the 'plugins' directory
+and will be automatically detected and included in the deployment process.
 """
 
 import argparse
@@ -14,6 +17,7 @@ from install_kubernetes.builders.amd64 import create_debian_installer_amd64
 from install_kubernetes.builders.rpi64 import create_debian_installer_rpi64
 from install_kubernetes.common import create_debian_package
 from install_kubernetes.kubernetes_tools import (
+    PROJECT_ROOT,
     deploy,
     destroy,
     get_kubectl_command,
@@ -27,7 +31,25 @@ _IMAGE_OUTPUT_DIR: str = "images"
 
 if __name__ == "__main__":
     managed_images = get_managed_images()
-    epilog_text = f"Managed images: {', '.join(managed_images)}"
+
+    # Check for plugins
+    plugins_dir = os.path.join(PROJECT_ROOT, "plugins")
+    plugins = [
+        img
+        for img in managed_images
+        if os.path.exists(os.path.join(plugins_dir, img))
+    ]
+    core_images = [img for img in managed_images if img not in plugins]
+
+    # Create epilog text with core images and plugins
+    epilog_text = f"Core images: {', '.join(core_images)}"
+    if plugins:
+        epilog_text += f"\nDetected plugins: {', '.join(plugins)}"
+        print(f"Detected {len(plugins)} plugin(s): {', '.join(plugins)}")
+    else:
+        epilog_text += (
+            "\nNo plugins detected. Add plugins to the 'plugins' directory."
+        )
 
     actions = ["deploy", "destroy", "build-amd64", "build-rpi64", "build-deb"]
     args_list = sys.argv[1:]
@@ -151,6 +173,16 @@ if __name__ == "__main__":
             print("2. Destroy (delete Kustomize configuration)")
             print("3. Create (build custom Debian installer images)")
             print("4. Exit")
+
+            # Display detected plugins
+            if plugins:
+                print("\nDetected plugins:")
+                for plugin in plugins:
+                    print(f"  - {plugin}")
+            else:
+                print(
+                    "\nNo plugins detected. Add plugins to the 'plugins' directory."
+                )
             choice: str = input("Please enter your choice (1-4): ")
 
             if choice == "1":
