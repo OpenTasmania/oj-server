@@ -170,3 +170,5 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
+# Some things are too embarassing
+/plugins
