@@ -71,7 +71,11 @@ def _purge_images_from_local_registry(
 
 
 def _apply_or_delete_components(
-    action: str, kubectl: str, kustomize_path: str, images: List[str]
+    action: str,
+    kubectl: str,
+    kustomize_path: str,
+    images: List[str],
+    plugin_manager,
 ) -> None:
     """
     Applies or deletes Kubernetes components filtered by specific criteria based on the
@@ -96,6 +100,10 @@ def _apply_or_delete_components(
     kustomized_yaml_str = run_command(
         kustomize_command, check=True, capture_output=True
     ).stdout
+
+    kustomized_yaml_str = plugin_manager.run_hook(
+        "pre_apply_k8s", kustomized_yaml_str
+    )
 
     all_resources = list(yaml.safe_load_all(kustomized_yaml_str))
 
@@ -699,6 +707,7 @@ def get_managed_images() -> List[str]:
 def deploy(
     env: str,
     kubectl: str,
+    plugin_manager,
     is_installed: bool = False,
     images: Optional[List[str]] = None,
     overwrite: bool = False,
@@ -726,44 +735,55 @@ def deploy(
         SystemExit: If the specified kustomize path does not exist.
 
     """
-    print(f"Deploying '{env}' environment...")
+    try:
+        print(f"Deploying '{env}' environment...")
 
-    _check_microk8s_addons()
-    _setup_dashboard(kubectl)
+        _check_microk8s_addons()
+        _setup_dashboard(kubectl)
 
-    if production:
-        env = "production"
-    else:
-        env = "local"
-    if env == "local":
-        _build_and_register_images_for_local_env(kubectl, images, overwrite)
+        if production:
+            env = "production"
+        else:
+            env = "local"
+        if env == "local":
+            _build_and_register_images_for_local_env(
+                kubectl, images, overwrite
+            )
 
-    if is_installed:
-        kustomize_path = f"/opt/oj-server/kubernetes/overlays/{env}"
-    else:
-        kustomize_path = os.path.join(
-            PROJECT_ROOT, "kubernetes", "overlays", env
-        )
+        if is_installed:
+            kustomize_path = f"/opt/oj-server/kubernetes/overlays/{env}"
+        else:
+            kustomize_path = os.path.join(
+                PROJECT_ROOT, "kubernetes", "overlays", env
+            )
 
-    if not os.path.isdir(kustomize_path):
-        print(
-            f"Error: Kustomize path not found at '{kustomize_path}'",
-            file=sys.stderr,
-        )
+        if not os.path.isdir(kustomize_path):
+            print(
+                f"Error: Kustomize path not found at '{kustomize_path}'",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if images is not None:
+            print(f"Deploying specified components: {', '.join(images)}")
+            _apply_or_delete_components(
+                "apply", kubectl, kustomize_path, images, plugin_manager
+            )
+        else:
+            print("Deploying all components...")
+            command: List[str] = [kubectl, "apply", "-k", kustomize_path]
+            run_command(command, check=True)
+        plugin_manager.run_hook("on_install_complete")
+    except Exception as e:
+        plugin_manager.run_hook("on_error", e)
+        print(f"An error occurred during deployment: {e}", file=sys.stderr)
         sys.exit(1)
-
-    if images is not None:
-        print(f"Deploying specified components: {', '.join(images)}")
-        _apply_or_delete_components("apply", kubectl, kustomize_path, images)
-    else:
-        print("Deploying all components...")
-        command: List[str] = [kubectl, "apply", "-k", kustomize_path]
-        run_command(command, check=True)
 
 
 def destroy(
     env: str,
     kubectl: str,
+    plugin_manager,
     images: Optional[List[str]] = None,
 ) -> None:
     """
@@ -782,131 +802,136 @@ def destroy(
             need to be destroyed. If None, all managed images will be considered.
 
     """
-    print(f"Destroying '{env}' environment...")
+    try:
+        print(f"Destroying '{env}' environment...")
 
-    resource_mapping = {
-        "postgres": ["postgres-deployment", "postgres-service"],
-        "osrm": ["osrm-deployment", "osrm-service"],
-        "nginx": ["nginx-deployment", "nginx-service"],
-        "nodejs": ["nodejs-deployment", "nodejs-service"],
-        "pgadmin": ["pgadmin-deployment", "pgadmin-service"],
-        "data_processing": ["gtfs-processing-job"],
-        "apache": ["apache-deployment", "apache-service"],
-        "carto": ["carto-deployment", "carto-service"],
-        "pgagent": ["pgagent-deployment"],
-        "pg_tileserv": ["pg-tileserv-deployment", "pg-tileserv-service"],
-        "py3gtfskit": ["py3gtfskit-job"],
-        "renderd": ["renderd-deployment", "renderd-service"],
-    }
+        resource_mapping = {
+            "postgres": ["postgres-deployment", "postgres-service"],
+            "osrm": ["osrm-deployment", "osrm-service"],
+            "nginx": ["nginx-deployment", "nginx-service"],
+            "nodejs": ["nodejs-deployment", "nodejs-service"],
+            "pgadmin": ["pgadmin-deployment", "pgadmin-service"],
+            "data_processing": ["gtfs-processing-job"],
+            "apache": ["apache-deployment", "apache-service"],
+            "carto": ["carto-deployment", "carto-service"],
+            "pgagent": ["pgagent-deployment"],
+            "pg_tileserv": ["pg-tileserv-deployment", "pg-tileserv-service"],
+            "py3gtfskit": ["py3gtfskit-job"],
+            "renderd": ["renderd-deployment", "renderd-service"],
+        }
 
-    # Add resource mappings for plugins
-    PLUGINS_DIR = os.path.join(PROJECT_ROOT, "plugins")
-    if os.path.exists(PLUGINS_DIR) and os.path.isdir(PLUGINS_DIR):
-        for plugin_name in os.listdir(PLUGINS_DIR):
-            plugin_path = os.path.join(PLUGINS_DIR, plugin_name)
-            if os.path.isdir(plugin_path):
-                # Default resource mapping for plugins: deployment and service with the plugin name
-                resource_mapping[plugin_name] = [
-                    f"{plugin_name}-deployment",
-                    f"{plugin_name}-service",
-                ]
+        # Add resource mappings for plugins
+        PLUGINS_DIR = os.path.join(PROJECT_ROOT, "plugins")
+        if os.path.exists(PLUGINS_DIR) and os.path.isdir(PLUGINS_DIR):
+            for plugin_name in os.listdir(PLUGINS_DIR):
+                plugin_path = os.path.join(PLUGINS_DIR, plugin_name)
+                if os.path.isdir(plugin_path):
+                    # Default resource mapping for plugins: deployment and service with the plugin name
+                    resource_mapping[plugin_name] = [
+                        f"{plugin_name}-deployment",
+                        f"{plugin_name}-service",
+                    ]
 
-                # Check if the plugin has a kustomization.yaml file
-                kustomization_file = os.path.join(
-                    plugin_path, "kubernetes", "kustomization.yaml"
-                )
+                    # Check if the plugin has a kustomization.yaml file
+                    kustomization_file = os.path.join(
+                        plugin_path, "kubernetes", "kustomization.yaml"
+                    )
 
-                # For backward compatibility, also check for resource_mapping.py
-                mapping_file = os.path.join(
-                    plugin_path, "kubernetes", "resource_mapping.py"
-                )
+                    # For backward compatibility, also check for resource_mapping.py
+                    mapping_file = os.path.join(
+                        plugin_path, "kubernetes", "resource_mapping.py"
+                    )
 
-                if os.path.exists(kustomization_file):
-                    try:
-                        # Parse the kustomization.yaml file to extract resources
-                        with open(kustomization_file, "r") as f:
-                            kustomization = yaml.safe_load(f)
+                    if os.path.exists(kustomization_file):
+                        try:
+                            # Parse the kustomization.yaml file to extract resources
+                            with open(kustomization_file, "r") as f:
+                                kustomization = yaml.safe_load(f)
 
-                        # Extract resources from the kustomization file
-                        resources = []
+                            # Extract resources from the kustomization file
+                            resources = []
 
-                        # Get resources from the 'resources' field
-                        if "resources" in kustomization and isinstance(
-                            kustomization["resources"], list
-                        ):
-                            for resource in kustomization["resources"]:
-                                # Extract the base name without extension and add appropriate suffixes
-                                base_name = os.path.splitext(resource)[0]
-                                if "deployment" in base_name.lower():
-                                    resources.append(f"{base_name}")
-                                elif "service" in base_name.lower():
-                                    resources.append(f"{base_name}")
-                                elif "job" in base_name.lower():
-                                    resources.append(f"{base_name}")
-                                elif "statefulset" in base_name.lower():
-                                    resources.append(f"{base_name}")
-                                elif "daemonset" in base_name.lower():
-                                    resources.append(f"{base_name}")
-                                else:
-                                    # For other resources, assume they follow the pattern: <name>-<kind>
-                                    resources.append(f"{base_name}")
+                            # Get resources from the 'resources' field
+                            if "resources" in kustomization and isinstance(
+                                kustomization["resources"], list
+                            ):
+                                for resource in kustomization["resources"]:
+                                    # Extract the base name without extension and add appropriate suffixes
+                                    base_name = os.path.splitext(resource)[0]
+                                    if "deployment" in base_name.lower():
+                                        resources.append(f"{base_name}")
+                                    elif "service" in base_name.lower():
+                                        resources.append(f"{base_name}")
+                                    elif "job" in base_name.lower():
+                                        resources.append(f"{base_name}")
+                                    elif "statefulset" in base_name.lower():
+                                        resources.append(f"{base_name}")
+                                    elif "daemonset" in base_name.lower():
+                                        resources.append(f"{base_name}")
+                                    else:
+                                        # For other resources, assume they follow the pattern: <name>-<kind>
+                                        resources.append(f"{base_name}")
 
-                        if resources:
-                            resource_mapping[plugin_name] = resources
-                    except Exception as e:
-                        print(
-                            f"Warning: Failed to load kustomization.yaml for plugin {plugin_name}: {e}"
-                        )
-                        # Keep the default mapping
-                elif os.path.exists(mapping_file):
-                    try:
-                        # Use a subprocess to safely extract the resource mapping from the plugin
-                        import importlib.util
-
-                        module = None
-                        spec = importlib.util.spec_from_file_location(
-                            "resource_mapping", mapping_file
-                        )
-                        if spec is not None:
-                            module = importlib.util.module_from_spec(spec)
-                            if spec.loader is not None:
-                                spec.loader.exec_module(module)
-
-                        if (
-                            module is not None
-                            and hasattr(module, "RESOURCE_MAPPING")
-                            and isinstance(module.RESOURCE_MAPPING, list)
-                        ):
-                            resource_mapping[plugin_name] = (
-                                module.RESOURCE_MAPPING
+                            if resources:
+                                resource_mapping[plugin_name] = resources
+                        except Exception as e:
+                            print(
+                                f"Warning: Failed to load kustomization.yaml for plugin {plugin_name}: {e}"
                             )
-                    except Exception as e:
-                        print(
-                            f"Warning: Failed to load resource mapping for plugin {plugin_name}: {e}"
-                        )
-                        # Keep the default mapping
+                            # Keep the default mapping
+                    elif os.path.exists(mapping_file):
+                        try:
+                            # Use a subprocess to safely extract the resource mapping from the plugin
+                            import importlib.util
 
-    images_to_destroy = get_managed_images() if images is None else images
+                            module = None
+                            spec = importlib.util.spec_from_file_location(
+                                "resource_mapping", mapping_file
+                            )
+                            if spec is not None:
+                                module = importlib.util.module_from_spec(spec)
+                                if spec.loader is not None:
+                                    spec.loader.exec_module(module)
 
-    resources_to_delete = []
-    for image in images_to_destroy:
-        resources = resource_mapping.get(image, [])
-        if resources:
-            for resource in resources:
-                print(f"Checking for {resource}")
-                resources_to_delete.append(f"{env}-{resource}")
+                            if (
+                                module is not None
+                                and hasattr(module, "RESOURCE_MAPPING")
+                                and isinstance(module.RESOURCE_MAPPING, list)
+                            ):
+                                resource_mapping[plugin_name] = (
+                                    module.RESOURCE_MAPPING
+                                )
+                        except Exception as e:
+                            print(
+                                f"Warning: Failed to load resource mapping for plugin {plugin_name}: {e}"
+                            )
+                            # Keep the default mapping
 
-    if not resources_to_delete:
-        print("No components specified to destroy.")
-    else:
-        print(f"Destroying resources: {', '.join(resources_to_delete)}")
-        command = [
-            kubectl,
-            "delete",
-            "deployments,jobs,statefulsets,daemonsets,services",
-            *resources_to_delete,
-            "--ignore-not-found=true",
-        ]
-        run_command(command, check=True)
+        images_to_destroy = get_managed_images() if images is None else images
 
-    _purge_images_from_local_registry(images)
+        resources_to_delete = []
+        for image in images_to_destroy:
+            resources = resource_mapping.get(image, [])
+            if resources:
+                for resource in resources:
+                    print(f"Checking for {resource}")
+                    resources_to_delete.append(f"{env}-{resource}")
+
+        if not resources_to_delete:
+            print("No components specified to destroy.")
+        else:
+            print(f"Destroying resources: {', '.join(resources_to_delete)}")
+            command = [
+                kubectl,
+                "delete",
+                "deployments,jobs,statefulsets,daemonsets,services",
+                *resources_to_delete,
+                "--ignore-not-found=true",
+            ]
+            run_command(command, check=True)
+
+        _purge_images_from_local_registry(images)
+    except Exception as e:
+        plugin_manager.run_hook("on_error", e)
+        print(f"An error occurred during destroy: {e}", file=sys.stderr)
+        sys.exit(1)

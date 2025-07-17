@@ -23,6 +23,7 @@ from install_kubernetes.kubernetes_tools import (
     get_kubectl_command,
     get_managed_images,
 )
+from install_kubernetes.plugin_manager import PluginManager
 
 _VERBOSE: bool = False
 _DEBUG: bool = False
@@ -30,15 +31,12 @@ _IMAGE_OUTPUT_DIR: str = "images"
 
 
 if __name__ == "__main__":
+    plugin_manager = PluginManager()
     managed_images = get_managed_images()
 
     # Check for plugins
     plugins_dir = os.path.join(PROJECT_ROOT, "plugins")
-    plugins = [
-        img
-        for img in managed_images
-        if os.path.exists(os.path.join(plugins_dir, img))
-    ]
+    plugins = [p.name for p in plugin_manager.plugins]
     core_images = [img for img in managed_images if img not in plugins]
 
     # Create epilog text with core images and plugins
@@ -62,7 +60,7 @@ if __name__ == "__main__":
             break
 
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="Kubernetes deployment script for OJM.",
+        description="Kubernetes deployment script for OJS.",
         epilog=epilog_text,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -129,6 +127,7 @@ if __name__ == "__main__":
         deploy(
             args.env,
             kubectl_cmd,
+            plugin_manager,
             is_installed=is_installed_run,
             images=args.images,
             overwrite=args.overwrite,
@@ -141,6 +140,7 @@ if __name__ == "__main__":
         destroy(
             args.env,
             kubectl_cmd,
+            plugin_manager,
             images=args.images,
         )
         sys.exit(0)
@@ -197,6 +197,7 @@ if __name__ == "__main__":
                 deploy(
                     env=env_choice,
                     kubectl=kubectl_cmd,
+                    plugin_manager=plugin_manager,
                     is_installed=is_installed_run,
                 )
 
@@ -209,7 +210,11 @@ if __name__ == "__main__":
                 )
                 kubectl_cmd = get_kubectl_command()
                 print(f"Using '{kubectl_cmd}' for Kubernetes commands.")
-                destroy(env=env_choice, kubectl=kubectl_cmd)
+                destroy(
+                    env=env_choice,
+                    kubectl=kubectl_cmd,
+                    plugin_manager=plugin_manager,
+                )
             elif choice == "3":
                 while True:
                     print("\n--- Create Installer Image Menu ---")
