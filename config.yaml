@@ -332,3 +332,12 @@ package_preseeding_values:
     tzdata/Zones/Australia: select Hobart
   unattended-upgrades:
     unattended-upgrades/enable_auto_updates: true boolean
+
+# Static ETL Configuration
+static_feeds:
+  - name: "ACT_GTFS"
+    type: "gtfs"
+    source: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
+    enabled: true
+    schedule: "daily"
+    description: "ACT Government GTFS feed for Canberra public transport"
