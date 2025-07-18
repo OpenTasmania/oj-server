@@ -54,6 +54,7 @@ install-map-server = "oj_server.install_map_server:main"
 
 [project.optional-dependencies]
 dev = [
+    "click>=8.2.1",
     "ruff>0.1.0",
     "pre-commit>3.0.0",
     "coverage>6.9,<8.0",
