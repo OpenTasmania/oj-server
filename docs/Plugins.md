@@ -102,7 +102,7 @@ Here is an example of a simple plugin that logs a message after the configuratio
 ```python
 # /plugins/my_plugin/plugin.py
 
-from install_kubernetes.plugin_interface import InstallerPlugin
+from installer.plugin_interface import InstallerPlugin
 
 
 class MyPlugin(InstallerPlugin):
@@ -184,7 +184,7 @@ def should_create_table(self, table_name: str, data_context: dict) -> bool:
 The `install_kubernetes.database_utils` module provides comprehensive database management:
 
 ```python
-from install_kubernetes.database_utils import get_database_manager, DatabaseManager
+from installer.database_utils import get_database_manager, DatabaseManager
 
 # Get database manager
 db_manager = get_database_manager(config)
@@ -205,7 +205,7 @@ db_manager.create_extension("postgis")
 The migration system provides structured database schema management:
 
 ```python
-from install_kubernetes.database_utils import Migration, MigrationManager
+from installer.database_utils import Migration, MigrationManager
 
 class MyMigration001(Migration):
     def __init__(self):
@@ -231,8 +231,8 @@ Here's a complete example of an advanced plugin that implements database optimiz
 ```python
 # /plugins/gtfs_plugin/plugin.py
 
-from install_kubernetes.plugin_interface import InstallerPlugin
-from install_kubernetes.database_utils import get_database_manager, DatabaseManager
+from installer.plugin_interface import InstallerPlugin
+from installer.database_utils import get_database_manager, DatabaseManager
 
 class GTFSPlugin(InstallerPlugin):
     def __init__(self):

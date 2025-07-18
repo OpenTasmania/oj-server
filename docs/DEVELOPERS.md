@@ -26,28 +26,36 @@ This document provides essential information for developers working on the Open 
 
 ## 2. Kubernetes-Based Deployment
 
-The primary method for deploying the OJ Server for development or production is via Kubernetes, using the `kubernetes_installer.py` script.
+The primary method for deploying the OJ Server is via a Flask-based application that provides both a web interface and a command-line interface (CLI).
 
-*   **Local Development (MicroK8s):**
+*   **Web Interface:**
+    1.  Start the Flask development server:
+        ```bash
+        FLASK_APP=installer_app/app.py flask run
+        ```
+    2.  Open your web browser and navigate to `http://127.0.0.1:5000`.
+    3.  Use the web interface to deploy, destroy, or build the application components.
+
+*   **Command-Line Interface (CLI):**
+    The CLI provides the same functionality as the web interface.
     ```bash
-    ./kubernetes_installer.py deploy --env local
+    python3 -m installer_app.cli --help
     ```
-    This deploys the system to the `oj` namespace and configures Nginx with self-signed SSL certificates.
+    This will display a list of available commands and options.
 
-*   **Production Environment:**
+    **Example: Deploy to a local environment**
     ```bash
-    ./kubernetes_installer.py deploy --production
+    python3 -m installer_app.cli deploy --env local
     ```
-    This deploys the system and configures Certbot to manage Let's Encrypt SSL certificates.
 
-For more details on the `kubernetes_installer.py` script, its options, and how to create custom node images, refer to the main `README.md` and the [Kubernetes Installer Guide](kubernetes.md).
+For more details, refer to the main `README.md`.
 
 ## 3. Project Architecture
 
 The project is organized into several key directories:
 
 *   `kubernetes/`: Contains all Kubernetes manifests, organized by components and overlays (`local`, `production`) using `kustomize`.
-*   `install_kubernetes/`: Contains the Python source code for the Kubernetes installer, including builders for custom Debian images.
+*   `installer/`: Contains the Python source code for the Flask-based installer application.
 *   `common/`: Shared Python utilities and helper functions used across the project.
 *   `docs/`: Project documentation, including plans, strategies, and developer guides.
 *   `processors/`: Contains the ETL logic for processing static and real-time transit data.
