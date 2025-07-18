@@ -15,7 +15,21 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 def _get_project_version_from_pyproject_toml() -> str:
     """
-    Extracts the project version from the pyproject.toml file.
+    Determines the project version from the given pyproject.toml file.
+
+    This function attempts to locate the `pyproject.toml` file in a predefined path relative
+    to the project root. If the file is present, it reads the file content and extracts the
+    project version from the `[project]` section. If the file is not found or the version
+    cannot be located within the file, the function terminates the program with an error.
+
+    Raises
+    ------
+    SystemExit
+        If the pyproject.toml file is not found or the version cannot be extracted.
+    Returns
+    -------
+    str
+        The extracted version string from the pyproject.toml file.
     """
     pyproject_path = os.path.join(PROJECT_ROOT, "..", "..", "pyproject.toml")
     if not os.path.exists(pyproject_path):
@@ -45,7 +59,17 @@ def _get_project_version_from_pyproject_toml() -> str:
 
 def _pause_for_debug(message: str) -> None:
     """
-    Pauses program execution for debugging purposes if debugging mode is enabled.
+    Pauses the program execution for debugging purposes when debugging mode is active.
+
+    This function prints a debug message and waits for user input to proceed if the
+    debugging mode is enabled. The input message serves as an optional message to
+    inform the user about the reason for the pause.
+
+    Parameters:
+        message (str): The message to display before pausing.
+
+    Returns:
+        None
     """
     if _DEBUG:
         print(f"DEBUG PAUSE: {message}")
@@ -61,7 +85,50 @@ def run_command(
     verbose: bool = False,
 ) -> subprocess.CompletedProcess:
     """
-    Executes a command as a subprocess and handles its behavior based on the specified parameters.
+    Executes a shell command as a subprocess and optionally captures its output.
+
+    This function runs a given command within an optional directory and environment,
+    enabling additional verbosity and error handling. It allows for capturing stdout
+    and stderr, and will fail gracefully if the command execution does not meet the
+    expected conditions. The function supports verbose mode for improving debugging
+    and adding verbosity to common command-line tools automatically.
+
+    Parameters:
+    command: List[str]
+        The shell command to be executed as a list where each element is a part
+        of the command.
+    directory: Optional[str]
+        The directory path to execute the command from. Default is None, which uses
+        the current working directory.
+    env: Optional[Dict[str, str]]
+        An optional dictionary of environment variables to use when executing the
+        command. Default is None, which inherits the environment from the current
+        process.
+    check: bool
+        If True, the function validates the command's exit code and raises an error
+        if it's non-zero. Default is True.
+    capture_output: bool
+        Whether to capture the command's stdout and stderr. If False, the output is
+        printed directly to the console. Default is False.
+    verbose: bool
+        A flag to enable verbose logging of the command's execution. It also attempts
+        to add verbosity flags to common command-line tools automatically. Default
+        is False.
+
+    Returns:
+    subprocess.CompletedProcess
+        The result of the executed command, containing information about the
+        execution, such as exit code, stdout, and stderr.
+
+    Raises:
+    SystemExit
+        Exits the current Python process with a status code of 1 if the command
+        execution fails and `check` is True.
+
+    Notes:
+    This function modifies the command arguments to include additional verbosity
+    for specific commands, such as docker, wget, apt, etc., when the verbose flag is
+    enabled.
     """
     if verbose:
         print(f"[VERBOSE] Executing: {' '.join(command)}")
@@ -106,7 +173,27 @@ def run_command(
 
 def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
     """
-    Verifies the presence of required tools and attempts to install missing ones.
+    Checks if the specified tools are installed and installs missing ones.
+
+    This function verifies the installation status of a list of tools by checking their
+    corresponding package names. If a tool is missing or not installed correctly, it initiates
+    an installation process using `sudo apt` or `sudo apt-get`. The function also includes
+    specific verifications for the "vmdb2" tool to ensure it is configured for passwordless
+    sudo execution. In case critical dependencies like `dpkg` are missing or required package
+    managers (`apt`, `apt-get`) are not available, it provides appropriate error messages.
+
+    Arguments:
+        tools: List of tuples where each tuple contains three elements:
+            - tool_name (str): The name of the tool.
+            - package_name (str): The corresponding package name for the tool.
+            - description (str): A short description of the tool's use case or purpose.
+
+    Returns:
+        bool: True if all tools are already installed or successfully installed.
+              False if installation failed or critical dependencies are not available.
+
+    Raises:
+        SystemExit: If `dpkg` is not found on the system, the program exits with an error.
     """
     missing_packages: List[Tuple[str, str, str]] = []
     for tool_name, package_name, description in tools:
@@ -211,7 +298,21 @@ def check_and_install_tools(tools: List[Tuple[str, str, str]]) -> bool:
 
 def create_debian_package(package_name: str = "oj-server") -> None:
     """
-    Creates a custom Debian package containing the Kubernetes configurations.
+    Creates a Debian package for the specified package name.
+
+    This function handles the entire process of creating a Debian package including
+    checking and installing required tools, creating the build directory, copying
+    necessary files, creating the DEBIAN control file, and finally building the
+    Debian package. The function also performs cleanup of the temporary build
+    directory after the package is successfully created.
+
+    Parameters:
+        package_name (str): The name of the package for which a Debian package
+                            should be created. Defaults to "oj-server".
+
+    Raises:
+        SystemExit: If any required tool is missing and cannot be installed, the
+                    system exits with a non-zero status.
     """
     version = _get_project_version_from_pyproject_toml()
     required_tools: List[Tuple[str, str, str]] = [
@@ -290,7 +391,26 @@ Description: Open Journey Server Kubernetes Configurations
 
 def _create_stripped_installer_script() -> str:
     """
-    Generates a stripped version of the Kubernetes installer script.
+    Removes unnecessary components and creates a stripped version of the Kubernetes
+    installer script.
+
+    This function reads the original Kubernetes installer script, removes specific
+    functions and statements that are not required for a stripped-down version, and
+    writes the modified content to a new file. The stripped version excludes certain
+    install options, unnecessary print statements, and options for creating Debian
+    packages. The resultant stripped script is saved and its path is returned.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the original script file cannot be found.
+    IOError
+        If there are issues in reading or writing to files.
+
+    Returns
+    -------
+    str
+        The file system path to the newly created stripped-down installer script.
     """
     original_script_path = os.path.join(
         PROJECT_ROOT, "..", "..", "kubernetes_installer.py"

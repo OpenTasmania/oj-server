@@ -173,7 +173,19 @@ def _apply_or_delete_components(
 
 def _setup_dashboard(kubectl: str):
     """
-    Enables the MicroK8s dashboard, generates a token, saves it, and sets up port forwarding.
+    Sets up the Kubernetes Dashboard including enabling dashboard addon,
+    waiting for deployment to be available, generating an access token,
+    and managing the dashboard port-forwarding service.
+
+    Parameters
+    ----------
+    kubectl : str
+        The path or command string for the `kubectl` CLI.
+
+    Raises
+    ------
+    SystemExit
+        If an error occurs while generating or saving the dashboard token.
     """
     print("\n--- Setting up Kubernetes Dashboard ---")
 
@@ -235,9 +247,22 @@ def _setup_dashboard(kubectl: str):
 
 def _manage_dashboard_port_forward_service(kubectl: str):
     """
-    Manages the systemd service for Kubernetes Dashboard port forwarding.
-    Checks if the service exists, is enabled, and is active. If not, it creates,
-    enables, and starts the service.
+    Manages the Kubernetes Dashboard Port Forward service for MicroK8s using systemd.
+    This function ensures the systemd service for port forwarding is created, enabled,
+    and started if it does not already exist or is not in an active/enabled state.
+    The user running this function will be configured as the service's executing user
+    and group, ensuring proper permission handling for the service operations.
+
+    Parameters:
+    kubectl: str
+        The command or path used to invoke `kubectl`. This parameter is not used
+        directly in the current implementation, but it may be relevant for custom
+        kubectl paths.
+
+    Raises:
+    SystemExit:
+        If an error occurs during any operation (e.g., writing service file, reloading
+        systemd, enabling or starting the service), the program exits with error status.
     """
     print("\n--- Managing Kubernetes Dashboard Port Forward Service ---")
 
@@ -338,7 +363,15 @@ WantedBy=multi-user.target
 
 def _check_microk8s_addons():
     """
-    Checks if the required MicroK8s addons are enabled and exits if they are not.
+    Checks and ensures that the required MicroK8s addons are enabled.
+
+    This function verifies the current status of MicroK8s addons by inspecting the
+    output of `microk8s status`. It identifies whether the necessary addons are
+    enabled, and if any required addon is missing, it attempts to enable them.
+
+    Raises:
+        SystemExit: If MicroK8s status fails to be retrieved or an addon cannot be
+                    enabled, the program exits with an error message.
     """
     print("\n--- Checking MicroK8s addon status ---")
     try:
@@ -666,7 +699,14 @@ def get_kubectl_command() -> str:
 
 
 def get_managed_images() -> List[str]:
-    """Returns a list of all manageable image names."""
+    """
+    Retrieves a list of all managed image names.
+
+    Returns
+    -------
+    List[str]
+        A list containing the names of all available managed images.
+    """
     return list(ALL_IMAGES.keys())
 
 
@@ -680,26 +720,38 @@ def deploy(
     production: bool = False,
 ) -> None:
     """
-    Deploys the specified environment using kustomize and kubectl.
+    Deploy resources to a Kubernetes environment.
 
-    This function handles the deployment process, allowing for optional
-    installation of specific images or entire components for a given
-    environment. It also processes local environment customizations
-    separately.
+    This function handles the deployment of resources to a specified Kubernetes
+    environment. It manages conditional deployments for different environments
+    (local or production), builds and registers container images when deploying
+    to a local environment, and applies the necessary Kubernetes configurations
+    using kustomize overlays. It ensures that all components or specific ones,
+    as provided, are deployed correctly. Additionally, it invokes hooks from
+    a plugin manager for custom behavior on success or error.
 
-    Args:
-        env (str): The environment to deploy (e.g., "local", "dev", "prod").
-        kubectl (str): The path to the `kubectl` command-line tool.
-        is_installed (bool, optional): Indicates whether the environment is
-            already installed. Defaults to False.
-        images (Optional[List[str]], optional): A list of images or components
-            to deploy. If None, all components are deployed. Defaults to None.
-        overwrite (bool, optional): Whether to overwrite existing image
-            registrations in a local environment. Defaults to False.
+    Parameters:
+    env: str
+        The target environment name to deploy to (e.g., "local", "production").
+    kubectl: str
+        The path to the kubectl executable or its alias.
+    plugin_manager
+        The plugin manager instance used to handle custom hooks.
+    is_installed: bool, default=False
+        Indicates whether the deployment assumes pre-installed configurations.
+    images: Optional[List[str]], default=None
+        A list of specific component images to deploy, if any.
+    overwrite: bool, default=False
+        Whether to overwrite existing Docker images during local deployment.
+    production: bool, default=False
+        Set to True if deploying to a production environment.
 
     Raises:
-        SystemExit: If the specified kustomize path does not exist.
+    Exception
+        If an error occurs during the deployment process.
 
+    Returns:
+    None
     """
     try:
         print(f"Deploying '{env}' environment...")
