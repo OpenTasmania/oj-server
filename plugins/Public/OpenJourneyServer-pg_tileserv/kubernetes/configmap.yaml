@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-tileserv-config
+data:
+  config.toml: |
+    HttpHost = "0.0.0.0"
+    HttpPort = 7800
+    DatabaseURL = "env:DATABASE_URL"
+    DefaultMaxFeatures = 10000
+    PublishSchemas = "public,gtfs"
+    URIPrefix = "/vector"
+    DevelopmentMode = false
+    AllowFunctionSources = true
