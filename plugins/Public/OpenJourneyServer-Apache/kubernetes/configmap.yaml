@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apache-config
+data:
+  httpd.conf: |
+    ServerRoot "/usr/local/apache2"
+    Listen 8080
+    LoadModule mpm_event_module modules/mod_mpm_event.so
+    LoadModule authn_file_module modules/mod_authn_file.so
+    LoadModule authn_core_module modules/mod_authn_core.so
+    LoadModule authz_host_module modules/mod_authz_host.so
+    LoadModule authz_groupfile_module modules/mod_authz_groupfile.so
+    LoadModule authz_user_module modules/mod_authz_user.so
+    LoadModule authz_core_module modules/mod_authz_core.so
+    LoadModule access_compat_module modules/mod_access_compat.so
+    LoadModule auth_basic_module modules/mod_auth_basic.so
+    LoadModule reqtimeout_module modules/mod_reqtimeout.so
+    LoadModule filter_module modules/mod_filter.so
+    LoadModule mime_module modules/mod_mime.so
+    LoadModule log_config_module modules/mod_log_config.so
+    LoadModule env_module modules/mod_env.so
+    LoadModule headers_module modules/mod_headers.so
+    LoadModule setenvif_module modules/mod_setenvif.so
+    LoadModule version_module modules/mod_version.so
+    LoadModule unixd_module modules/mod_unixd.so
+    LoadModule status_module modules/mod_status.so
+    LoadModule autoindex_module modules/mod_autoindex.so
+    <IfModule dir_module>
+        DirectoryIndex index.html
+    </IfModule>
+    <Files ".ht*">
+        Require all denied
+    </Files>
+    ErrorLog /proc/self/fd/2
+    LogLevel warn
+    LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+    CustomLog /proc/self/fd/1 combined
+    Include conf/extra/mod_tile.conf
+    Include conf/extra/tile-site.conf
+  mod_tile.conf: |
+    # mod_tile.conf
+    LoadModule tile_module /usr/lib/apache2/modules/mod_tile.so
+    ModTileRenderdSocketName /var/run/renderd/renderd.sock
+    ModTileEnableStats On
+    ModTileBulkMode Off
+    ModTileRequestTimeout 5
+    ModTileMissingRequestTimeout 30
+    ModTileMaxLoadOld 2
+    ModTileMaxLoadMissing 5
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        ExpiresByType image/png "access plus 1 month"
+    </IfModule>
+    <IfModule mod_headers.c>
+        Header set Cache-Control "max-age=2592000, public"
+    </IfModule>
+  tile-site.conf: |
+    # Apache tile serving site
+    <VirtualHost *:8080>
+        ServerName your-server-name
+        ServerAdmin your-admin-email
+        # The URI /hot/ should match the URI in renderd.conf (e.g., [default] URI=/hot/).
+        AddTileConfig /hot/ default
+        ErrorLog /proc/self/fd/2
+        CustomLog /proc/self/fd/1 combined
+    </VirtualHost>
