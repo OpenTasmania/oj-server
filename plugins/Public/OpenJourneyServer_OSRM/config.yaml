@@ -1,0 +1,51 @@
+# OSRM Plugin Configuration
+# All OSRM-related configuration settings for OpenJourney Server
+
+# Containerization Settings
+osrm_image_tag: "osrm/osrm-backend:latest" # OSRM Docker image to use
+
+# OSRM upstream port(s) for Nginx proxying
+osrm:
+  car_profile_port: 5000
+  # bicycle_profile_port: 5001 # Example if you had another
+
+osrm_service:
+  car_profile_default_host_port: 5000 # Host port Nginx will proxy to for car profile
+  container_osrm_port: 5000         # OSRM's internal port in the container
+  image_tag: "osrm/osrm-backend:latest"
+  extra_routed_args: "--algorithm MLD --max-matching-size 2000" # Example extra args
+  systemd_template: |
+    [Unit]
+    Description=OSRM Routed service for region: {region_name}
+    After=docker.service network-online.target
+    Wants=docker.service
+
+    [Service]
+    Restart=always
+    RestartSec=5
+    ExecStartPre=-/usr/bin/{container_runtime_command} stop osrm-routed-{region_name}
+    ExecStartPre=-/usr/bin/{container_runtime_command} rm osrm-routed-{region_name}
+    ExecStart=/usr/bin/{container_runtime_command} run --rm --name osrm-routed-{region_name} \
+        -p 127.0.0.1:{host_port_for_region}:{container_osrm_port} \
+        -v "{host_osrm_data_dir_for_region}":"/data_processing":ro \
+        {osrm_image_tag} osrm-routed "/data_processing/{osrm_filename_in_container}" --max-table-size {max_table_size_routed} {extra_osrm_routed_args}
+
+    ExecStop=/usr/bin/{container_runtime_command} stop osrm-routed-{region_name}
+
+    [Install]
+    WantedBy=multi-user.target
+    # File created by script V{script_hash} for region {region_name}
+
+# OSRM Data Processing Settings
+osrm_data:
+  base_dir: "/opt/osm_data"
+  processed_dir: "/opt/osrm_processed_data"
+  base_pbf_url: "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
+  base_pbf_filename: "australia-latest.osm.pbf"
+  profile_script_in_container: "/opt/car.lua" # Standard OSRM car profile
+
+# Nginx Configuration for OSRM Routing
+nginx_osrm_location_template: |
+  location /route/v1/ { # Assumes car profile
+      proxy_pass http://localhost:{osrm_port_car}/route/v1/;
+  }
