@@ -20,8 +20,26 @@ from installer_app.utils.database_utils import (
 
 class GTFSPlugin(InstallerPlugin):
     """
-    GTFS Plugin that implements lazy table creation and database optimization.
-    Only creates database tables and rows that are actually needed for GTFS data processing.
+    A plugin for handling GTFS data integration with database operations.
+
+    The GTFSPlugin class is used to manage GTFS-related data within a database. It provides
+    capabilities to define database requirements, manage Python dependencies, determine table
+    creation based on context, and execute database operations such as creating the necessary tables.
+    This plugin is designed to integrate with systems that rely on GTFS (General Transit Feed
+    Specification) data and includes extended support for optional features like OpenJourney extensions.
+
+    Attributes:
+        logger: A logger instance to track plugin operations.
+
+    Methods:
+        name: Provides the unique identifier of the plugin.
+        get_python_dependencies: Lists the Python package dependencies needed by this plugin.
+        get_database_requirements: Describes required and optional database tables and estimated sizes.
+        get_required_tables: Retrieves a list of all required table names.
+        get_optional_tables: Retrieves a list of optional table names.
+        should_create_table: Determines if a specific table should be created based on provided data context.
+        get_database_manager: Returns the database manager instance based on configuration.
+        create_table: Executes SQL commands to create a database table given its name and required schema.
     """
 
     def __init__(self):
@@ -35,8 +53,27 @@ class GTFSPlugin(InstallerPlugin):
         """A unique name for the plugin."""
         return "GTFSPlugin"
 
+    def get_python_dependencies(self) -> List[str]:
+        """
+        Retrieves the list of Python dependencies required for the application.
+
+        Returns
+        -------
+        List[str]
+            A list of strings specifying the Python dependencies with version
+            specifications.
+        """
+        return ["gtfs-kit>10.3.0,<11.0.0"]
+
     def get_database_requirements(self) -> Dict[str, Any]:
-        """Return database requirements for this plugin."""
+        """
+        Retrieves a dictionary specifying the database requirements including required tables,
+        optional tables, required extensions, and an estimation of row counts for specific tables.
+
+        Returns:
+            Dict[str, Any]: A dictionary outlining the database requirements, classified as required
+            tables, optional tables, required extensions, and estimated row counts for relevant tables.
+        """
         return {
             "required_tables": [
                 "data_sources",
@@ -65,19 +102,52 @@ class GTFSPlugin(InstallerPlugin):
         }
 
     def get_required_tables(self) -> List[str]:
-        """Return list of table names this plugin requires."""
+        """
+        Retrieves the names of required database tables.
+
+        This method obtains a list of table names that are necessary for the database
+        to function correctly based on its requirements.
+
+        Returns:
+            List[str]: A list of table names that are required.
+        """
         requirements = self.get_database_requirements()
         return list(requirements["required_tables"])
 
     def get_optional_tables(self) -> List[str]:
-        """Return list of optional table names this plugin might use."""
+        """
+        Fetches the names of optional tables specified in the database requirements.
+
+        This method retrieves database requirements and extracts any optional tables
+        defined in the requirements.
+
+        Returns
+        -------
+        List[str]
+            A list containing the names of optional tables. If no optional tables are
+            defined, an empty list is returned.
+        """
         requirements = self.get_database_requirements()
         return list(requirements.get("optional_tables", []))
 
     def should_create_table(
         self, table_name: str, data_context: dict
     ) -> bool:
-        """Determine if a specific table should be created based on data context."""
+        """
+        Determines whether a database table should be created based on its name
+        and the provided data context.
+
+        Parameters:
+        table_name: str
+            The name of the table to evaluate for creation.
+        data_context: dict
+            A dictionary containing context data that indicates the presence
+            or absence of data attributes required for creating certain tables.
+
+        Returns:
+        bool
+            True if the table should be created; False otherwise.
+        """
         # Always create required tables
         if table_name in self.get_required_tables():
             return True
@@ -99,7 +169,21 @@ class GTFSPlugin(InstallerPlugin):
         return bool(optional_table_conditions.get(table_name, False))
 
     def get_database_manager(self, config: dict) -> DatabaseManager:
-        """Get database manager from configuration."""
+        """
+        Retrieves or creates a database manager instance using the provided configuration.
+        If a database manager already exists, it will return the existing one. If not, the function
+        will attempt to create a new database manager. Handles exceptions during the creation process
+        by logging the error and raising the exception.
+
+        Args:
+            config (dict): Configuration dictionary required to initialize the database manager.
+
+        Returns:
+            DatabaseManager: An instance of the DatabaseManager class.
+
+        Raises:
+            Exception: If an error occurs during the creation of the database manager.
+        """
         if self._db_manager is None:
             try:
                 self._db_manager = get_database_manager(config)
@@ -320,7 +404,23 @@ class GTFSPlugin(InstallerPlugin):
     def ensure_tables_exist(
         self, db_manager: DatabaseManager, data_context: Optional[dict] = None
     ):
-        """Check if required tables exist, create if not."""
+        """
+        Ensures that the required and optional tables, along with necessary database extensions
+        and schema, exist in the specified database. Missing tables are created if they are not
+        already present. Optional tables are created conditionally based on the provided
+        data context.
+
+        Arguments:
+            db_manager (DatabaseManager): The database manager instance responsible for
+                executing database operations.
+            data_context (Optional[dict]): An optional dictionary with context data used
+                for conditional creation of optional tables.
+
+        Raises:
+            Exception: If an error occurs while ensuring the existence of tables, schema,
+                or extensions.
+
+        """
         if data_context is None:
             data_context = {}
 
@@ -366,7 +466,23 @@ class GTFSPlugin(InstallerPlugin):
             raise
 
     def analyze_gtfs_data_context(self, config: dict) -> dict:
-        """Analyze GTFS configuration to determine what tables are needed."""
+        """
+        Analyzes the GTFS data context based on the provided configuration.
+
+        This method evaluates the presence of various features within a
+        GTFS feed using hints provided in the given configuration. It updates
+        a dictionary that reflects the availability of key feature categories
+        such as shapes, fares, fare rules, transfers, and others, and finally
+        returns this dictionary for further use.
+
+        Parameters:
+            config (dict): A dictionary containing GTFS configuration details,
+                           which includes information about enabled features.
+
+        Returns:
+            dict: A dictionary indicating the availability of specific GTFS
+                  data categories based on the provided configuration.
+        """
         data_context = {
             "has_shapes": False,
             "has_fare_data": False,
@@ -398,7 +514,22 @@ class GTFSPlugin(InstallerPlugin):
 
     # InstallerPlugin interface methods
     def post_config_load(self, config: dict) -> dict:
-        """Hook called after the main configuration is loaded."""
+        """
+        Configures and updates the given configuration dictionary with GTFS-specific
+        settings. Ensures that GTFS-related keys and values are added if they do not
+        already exist. This function is primarily used after the initial loading of
+        the configuration.
+
+        Parameters:
+        config: dict
+            The configuration dictionary to be updated. It should contain the
+            application settings and any other related configurations, if available.
+
+        Returns:
+        dict
+            The updated configuration dictionary containing the GTFS-specific
+            settings, if they were not already present.
+        """
         self.logger.info("GTFS Plugin: Configuration loaded")
 
         # Add GTFS-specific configuration if not present
@@ -411,7 +542,22 @@ class GTFSPlugin(InstallerPlugin):
         return config
 
     def pre_apply_k8s(self, manifests: dict) -> dict:
-        """Hook called before Kubernetes manifests are applied."""
+        """
+        Prepares Kubernetes manifests for deployment.
+
+        This function modifies the provided Kubernetes manifests by adding GTFS daemon
+        manifests if they are not already present. It looks for GTFS-specific manifests
+        in the `gtfs_daemon` directory located relative to the script's file directory
+        and incorporates them into the manifests dictionary. It logs any additions or
+        errors encountered during the process.
+
+        Args:
+            manifests (dict): A dictionary of Kubernetes manifest file names and their
+                contents.
+
+        Returns:
+            dict: The updated Kubernetes manifests after adding GTFS-specific manifests.
+        """
         self.logger.info("GTFS Plugin: Preparing Kubernetes manifests")
 
         # Add GTFS daemon manifests if not present
