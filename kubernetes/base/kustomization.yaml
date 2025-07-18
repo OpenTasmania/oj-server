@@ -10,7 +10,6 @@ resources:
 - ../components/nodejs
 - ../components/certbot
 - ../components/self-signed-certs
-- ../components/py3gtfskit
 
 # Common labels to apply to all resources
 labels:
