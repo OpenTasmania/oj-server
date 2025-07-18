@@ -5,7 +5,55 @@ from typing import Any, Dict, List
 
 
 class InstallerPlugin(ABC):
-    """Abstract Base Class for an installer plugin."""
+    """
+    Defines the interface for an installer plugin.
+
+    This abstract base class is intended to be subclassed to create custom installer plugins.
+    It provides a framework for defining various hooks, configurations, and behaviors required
+    during the installation and post-installation processes of a plugin or application.
+
+    The class specifies abstract methods and properties that must be overridden by derived
+    classes to define their specific functionality. It also provides default implementation
+    for certain methods that can be optionally overridden for custom behavior.
+
+    Attributes:
+        name (str): Abstract property that should be implemented by subclasses to
+                    represent the name associated with the plugin.
+
+    Methods:
+        post_config_load(config: dict) -> dict
+            Modifies or processes the configuration dictionary after it has been loaded.
+
+        pre_apply_k8s(manifests: dict) -> dict
+            Prepares and processes Kubernetes manifests before applying them.
+
+        on_install_complete()
+            Abstract hook for executing logic post-installation.
+
+        on_error(error: Exception)
+            Abstract method for handling errors during execution.
+
+        get_python_dependencies() -> List[str]
+            Retrieves a list of Python dependencies required for the plugin.
+
+        get_database_requirements() -> Dict[str, Any]
+            Abstract method to define database requirements.
+
+        get_required_tables() -> List[str]
+            Abstract method to retrieve names of required tables.
+
+        get_optional_tables() -> List[str]
+            Abstract method to retrieve names of optional tables.
+
+        should_create_table(table_name: str, data_context: dict) -> bool
+            Abstract method to determine whether a table should be created.
+
+        pre_database_setup(config: dict) -> dict
+            Abstract method to prepare configurations before database initialization.
+
+        post_database_setup(db_connection)
+            Abstract hook for performing actions after database setup is complete.
+    """
 
     @property
     @abstractmethod
