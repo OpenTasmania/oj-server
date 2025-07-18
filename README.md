@@ -66,7 +66,7 @@ The primary installation method uses a Flask-based application that provides bot
             ```
     *   Install the required Python packages:
         ```bash
-        pip install -r installer_app/requirements.txt
+        uv sync
         ```
 
 2.  **Deploy the Application:**
@@ -76,7 +76,7 @@ The primary installation method uses a Flask-based application that provides bot
     *   **Web Interface:**
         1.  Start the Flask development server:
             ```bash
-            FLASK_APP=installer_app/app.py flask run
+            FLASK_APP=installer.installer_app.app:create_app flask run
             ```
         2.  Open your web browser and navigate to `http://127.0.0.1:5000`.
         3.  Use the web interface to deploy, destroy, or build the application components.
@@ -84,13 +84,13 @@ The primary installation method uses a Flask-based application that provides bot
     *   **Command-Line Interface (CLI):**
         The CLI provides the same functionality as the web interface.
         ```bash
-        python3 -m installer_app.cli --help
+        python3 -m installer.installer_app.cli --help
         ```
         This will display a list of available commands and options.
 
         **Example: Deploy to a local environment**
         ```bash
-        python3 -m installer_app.cli deploy --env local
+        python3 -m installer.installer_app.cli deploy --env local
         ```
 
 ## 4. History
@@ -107,9 +107,8 @@ robust, scalable, and maintainable solution for deploying the entire Open Journe
 
 ## 5. Future
 
-Theres a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
-Planned [enhancements](https://gitlab.com/opentasmania/oj-server/-/issues/?label_name%5B%5D=Enhancement) can also be
-found on the Gitlab site.
+There's a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
+Planned [enhancements](https://gitlab.com/opentasmania/oj-server/-/issues/?label_name%5B%5D=Enhancement) can also be found on the Gitlab site.
 
 ## 6. Support
 
