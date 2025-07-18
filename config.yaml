@@ -218,7 +218,7 @@ renderd:
   tile_cache_dir: "/var/lib/mod_tile"
   run_dir: "/var/run/renderd" # For socket and stats file
   socket_path: "/var/run/renderd/renderd.sock"
-  mapnik_xml_stylesheet_path: "/usr/local/share/maps/style/plugins/Public/OpenJourneyServer-OpenStreetMap/carto/mapnik.xml"
+  mapnik_xml_stylesheet_path: "/usr/local/share/maps/style/plugins/Public/OpenJourneyServer_OpenStreetMap/carto/mapnik.xml"
   mapnik_plugins_dir_override: /usr/lib/x86_64-linux-gnu/mapnik/4.0/input/
   uri_path_segment: "hot" # Used in renderd.conf URI and Nginx/Apache proxy paths
 
