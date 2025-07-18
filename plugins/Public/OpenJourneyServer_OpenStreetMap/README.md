@@ -1,6 +1,6 @@
-# OpenStreetMap Plugin for OpenJourney Server
+# OpenStreetMap Tile Rendering Plugin
 
-This plugin provides OpenStreetMap tile rendering capabilities for the OpenJourney server. It manages the renderd service, tile caching, and integration with the mapping stack including Mapnik, mod_tile, and Apache for serving raster tiles.
+This plugin provides OpenStreetMap tile rendering capabilities through the renderd service. It manages tile caching and integration with the mapping stack including Mapnik, mod_tile, and Apache for serving raster tiles.
 
 ## Features
 
@@ -9,7 +9,7 @@ This plugin provides OpenStreetMap tile rendering capabilities for the OpenJourn
 - **Kubernetes Deployment**: Full Kubernetes integration with deployments, services, and persistent volumes
 - **Mapnik Integration**: Uses Mapnik for high-quality map rendering with OpenStreetMap Carto styles
 - **Tile Caching**: Efficient tile caching with mod_tile integration
-- **Plugin Architecture**: Fully integrated with OpenJourney plugin system
+- **Plugin Architecture**: Modular plugin-based architecture
 
 ## Database Schema
 
@@ -51,7 +51,7 @@ plugins/Public/OpenJourneyServer-OpenStreetMap/
 
 ## Configuration
 
-The plugin integrates with the existing OpenJourney configuration system:
+The plugin uses the following configuration parameters:
 
 ```yaml
 openstreetmap:
@@ -264,14 +264,14 @@ python -c "from plugins.OpenStreetMap import OpenStreetMapPlugin; print('Plugin 
 curl http://localhost/raster/hot/10/512/512.png
 ```
 
-## Integration with OpenJourney
+## Integration Examples
 
-The OpenStreetMap plugin integrates seamlessly with other OpenJourney components:
+The OpenStreetMap plugin can be integrated with various mapping applications:
 
-- **GTFS Plugin**: Overlay public transit data on base maps
-- **Routing**: Use OSM road network for routing calculations
-- **Web Interface**: Provide base map tiles for web applications
-- **API**: Expose tile endpoints through OpenJourney API
+- **Transit Data Overlay**: Overlay public transit data on base maps
+- **Routing Applications**: Use OSM road network for routing calculations
+- **Web Mapping**: Provide base map tiles for web applications
+- **API Integration**: Expose tile endpoints through REST API
 
 ## License
 
