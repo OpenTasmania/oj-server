@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gtfs-daemon-config
+  labels:
+    app: gtfs-daemon
+data:
+  config.json: |
+    {
+      "feeds": [
+        {
+          "name": "ACT Transport",
+          "url": "https://www.transport.act.gov.au/googletransit/google_transit.zip",
+          "description": "Australian Capital Territory public transport GTFS feed"
+        },
+        {
+          "name": "Tasmania Transport",
+          "url": "https://www.transport.tas.gov.au/gtfs/import/general_transit_feed.zip",
+          "description": "Tasmania public transport GTFS feed"
+        }
+      ],
+      "log_level": "INFO",
+      "max_retries": 3,
+      "retry_delay": 60
+    }
+  # Environment variables for additional configuration
+  LOG_LEVEL: "INFO"
+  MAX_RETRIES: "3"
+  RETRY_DELAY: "60"
+  GTFS_CONFIG_FILE: "/app/config.json"

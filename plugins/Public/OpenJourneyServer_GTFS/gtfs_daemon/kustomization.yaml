@@ -1,0 +1,17 @@
+# oj-server/kubernetes/components/gtfs_daemon/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cronjob.yaml
+  - configmap.yaml
+  - network-policy.yaml
+
+images:
+  - name: gtfs-daemon
+    newTag: latest
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/component: gtfs-daemon

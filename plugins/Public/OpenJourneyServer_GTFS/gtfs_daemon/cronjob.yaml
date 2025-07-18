@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gtfs-daemon-cronjob
+  labels:
+    app: gtfs-daemon
+spec:
+  # Run every 6 hours (at 00:00, 06:00, 12:00, 18:00)
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: gtfs-daemon
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: gtfs-daemon
+              image: gtfs-daemon:latest
+              envFrom:
+                - secretRef:
+                    name: postgres-secret
+                - configMapRef:
+                    name: gtfs-daemon-config
+              env:
+                - name: POSTGRES_HOST
+                  value: "postgres-service"
+                - name: POSTGRES_PORT
+                  value: "5432"
+              volumeMounts:
+                - name: gtfs-config
+                  mountPath: /app/config.json
+                  subPath: config.json
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "2Gi"
+                  cpu: "1000m"
+          volumes:
+            - name: gtfs-config
+              configMap:
+                name: gtfs-daemon-config
+                items:
+                  - key: config.json
+                    path: config.json

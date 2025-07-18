@@ -1,0 +1,17 @@
+{
+  "feeds": [
+    {
+      "name": "ACT Transport",
+      "url": "https://www.transport.act.gov.au/googletransit/google_transit.zip",
+      "description": "Australian Capital Territory public transport GTFS feed"
+    },
+    {
+      "name": "Tasmania Transport",
+      "url": "https://www.transport.tas.gov.au/gtfs/import/general_transit_feed.zip",
+      "description": "Tasmania public transport GTFS feed"
+    }
+  ],
+  "log_level": "INFO",
+  "max_retries": 3,
+  "retry_delay": 60
+}
