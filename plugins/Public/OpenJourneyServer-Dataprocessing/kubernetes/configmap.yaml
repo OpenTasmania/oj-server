@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: data-processing-config
-data:
-  GTFS_FEED_URL: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
-  OSM_PBF_URL: "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
