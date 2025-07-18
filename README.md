@@ -51,67 +51,47 @@ The system is deployed as a collection of containerized services orchestrated by
 
 ### Quick Start: Kubernetes Deployment
 
-The primary installation method uses the `kubernetes_installer.py` script to deploy the entire stack to a Kubernetes
-cluster.
+The primary installation method uses a Flask-based application that provides both a web interface and a command-line interface (CLI) to deploy the entire stack to a Kubernetes cluster.
 
-1. **Prerequisites:** Ensure you have a running Kubernetes cluster. For local development, we
-   recommend [MicroK8s](httpss://microk8s.io/).
-    * **Install MicroK8s (for local development):**
-      ```bash
-      sudo snap install microk8s --classic
-      sudo usermod -a -G microk8s $USER
-      sudo chown -f -R $USER ~/.kube
-      newgrp microk8s
-      microk8s status --wait-ready
-      microk8s enable dns storage ingress registry
-      ```
+1.  **Prerequisites:**
+    *   Ensure you have a running Kubernetes cluster. For local development, we recommend [MicroK8s](httpss://microk8s.io/).
+        *   **Install MicroK8s (for local development):**
+            ```bash
+            sudo snap install microk8s --classic
+            sudo usermod -a -G microk8s $USER
+            sudo chown -f -R $USER ~/.kube
+            newgrp microk8s
+            microk8s status --wait-ready
+            microk8s enable dns storage ingress registry
+            ```
+    *   Install the required Python packages:
+        ```bash
+        pip install -r installer_app/requirements.txt
+        ```
 
-2. **Deploy the Application:** Use the `kubernetes_installer.py` script to deploy. You can use its interactive menu or
-   run a direct command.
-    * **Interactive Menu:**
-      ```bash
-      ./kubernetes_installer.py
-      ```
-    * **Direct Command (for local environment):**
-      ```bash
-      ./kubernetes_installer.py deploy --env local
-      ```
+2.  **Deploy the Application:**
 
-3. **Accessing the System:** Once deployed, the services will be accessible through the Nginx Ingress controller in your
-   cluster.
+    You can deploy the application using either the web interface or the CLI.
 
-For more detailed instructions on deployment, creating custom OS images for nodes, and advanced configuration, please
-see the [Kubernetes Installer Guide](docs/kubernetes.md).
+    *   **Web Interface:**
+        1.  Start the Flask development server:
+            ```bash
+            FLASK_APP=installer_app/app.py flask run
+            ```
+        2.  Open your web browser and navigate to `http://127.0.0.1:5000`.
+        3.  Use the web interface to deploy, destroy, or build the application components.
 
-### `kubernetes_installer.py` Help
+    *   **Command-Line Interface (CLI):**
+        The CLI provides the same functionality as the web interface.
+        ```bash
+        python3 -m installer_app.cli --help
+        ```
+        This will display a list of available commands and options.
 
-For a full list of commands and options available in the installer script, run:
-
-```bash
-./kubernetes_installer.py --help
-```
-
-This will display the following information:
-
-```
-usage: kubernetes_installer.py [-h] [--env ENV] [--images [IMAGES ...]] [-v] [-d] [--overwrite] [--production]
-                             {deploy,destroy,build-amd64,build-rpi64,build-deb,menu} ...
-
-Kubernetes deployment script for OJM.
-
-positional arguments:
-  {deploy,destroy,build-amd64,build-rpi64,build-deb,menu}
-                        The action to perform.
-
-options:
-  -h, --help            show this help message and exit
-  --env ENV             The environment to target (e.g., 'local', 'staging'). Cannot be used with --production.
-  --images [IMAGES ...] A space-delimited list of images to deploy or destroy. If not provided, all images will be processed.
-  -v, --verbose         Enable verbose output.
-  -d, --debug           Enable debug mode (implies --verbose and pauses before each step).
-  --overwrite           Force overwrite of existing Docker images in the local registry. Only valid with 'deploy' action.
-  --production          Target the production environment. Cannot be used with --env.
-```
+        **Example: Deploy to a local environment**
+        ```bash
+        python3 -m installer_app.cli deploy --env local
+        ```
 
 ## 4. History
 
