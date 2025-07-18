@@ -8,7 +8,7 @@ data:
     HttpPort = 7800
     DatabaseURL = "env:DATABASE_URL"
     DefaultMaxFeatures = 10000
-    PublishSchemas = "public,gtfs"
+    PublishSchemas = "public,canonical"
     URIPrefix = "/vector"
     DevelopmentMode = false
     AllowFunctionSources = true
