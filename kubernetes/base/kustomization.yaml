@@ -8,10 +8,9 @@ resources:
 - ../components/postgres
 - ../components/osrm
 - ../components/pg_tileserv
-- ../components/renderd
+- ../../plugins/Public/OpenStreetMap/kubernetes
 - ../components/apache
 - ../components/nginx
-- ../components/carto
 - ../components/nodejs
 - ../components/certbot
 - ../components/pgadmin
