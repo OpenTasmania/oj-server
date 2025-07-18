@@ -31,7 +31,7 @@ keywords = ["oj", "ojs", "gtfs", "gis", "map server", "routing", "postgis", "pos
 requires-python = ">=3.13,<4.0"
 
 dependencies = [
-    "certifi==2025.6.15",
+    "certifi==2025.7.14",
     "cython~=3.1.2",
     "folium>0.19.0,<1.0.0",
     "gtfs-kit>10.3.0,<11.0.0",
@@ -44,9 +44,6 @@ dependencies = [
     "PyYAML>6.0.0,<7.0.0",
     "requests>2.32.0,<3.0.0",
     "urwid>3.0.0,<4.0.0",
-    # "yafc @ git+https://gitlab.com/opentasmania/yafconfigurator.git@3.0.4",
-    # System dependencies (not installable via pip):
-    # - python3-apt: Required for AptManager
 ]
 
 [project.urls]
