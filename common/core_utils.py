@@ -15,7 +15,13 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from installer.config_models import SYMBOLS_DEFAULT
+SYMBOLS_DEFAULT = {
+    "info": "ℹ️",
+    "warning": "⚠️",
+    "error": "❌",
+    "debug": "🐛",
+    "critical": "🔥",
+}
 
 module_logger = logging.getLogger(__name__)
 
