@@ -1,9 +1,0 @@
---- /dev/fd/63	2025-06-14 09:27:58.731527973 +1000
-+++ openstreetmap-carto.lua	2025-06-14 09:27:46.979443548 +1000
-@@ -1,3 +1,6 @@
-+-- Source:
-+-- https://raw.githubusercontent.com/giggls/openstreetmap-carto-de/refs/heads/master/openstreetmap-carto.lua
-+
- -- For documentation of Lua tag transformations, see:
- -- https://github.com/openstreetmap/osm2pgsql/blob/master/docs/lua.md
- 
