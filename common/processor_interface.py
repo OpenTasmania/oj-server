@@ -14,10 +14,14 @@ from typing import Any, Dict, List, Optional
 
 class ProcessorInterface(ABC):
     """
-    Abstract base class defining the required methods for all static data processors.
+    Interface for ETL processors defining standard methods for data extraction, transformation,
+    and loading.
 
-    All processors must implement the extract, transform, and load (ETL) pattern
-    to convert external data sources into the canonical database schema.
+    This class provides an abstract blueprint for implementing ETL (Extract, Transform, Load)
+    processors. Subclasses are required to implement specific methods for extracting data from
+    various sources, transforming raw data into a structured format, and loading it into a database
+    or another destination. It also includes a processing pipeline that orchestrates the ETL process
+    and additional utility functions such as validation and cleanup.
     """
 
     def __init__(self, db_config: Dict[str, Any]):
@@ -33,13 +37,28 @@ class ProcessorInterface(ABC):
     @property
     @abstractmethod
     def processor_name(self) -> str:
-        """Return the name of this processor (e.g., 'GTFS', 'NeTEx')."""
+        """
+        This abstract property represents the name of the processor. It is intended to be
+        implemented by subclasses to specify the name of the processor being used or
+        defined.
+
+        Returns:
+            str: The name of the processor.
+        """
         pass
 
     @property
     @abstractmethod
     def supported_formats(self) -> List[str]:
-        """Return list of supported file formats/extensions (e.g., ['.zip', '.xml'])."""
+        """
+        Property to retrieve the list of supported formats.
+
+        This property is an abstract method that must be implemented by any subclass.
+        It specifies the supported formats in the form of a list of strings.
+
+        Returns:
+            List[str]: A list of supported formats as strings.
+        """
         pass
 
     @abstractmethod
@@ -199,7 +218,14 @@ class ProcessorInterface(ABC):
 
 
 class ProcessorError(Exception):
-    """Custom exception for processor-related errors."""
+    """
+    Custom exception class to handle processor-specific errors.
+
+    ProcessorError is used to encapsulate information about errors that occur
+    during the execution of a specific processor. It includes the error message,
+    the name of the processor where the error occurred (if applicable), and the
+    original exception that may have triggered this error (if applicable).
+    """
 
     def __init__(
         self,
