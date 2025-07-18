@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Deploy</h1>
+  <form method="post">
+    <label for="env">Environment:</label>
+    <input type="text" id="env" name="env" value="local">
+    <br>
+    <label for="images">Images:</label>
+    <input type="text" id="images" name="images">
+    <br>
+    <label for="overwrite">Overwrite:</label>
+    <input type="checkbox" id="overwrite" name="overwrite">
+    <br>
+    <label for="production">Production:</label>
+    <input type="checkbox" id="production" name="production">
+    <br>
+    <input type="submit" value="Deploy">
+  </form>
+{% endblock %}

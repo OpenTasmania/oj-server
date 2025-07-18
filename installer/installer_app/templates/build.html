@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Build</h1>
+  <form method="post">
+    <label for="build_type">Build Type:</label>
+    <select id="build_type" name="build_type">
+      <option value="deb">Debian Package</option>
+      <option value="amd64">AMD64 Installer</option>
+      <option value="rpi64">RPi64 Installer</option>
+    </select>
+    <br>
+    <label for="rpi_model">Raspberry Pi Model:</label>
+    <select id="rpi_model" name="rpi_model">
+      <option value="4">4</option>
+      <option value="3">3</option>
+    </select>
+    <br>
+    <input type="submit" value="Build">
+  </form>
+{% endblock %}

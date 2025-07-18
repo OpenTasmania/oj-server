@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Destroy</h1>
+  <form method="post">
+    <label for="env">Environment:</label>
+    <input type="text" id="env" name="env" value="local">
+    <br>
+    <label for="images">Images:</label>
+    <input type="text" id="images" name="images">
+    <br>
+    <input type="submit" value="Destroy">
+  </form>
+{% endblock %}

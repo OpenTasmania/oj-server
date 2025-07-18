@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>OpenJourney Installer</h1>
+  <ul>
+    <li><a href="{{ url_for('deploy_route') }}">Deploy</a></li>
+    <li><a href="{{ url_for('destroy_route') }}">Destroy</a></li>
+    <li><a href="{{ url_for('build_route') }}">Build</a></li>
+  </ul>
+{% endblock %}
