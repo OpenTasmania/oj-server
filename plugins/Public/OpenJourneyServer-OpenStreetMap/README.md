@@ -41,12 +41,12 @@ The plugin is automatically installed when the OpenJourney server is deployed wi
 
 ```bash
 # The plugin is located at:
-plugins/Public/OpenStreetMap/
+plugins/Public/OpenJourneyServer-OpenStreetMap/
 
 # Required components:
 # - plugin.py: Main plugin implementation
 # - kubernetes/: Kubernetes manifests for renderd
-# - carto/: OpenStreetMap Carto style files
+# - carto/: OpenJourneyServer-OpenStreetMap Carto style files
 ```
 
 ## Configuration
@@ -110,7 +110,7 @@ The plugin includes complete Kubernetes manifests:
 
 ```bash
 # Deploy renderd service
-kubectl apply -f plugins/Public/OpenStreetMap/kubernetes/
+kubectl apply -f plugins/Public/OpenJourneyServer-OpenStreetMap/kubernetes/
 
 # Check deployment status
 kubectl get pods -l app=renderd
@@ -146,7 +146,7 @@ Access rendered tiles through the web interface:
 ```javascript
 // Leaflet integration
 L.tileLayer('http://your-server/raster/hot/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
+    attribution: '© OpenJourneyServer-OpenStreetMap contributors',
     maxZoom: 18
 }).addTo(map);
 ```
