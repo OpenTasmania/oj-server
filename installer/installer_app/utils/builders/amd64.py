@@ -4,7 +4,7 @@ import shutil
 import sys
 from typing import List, Tuple
 
-from install_kubernetes.common import (
+from ..common import (
     _IMAGE_OUTPUT_DIR,
     _create_stripped_installer_script,
     _get_project_version_from_pyproject_toml,
