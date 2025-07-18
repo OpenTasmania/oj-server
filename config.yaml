@@ -17,7 +17,6 @@ dev_override_unsafe_password: false # Set to true only for development to overri
 
 # Containerization Settings
 container_runtime_command: "docker" # e.g., "docker" or "podman"
-osrm_image_tag: "osrm/osrm-backend:latest" # OSRM Docker image to use
 
 # ----------------------------------------------------------------------
 # pgAdmin and pgAgent Configuration
@@ -154,9 +153,6 @@ nginx:
         location /raster/hot/ {{
             proxy_pass http://localhost:{apache_port}/hot/;
         }}
-        location /route/v1/ {{ # Assumes car profile
-            proxy_pass http://localhost:{osrm_port_car}/route/v1/;
-        }}
         location / {{
             root {website_root_dir};
             index index.html index.htm;
@@ -241,45 +237,6 @@ renderd:
     HOST={renderd_host}
     TILESIZE=256
 
-# OSRM upstream port(s) for Nginx proxying
-osrm:
-  car_profile_port: 5000
-  # bicycle_profile_port: 5001 # Example if you had another
-
-osrm_service:
-  car_profile_default_host_port: 5000 # Host port Nginx will proxy to for car profile
-  container_osrm_port: 5000         # OSRM's internal port in the container
-  image_tag: "osrm/osrm-backend:latest"
-  extra_routed_args: "--algorithm MLD --max-matching-size 2000" # Example extra args
-  systemd_template: |
-    [Unit]
-    Description=OSRM Routed service for region: {region_name}
-    After=docker.service network-online.target
-    Wants=docker.service
-
-    [Service]
-    Restart=always
-    RestartSec=5
-    ExecStartPre=-/usr/bin/{container_runtime_command} stop osrm-routed-{region_name}
-    ExecStartPre=-/usr/bin/{container_runtime_command} rm osrm-routed-{region_name}
-    ExecStart=/usr/bin/{container_runtime_command} run --rm --name osrm-routed-{region_name} \
-        -p 127.0.0.1:{host_port_for_region}:{container_osrm_port} \
-        -v "{host_osrm_data_dir_for_region}":"/data_processing":ro \
-        {osrm_image_tag} osrm-routed "/data_processing/{osrm_filename_in_container}" --max-table-size {max_table_size_routed} {extra_osrm_routed_args}
-
-    ExecStop=/usr/bin/{container_runtime_command} stop osrm-routed-{region_name}
-
-    [Install]
-    WantedBy=multi-user.target
-    # File created by script V{script_hash} for region {region_name}
-
-# OSRM Data Processing Settings
-osrm_data:
-  base_dir: "/opt/osm_data"
-  processed_dir: "/opt/osrm_processed_data"
-  base_pbf_url: "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf"
-  base_pbf_filename: "australia-latest.osm.pbf"
-  profile_script_in_container: "/opt/car.lua" # Standard OSRM car profile
 
 certbot:
   # admin_email: null # Example: "your-email@example.com" (If null or not provided, an email will be derived from vm_ip_or_domain)
@@ -350,18 +307,18 @@ webapp:
                     'sources': {{
                         'pgtileserv_stops': {{
                             'type': 'vector',
-                            'tiles': ['{scheme}://{vm_ip_or_domain}:{nginx_port}{pg_tileserv_uri_prefix}/public.gtfs_stops/{{z}}/{{x}}/{{y}}.pbf'],
+                            'tiles': ['{scheme}://{vm_ip_or_domain}:{nginx_port}{pg_tileserv_uri_prefix}/canonical.transport_stops/{{z}}/{{x}}/{{y}}.pbf'],
                             'maxzoom': 16 }},
                         'pgtileserv_shapes': {{
                             'type': 'vector',
-                            'tiles': ['{scheme}://{vm_ip_or_domain}:{nginx_port}{pg_tileserv_uri_prefix}/public.gtfs_shapes_lines/{{z}}/{{x}}/{{y}}.pbf'],
+                            'tiles': ['{scheme}://{vm_ip_or_domain}:{nginx_port}{pg_tileserv_uri_prefix}/canonical.transport_shapes/{{z}}/{{x}}/{{y}}.pbf'],
                             'maxzoom': 16 }} }},
                     'layers': [
                         {{ 'id': 'background', 'type': 'background', 'paint': {{ 'background-color': '#f0f2f5' }} }},
-                        {{ 'id': 'routes-lines', 'type': 'line', 'source': 'pgtileserv_shapes', 'source-layer': 'public.gtfs_shapes_lines',
+                        {{ 'id': 'routes-lines', 'type': 'line', 'source': 'pgtileserv_shapes', 'source-layer': 'canonical.transport_shapes',
                            'layout': {{ 'line-join': 'round', 'line-cap': 'round' }},
                            'paint': {{ 'line-color': '#e3342f', 'line-width': 2.5, 'line-opacity': 0.8 }} }},
-                        {{ 'id': 'stops-circles', 'type': 'circle', 'source': 'pgtileserv_stops', 'source-layer': 'public.gtfs_stops',
+                        {{ 'id': 'stops-circles', 'type': 'circle', 'source': 'pgtileserv_stops', 'source-layer': 'canonical.transport_stops',
                            'paint': {{ 'circle-radius': 4, 'circle-color': '#3490dc', 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' }} }} ]
                 }}, center: [147.3257, -42.8826], zoom: 12 }});
             vectorMap.addControl(new maplibregl.NavigationControl());
