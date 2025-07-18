@@ -6,16 +6,10 @@ namespace: OpenJourneyServer
 resources:
 - namespace.yaml
 - ../components/postgres
-- ../components/osrm
-- ../components/pg_tileserv
-- ../../plugins/Public/OpenStreetMap/kubernetes
-- ../components/apache
 - ../components/nginx
 - ../components/nodejs
 - ../components/certbot
-- ../components/pgadmin
-- ../components/pgagent
-- ../components/data_processing
+- ../components/self-signed-certs
 - ../components/py3gtfskit
 
 # Common labels to apply to all resources
