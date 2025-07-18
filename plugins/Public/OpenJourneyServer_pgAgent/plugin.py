@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 pgAgent Plugin for OpenJourney Server
 
