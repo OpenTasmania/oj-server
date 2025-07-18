@@ -1,10 +1,15 @@
-# Installer Plugin Architecture
+# OpenJourney Server Plugin Architecture
 
 ## 1. Overview
 
-This document describes the plugin architecture for the OpenJourney Server installer. This system allows developers to
-extend and customize the installation process without modifying the core installer code. This is useful for adding new
-features, integrating with external systems, or applying site-specific configurations.
+This document describes the enhanced plugin architecture for the OpenJourney Server installer and data processing system. This system allows developers to extend and customize both the installation process and database management without modifying the core code. The architecture implements database optimization features including lazy table creation, conditional row insertion, and intelligent resource management.
+
+Key features of the enhanced plugin architecture:
+- **Lazy Table Creation**: Tables are only created when actually needed
+- **Conditional Database Operations**: Optional tables and features are created based on data context
+- **Database Optimization**: Plugins only create the database objects they require
+- **Migration System**: Structured database schema management and versioning
+- **Resource Efficiency**: Reduces database bloat and improves startup performance
 
 ## 2. How it Works
 
@@ -97,7 +102,7 @@ Here is an example of a simple plugin that logs a message after the configuratio
 ```python
 # /plugins/my_plugin/plugin.py
 
-from installer.plugin_interface import InstallerPlugin
+from install_kubernetes.plugin_interface import InstallerPlugin
 
 
 class MyPlugin(InstallerPlugin):
@@ -108,11 +113,219 @@ class MyPlugin(InstallerPlugin):
     def post_config_load(self, config: dict) -> dict:
         print("MyPlugin: The configuration has been loaded!")
         return config
+
+    def get_database_requirements(self) -> dict:
+        return {
+            "required_tables": [],
+            "optional_tables": [],
+            "required_extensions": [],
+            "estimated_row_count": {}
+        }
+
+    def get_required_tables(self) -> list:
+        return []
+
+    def get_optional_tables(self) -> list:
+        return []
+
+    def should_create_table(self, table_name: str, data_context: dict) -> bool:
+        return False
+
+    def pre_database_setup(self, config: dict) -> dict:
+        return config
+
+    def post_database_setup(self, db_connection):
+        pass
 ```
 
-## 4. Security Considerations
+## 4. Database Optimization Features
+
+The enhanced plugin architecture includes powerful database optimization features that allow plugins to create only the database objects they actually need.
+
+### 4.1. Lazy Table Creation
+
+Tables are created only when they are actually needed, based on the data context and plugin requirements:
+
+- **Required Tables**: Always created for core functionality
+- **Optional Tables**: Created only when specific data or features are present
+- **Conditional Creation**: Based on configuration settings and data analysis
+
+### 4.2. Database Requirements Declaration
+
+Plugins declare their database requirements through the `get_database_requirements()` method:
+
+```python
+def get_database_requirements(self) -> Dict[str, Any]:
+    return {
+        "required_tables": ["routes", "stops"],           # Always created
+        "optional_tables": ["fares", "transfers"],        # Created conditionally
+        "required_extensions": ["postgis"],               # Database extensions needed
+        "estimated_row_count": {                          # For capacity planning
+            "routes": 1000,
+            "stops": 5000
+        }
+    }
+```
+
+### 4.3. Data Context Analysis
+
+Plugins analyze the data context to determine which optional tables to create:
+
+```python
+def should_create_table(self, table_name: str, data_context: dict) -> bool:
+    # Create fares table only if fare data is present
+    if table_name == "fares":
+        return data_context.get("has_fare_data", False)
+    return False
+```
+
+### 4.4. Database Utilities
+
+The `install_kubernetes.database_utils` module provides comprehensive database management:
+
+```python
+from install_kubernetes.database_utils import get_database_manager, DatabaseManager
+
+# Get database manager
+db_manager = get_database_manager(config)
+
+# Check if table exists
+if db_manager.table_exists("routes", "openjourney"):
+    print("Routes table exists")
+
+# Create schema
+db_manager.create_schema("openjourney")
+
+# Create extension
+db_manager.create_extension("postgis")
+```
+
+### 4.5. Migration System
+
+The migration system provides structured database schema management:
+
+```python
+from install_kubernetes.database_utils import Migration, MigrationManager
+
+class MyMigration001(Migration):
+    def __init__(self):
+        super().__init__("initial_schema", "001", "MyPlugin")
+    
+    def up(self, db_manager: DatabaseManager):
+        # Apply migration
+        db_manager.connection.execute("CREATE TABLE ...")
+    
+    def down(self, db_manager: DatabaseManager):
+        # Rollback migration
+        db_manager.connection.execute("DROP TABLE ...")
+
+# Apply migration
+migration_manager = MigrationManager(db_manager)
+migration_manager.apply_migration(MyMigration001())
+```
+
+## 5. Advanced Plugin Example: GTFS Plugin
+
+Here's a complete example of an advanced plugin that implements database optimization:
+
+```python
+# /plugins/gtfs_plugin/plugin.py
+
+from install_kubernetes.plugin_interface import InstallerPlugin
+from install_kubernetes.database_utils import get_database_manager, DatabaseManager
+
+class GTFSPlugin(InstallerPlugin):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self._db_manager = None
+        self._created_tables = set()
+
+    @property
+    def name(self) -> str:
+        return "GTFSPlugin"
+
+    def get_database_requirements(self) -> Dict[str, Any]:
+        return {
+            "required_tables": ["data_sources", "routes", "stops", "segments"],
+            "optional_tables": ["fares", "transfers", "path_geometry"],
+            "required_extensions": ["postgis"],
+            "estimated_row_count": {
+                "routes": 1000,
+                "stops": 5000,
+                "segments": 10000
+            }
+        }
+
+    def should_create_table(self, table_name: str, data_context: dict) -> bool:
+        # Create optional tables based on data context
+        conditions = {
+            "fares": data_context.get("has_fare_data", False),
+            "transfers": data_context.get("has_transfers", False),
+            "path_geometry": data_context.get("has_shapes", False)
+        }
+        return conditions.get(table_name, False)
+
+    def ensure_tables_exist(self, db_manager: DatabaseManager, data_context: dict):
+        # Create schema
+        if not db_manager.schema_exists("openjourney"):
+            db_manager.create_schema("openjourney")
+
+        # Create required extensions
+        if not db_manager.extension_exists("postgis"):
+            db_manager.create_extension("postgis")
+
+        # Get existing tables
+        existing_tables = set(db_manager.get_tables("openjourney"))
+        
+        # Determine which tables to create
+        required_tables = set(self.get_required_tables())
+        optional_tables = set(self.get_optional_tables())
+        
+        tables_to_create = required_tables - existing_tables
+        
+        # Add optional tables if conditions are met
+        for table in optional_tables:
+            if table not in existing_tables and self.should_create_table(table, data_context):
+                tables_to_create.add(table)
+
+        # Create missing tables
+        for table in tables_to_create:
+            self.create_table(db_manager, table)
+
+    def pre_database_setup(self, config: dict) -> dict:
+        # Analyze data context
+        data_context = self.analyze_gtfs_data_context(config)
+        config["gtfs_data_context"] = data_context
+        return config
+
+    def post_database_setup(self, db_connection):
+        # Setup database schema based on context
+        db_manager = self.get_database_manager(config)
+        data_context = config.get("gtfs_data_context", {})
+        self.ensure_tables_exist(db_manager, data_context)
+```
+
+## 6. Configuration-Driven Features
+
+Plugins can use configuration to control which features are enabled:
+
+```yaml
+# config.yaml
+plugins:
+  gtfs_processor:
+    enabled: true
+    features:
+      - routes
+      - stops
+      - segments
+      - fares      # Optional - only create if fare data exists
+      - transfers  # Optional - only create if transfer data exists
+```
+
+## 7. Security Considerations
 
 - **Code Execution**: The plugin architecture executes Python code from the `/plugins/` directory. You should only use
   plugins from trusted sources.
 - **Permissions**: Plugins run with the same permissions as the main installer script. This means that they can read and
   write files, access the network, and execute shell commands.
+- **Database Access**: Plugins have direct database access through the DatabaseManager. Ensure proper validation and sanitization of data.
