@@ -147,7 +147,106 @@ class MyCSVProcessor(ProcessorInterface):
 
 This new processor could then be discovered and used by the main application to process `.csv` files.
 
-## 5. Testing
+## 5. Static ETL Orchestrator
+
+The Static ETL Orchestrator (`run_static_etl.py`) is a command-line tool that manages the processing of static transit data feeds. It's located in `plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py` and serves as the main entry point for the static data pipeline.
+
+### Purpose and Usage
+
+The Static ETL Orchestrator is designed for **both setup and ongoing operational use**:
+
+*   **During Setup**: Process initial static transit data to populate the canonical database schema
+*   **Ongoing Operations**: Scheduled periodic processing (daily, weekly) to refresh static data
+*   **Manual Operations**: On-demand processing for immediate data updates or testing
+
+### When to Use
+
+*   **Initial Data Load**: When setting up a new transit system or adding new data sources
+*   **Scheduled Updates**: Automated periodic refresh of static transit data (recommended: daily for GTFS feeds)
+*   **Data Validation**: Testing and validating new data sources before production deployment
+*   **Troubleshooting**: Manual processing to diagnose data issues or test configuration changes
+
+### Configuration
+
+The orchestrator reads static feed configurations from `config.yaml`:
+
+```yaml
+static_feeds:
+  - name: "ACT_GTFS"
+    type: "gtfs"
+    source: "https://www.transport.act.gov.au/googletransit/google_transit.zip"
+    enabled: true
+    schedule: "daily"
+    description: "ACT Government GTFS feed for Canberra public transport"
+```
+
+### Command-Line Usage
+
+Run the orchestrator from the project root directory:
+
+```bash
+# Process all enabled feeds
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py
+
+# Process a specific feed
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --feed ACT_GTFS
+
+# Dry run (validate without processing)
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --dry-run
+
+# List configured feeds
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --list-feeds
+
+# List available processors
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --list-processors
+
+# Use custom config file
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --config /path/to/config.yaml
+
+# Enable verbose logging
+python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --verbose
+```
+
+### Deployment Scenarios
+
+#### Manual/Development Usage
+Use the command-line interface for development, testing, and manual operations.
+
+#### Scheduled Production Usage
+Deploy as a scheduled job for automated data refresh:
+
+*   **Kubernetes CronJob**: For containerized deployments
+*   **System cron job**: For traditional server deployments
+*   **CI/CD pipeline**: For automated data refresh workflows
+
+Example Kubernetes CronJob:
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: static-etl-cronjob
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: static-etl
+            image: openjourney-server:latest
+            command: ["python", "plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py"]
+            args: ["--config", "/app/config.yaml"]
+```
+
+### Integration
+
+The Static ETL Orchestrator is part of the pipeline architecture:
+
+*   **Static Data Pipeline**: Handles infrequently changing data (GTFS, NeTEx) → Canonical Database Schema
+
+It complements but does not replace the existing plugin daemons, providing a modern, pluggable approach to static data processing.
+
+## 6. Testing
 
 The project uses `pytest` for testing.
 
@@ -165,13 +264,13 @@ The project uses `pytest` for testing.
     2.  Define test functions with names starting with `test_`.
     3.  Use standard `assert` statements to verify behavior.
 
-## 5. Code Style and Quality
+## 7. Code Style and Quality
 
 *   **Linting & Formatting:** The project uses `ruff` for linting and code formatting, configured in `pyproject.toml`.
 *   **Type Checking:** `mypy` is used for static type checking.
 *   **Pre-commit:** Hooks automatically run `ruff` and `mypy` on every commit to maintain code quality.
 
-## 6. Contribution Workflow
+## 8. Contribution Workflow
 
 1.  Fork the repository.
 2.  Create a new branch for your feature or bug fix.
