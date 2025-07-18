@@ -51,47 +51,49 @@ The system is deployed as a collection of containerized services orchestrated by
 
 ### Quick Start: Kubernetes Deployment
 
-The primary installation method uses a Flask-based application that provides both a web interface and a command-line interface (CLI) to deploy the entire stack to a Kubernetes cluster.
+The primary installation method uses a Flask-based application that provides both a web interface and a command-line
+interface (CLI) to deploy the entire stack to a Kubernetes cluster.
 
-1.  **Prerequisites:**
-    *   Ensure you have a running Kubernetes cluster. For local development, we recommend [MicroK8s](httpss://microk8s.io/).
-        *   **Install MicroK8s (for local development):**
-            ```bash
-            sudo snap install microk8s --classic
-            sudo usermod -a -G microk8s $USER
-            sudo chown -f -R $USER ~/.kube
-            newgrp microk8s
-            microk8s status --wait-ready
-            microk8s enable dns storage ingress registry
-            ```
-    *   Install the required Python packages:
-        ```bash
-        uv sync
-        ```
+1. **Prerequisites:**
+    * Ensure you have a running Kubernetes cluster. For local development, we
+      recommend [MicroK8s](httpss://microk8s.io/).
+        * **Install MicroK8s (for local development):**
+          ```bash
+          sudo snap install microk8s --classic
+          sudo usermod -a -G microk8s $USER
+          sudo chown -f -R $USER ~/.kube
+          newgrp microk8s
+          microk8s status --wait-ready
+          microk8s enable dns storage ingress registry
+          ```
+    * Install the required Python packages:
+      ```bash
+      uv sync
+      ```
 
-2.  **Deploy the Application:**
+2. **Deploy the Application:**
 
-    You can deploy the application using either the web interface or the CLI.
+   You can deploy the application using either the web interface or the CLI.
 
-    *   **Web Interface:**
-        1.  Start the Flask development server:
-            ```bash
-            FLASK_APP=installer.installer_app.app:create_app flask run
-            ```
-        2.  Open your web browser and navigate to `http://127.0.0.1:5000`.
-        3.  Use the web interface to deploy, destroy, or build the application components.
+    * **Web Interface:**
+        1. Start the Flask development server:
+           ```bash
+           FLASK_APP=installer.installer_app.app:create_app flask run
+           ```
+        2. Open your web browser and navigate to `http://127.0.0.1:5000`.
+        3. Use the web interface to deploy, destroy, or build the application components.
 
-    *   **Command-Line Interface (CLI):**
-        The CLI provides the same functionality as the web interface.
-        ```bash
-        python3 -m installer.installer_app.cli --help
-        ```
-        This will display a list of available commands and options.
+    * **Command-Line Interface (CLI):**
+      The CLI provides the same functionality as the web interface.
+      ```bash
+      python3 -m installer.installer_app.cli --help
+      ```
+      This will display a list of available commands and options.
 
-        **Example: Deploy to a local environment**
-        ```bash
-        python3 -m installer.installer_app.cli deploy --env local
-        ```
+      **Example: Deploy to a local environment**
+      ```bash
+      python3 -m installer.installer_app.cli deploy --env local
+      ```
 
 ## 4. History
 
@@ -108,7 +110,8 @@ robust, scalable, and maintainable solution for deploying the entire Open Journe
 ## 5. Future
 
 There's a [Todo list](docs/TODO.md), which is automatically generated from comments found in the code.
-Planned [enhancements](https://gitlab.com/opentasmania/oj-server/-/issues/?label_name%5B%5D=Enhancement) can also be found on the Gitlab site.
+Planned [enhancements](https://gitlab.com/opentasmania/oj-server/-/issues/?label_name%5B%5D=Enhancement) can also be
+found on the Gitlab site.
 
 ## 6. Support
 
