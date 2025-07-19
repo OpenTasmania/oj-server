@@ -1,54 +1,52 @@
 # Open Journey Server Development Guidelines
 
-This document provides essential information for developers working on the Open Journey Server project. It covers the
-development environment, deployment process, and project architecture.
+This document provides essential information for developers working on the Open Journey Server project. It covers the development environment, deployment process, and project architecture.
 
 ## 1. Development Environment Setup
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://gitlab.com/opentasmania/oj-server.git
-   cd oj-server
-   ```
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://gitlab.com/opentasmania/oj-server.git
+    cd oj-server
+    ```
 
-2. **Python Environment:** The project uses `uv` for managing Python dependencies.
-   ```bash
-   # Activate the virtual environment (if you have one)
-   # or set up a new one with uv
-   uv venv
-   source .venv/bin/activate
-   uv pip install -r requirements.txt
-   ```
+2.  **Python Environment:** The project uses `uv` for managing Python dependencies.
+    ```bash
+    # Activate the virtual environment (if you have one)
+    # or set up a new one with uv
+    uv venv
+    source .venv/bin/activate
+    uv pip install -r requirements.txt
+    ```
 
-3. **Pre-commit Hooks:** Install the pre-commit hooks to ensure code quality and style consistency.
-   ```bash
-   uv run pre-commit install
-   ```
+3.  **Pre-commit Hooks:** Install the pre-commit hooks to ensure code quality and style consistency.
+    ```bash
+    uv run pre-commit install
+    ```
 
 ## 2. Kubernetes-Based Deployment
 
-The primary method for deploying the OJ Server is via a Flask-based application that provides both a web interface and a
-command-line interface (CLI).
+The primary method for deploying the OJ Server is via a Flask-based application that provides both a web interface and a command-line interface (CLI).
 
-* **Web Interface:**
-    1. Start the Flask development server:
-       ```bash
-       FLASK_APP=installer_app/app.py flask run
-       ```
-    2. Open your web browser and navigate to `http://127.0.0.1:5000`.
-    3. Use the web interface to deploy, destroy, or build the application components.
+*   **Web Interface:**
+    1.  Start the Flask development server:
+        ```bash
+        FLASK_APP=installer_app/app.py flask run
+        ```
+    2.  Open your web browser and navigate to `http://127.0.0.1:5000`.
+    3.  Use the web interface to deploy, destroy, or build the application components.
 
-* **Command-Line Interface (CLI):**
-  The CLI provides the same functionality as the web interface.
-  ```bash
-  python3 -m installer_app.cli --help
-  ```
-  This will display a list of available commands and options.
+*   **Command-Line Interface (CLI):**
+    The CLI provides the same functionality as the web interface.
+    ```bash
+    python3 -m installer_app.cli --help
+    ```
+    This will display a list of available commands and options.
 
-  **Example: Deploy to a local environment**
-  ```bash
-  python3 -m installer_app.cli deploy --env local
-  ```
+    **Example: Deploy to a local environment**
+    ```bash
+    python3 -m installer_app.cli deploy --env local
+    ```
 
 For more details, refer to the main `README.md`.
 
@@ -56,52 +54,41 @@ For more details, refer to the main `README.md`.
 
 The project is organized into several key directories:
 
-* `kubernetes/`: Contains all Kubernetes manifests, organized by components and overlays (`local`, `production`) using
-  `kustomize`.
-* `installer/`: Contains the Python source code for the Flask-based installer application.
-* `common/`: Shared Python utilities and helper functions used across the project.
-* `docs/`: Project documentation, including plans, strategies, and developer guides.
-* `processors/`: Contains the ETL logic for processing static and real-time transit data.
+*   `kubernetes/`: Contains all Kubernetes manifests, organized by components and overlays (`local`, `production`) using `kustomize`.
+*   `installer/`: Contains the Python source code for the Flask-based installer application.
+*   `common/`: Shared Python utilities and helper functions used across the project.
+*   `docs/`: Project documentation, including plans, strategies, and developer guides.
+*   `processors/`: Contains the ETL logic for processing static and real-time transit data.
 
 ### Core Design Principle: Pluggable Processors
 
-To handle a wide variety of transit data, the project uses a modular, pluggable architecture for both static and
-real-time data.
+To handle a wide variety of transit data, the project uses a modular, pluggable architecture for both static and real-time data.
 
-* **Static Data Pipeline:** An ETL pipeline uses independent processor plugins for each data format (e.g., GTFS, NeTEx).
-  All data is transformed into a single **Canonical Database Schema**, ensuring a consistent data structure in PostGIS.
+*   **Static Data Pipeline:** An ETL pipeline uses independent processor plugins for each data format (e.g., GTFS, NeTEx). All data is transformed into a single **Canonical Database Schema**, ensuring a consistent data structure in PostGIS.
+*   **Real-time Data Service:** A continuously running service uses dedicated plugins for each real-time feed (e.g., GTFS-RT, SIRI). Each plugin transforms its data into a standard **Canonical Data Model** before it's cached and served via an API.
 
-This architecture decouples the core application from the complexities of individual data formats. For more details, see
-the strategy documents in `docs/strategies/`.
+This architecture decouples the core application from the complexities of individual data formats. For more details, see the strategy documents in `docs/strategies/`.
 
 ## 4. Creating a Data Processor
 
-The Open Journey Server uses a pluggable processor architecture to handle different static data formats (like GTFS,
-NeTEx, etc.). This is managed by the `ProcessorInterface` abstract base class, which ensures all data processors follow
-a consistent Extract, Transform, and Load (ETL) pattern.
+The Open Journey Server uses a pluggable processor architecture to handle different static data formats (like GTFS, NeTEx, etc.). This is managed by the `ProcessorInterface` abstract base class, which ensures all data processors follow a consistent Extract, Transform, and Load (ETL) pattern.
 
-To add support for a new data format, you need to create a new processor class that inherits from
-`common.processor_interface.ProcessorInterface` and implement its abstract methods.
+To add support for a new data format, you need to create a new processor class that inherits from `common.processor_interface.ProcessorInterface` and implement its abstract methods.
 
 ### The `ProcessorInterface` Contract
 
 Any new processor must implement the following properties and methods:
 
-* **`processor_name` (property)**: A unique string name for your processor (e.g., `"GTFS"`).
-* **`supported_formats` (property)**: A list of file extensions your processor can handle (e.g., `['.zip', '.xml']`).
-* **`validate_source(self, source_path)`**: A method that returns `True` if the given `source_path` is a valid file for
-  this processor.
-* **`extract(self, source_path, **kwargs)`**: Reads the data from the `source_path` and returns it in a raw format (
-  e.g., a dictionary of dataframes).
-* **`transform(self, raw_data, source_info)`**: Takes the raw data from `extract` and transforms it into the project's
-  canonical data model.
-* **`load(self, transformed_data)`**: Loads the transformed, canonical data into the PostgreSQL database.
+*   **`processor_name` (property)**: A unique string name for your processor (e.g., `"GTFS"`).
+*   **`supported_formats` (property)**: A list of file extensions your processor can handle (e.g., `['.zip', '.xml']`).
+*   **`validate_source(self, source_path)`**: A method that returns `True` if the given `source_path` is a valid file for this processor.
+*   **`extract(self, source_path, **kwargs)`**: Reads the data from the `source_path` and returns it in a raw format (e.g., a dictionary of dataframes).
+*   **`transform(self, raw_data, source_info)`**: Takes the raw data from `extract` and transforms it into the project's canonical data model.
+*   **`load(self, transformed_data)`**: Loads the transformed, canonical data into the PostgreSQL database.
 
 ### The `ProcessorRegistry`
 
-Once your processor is created, it must be registered with the global `processor_registry` instance from
-`common.processor_interface`. This allows the system to automatically discover and use your processor for the correct
-file types.
+Once your processor is created, it must be registered with the global `processor_registry` instance from `common.processor_interface`. This allows the system to automatically discover and use your processor for the correct file types.
 
 ### Example: A Simple CSV Processor
 
@@ -113,7 +100,6 @@ Here is a minimal example of what a processor looks like.
 from pathlib import Path
 from typing import Dict, List, Any
 from common.processor_interface import ProcessorInterface, processor_registry, ProcessorError
-
 
 class MyCSVProcessor(ProcessorInterface):
     """A simple processor for CSV files."""
@@ -163,24 +149,22 @@ This new processor could then be discovered and used by the main application to 
 
 ## 5. Static ETL Orchestrator
 
-The Static ETL Orchestrator (`run_static_etl.py`) is a command-line tool that manages the processing of static transit
-data feeds. It's located in `plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py` and serves as the main
-entry point for the static data pipeline.
+The Static ETL Orchestrator (`run_static_etl.py`) is a command-line tool that manages the processing of static transit data feeds. It's located in `plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py` and serves as the main entry point for the static data pipeline.
 
 ### Purpose and Usage
 
 The Static ETL Orchestrator is designed for **both setup and ongoing operational use**:
 
-* **During Setup**: Process initial static transit data to populate the canonical database schema
-* **Ongoing Operations**: Scheduled periodic processing (daily, weekly) to refresh static data
-* **Manual Operations**: On-demand processing for immediate data updates or testing
+*   **During Setup**: Process initial static transit data to populate the canonical database schema
+*   **Ongoing Operations**: Scheduled periodic processing (daily, weekly) to refresh static data
+*   **Manual Operations**: On-demand processing for immediate data updates or testing
 
 ### When to Use
 
-* **Initial Data Load**: When setting up a new transit system or adding new data sources
-* **Scheduled Updates**: Automated periodic refresh of static transit data (recommended: daily for GTFS feeds)
-* **Data Validation**: Testing and validating new data sources before production deployment
-* **Troubleshooting**: Manual processing to diagnose data issues or test configuration changes
+*   **Initial Data Load**: When setting up a new transit system or adding new data sources
+*   **Scheduled Updates**: Automated periodic refresh of static transit data (recommended: daily for GTFS feeds)
+*   **Data Validation**: Testing and validating new data sources before production deployment
+*   **Troubleshooting**: Manual processing to diagnose data issues or test configuration changes
 
 ### Configuration
 
@@ -226,19 +210,16 @@ python plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py --verbo
 ### Deployment Scenarios
 
 #### Manual/Development Usage
-
 Use the command-line interface for development, testing, and manual operations.
 
 #### Scheduled Production Usage
-
 Deploy as a scheduled job for automated data refresh:
 
-* **Kubernetes CronJob**: For containerized deployments
-* **System cron job**: For traditional server deployments
-* **CI/CD pipeline**: For automated data refresh workflows
+*   **Kubernetes CronJob**: For containerized deployments
+*   **System cron job**: For traditional server deployments
+*   **CI/CD pipeline**: For automated data refresh workflows
 
 Example Kubernetes CronJob:
-
 ```yaml
 apiVersion: batch/v1
 kind: CronJob
@@ -251,51 +232,50 @@ spec:
       template:
         spec:
           containers:
-            - name: static-etl
-              image: openjourney-server:latest
-              command: [ "python", "plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py" ]
-              args: [ "--config", "/app/config.yaml" ]
+          - name: static-etl
+            image: openjourney-server:latest
+            command: ["python", "plugins/Public/OpenJourneyServer_Dataprocessing/run_static_etl.py"]
+            args: ["--config", "/app/config.yaml"]
 ```
 
 ### Integration
 
 The Static ETL Orchestrator is part of the pipeline architecture:
 
-* **Static Data Pipeline**: Handles infrequently changing data (GTFS, NeTEx) → Canonical Database Schema
+*   **Static Data Pipeline**: Handles infrequently changing data (GTFS, NeTEx) → Canonical Database Schema
 
-It complements but does not replace the existing plugin daemons, providing a modern, pluggable approach to static data
-processing.
+It complements but does not replace the existing plugin daemons, providing a modern, pluggable approach to static data processing.
 
 ## 6. Testing
 
 The project uses `pytest` for testing.
 
-* **Running Tests:**
-  ```bash
-  # Run all tests
-  pytest
+*   **Running Tests:**
+    ```bash
+    # Run all tests
+    pytest
 
-  # Run tests with coverage report
-  pytest --cov=.
-  ```
+    # Run tests with coverage report
+    pytest --cov=.
+    ```
 
-* **Adding New Tests:**
-    1. Create a new test file in the `tests/` directory, named `test_*.py`.
-    2. Define test functions with names starting with `test_`.
-    3. Use standard `assert` statements to verify behavior.
+*   **Adding New Tests:**
+    1.  Create a new test file in the `tests/` directory, named `test_*.py`.
+    2.  Define test functions with names starting with `test_`.
+    3.  Use standard `assert` statements to verify behavior.
 
 ## 7. Code Style and Quality
 
-* **Linting & Formatting:** The project uses `ruff` for linting and code formatting, configured in `pyproject.toml`.
-* **Type Checking:** `mypy` is used for static type checking.
-* **Pre-commit:** Hooks automatically run `ruff` and `mypy` on every commit to maintain code quality.
+*   **Linting & Formatting:** The project uses `ruff` for linting and code formatting, configured in `pyproject.toml`.
+*   **Type Checking:** `mypy` is used for static type checking.
+*   **Pre-commit:** Hooks automatically run `ruff` and `mypy` on every commit to maintain code quality.
 
 ## 8. Contribution Workflow
 
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Make your changes.
-4. Run tests to ensure your changes don't break existing functionality.
-5. Submit a merge request.
+1.  Fork the repository.
+2.  Create a new branch for your feature or bug fix.
+3.  Make your changes.
+4.  Run tests to ensure your changes don't break existing functionality.
+5.  Submit a merge request.
 
 For more details, refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file.
