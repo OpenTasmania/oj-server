@@ -76,6 +76,155 @@ def _pause_for_debug(message: str) -> None:
         input("Press Enter to continue...")
 
 
+def check_sudo_capabilities() -> Dict[str, bool]:
+    """
+    Check if sudo commands can be executed without password prompts.
+
+    Returns:
+        Dict[str, bool]: A dictionary indicating which sudo operations are available:
+            - 'sudo_available': True if sudo command exists
+            - 'passwordless_sudo': True if sudo can run without password
+            - 'apt_sudo': True if sudo apt commands work
+            - 'snap_sudo': True if sudo snap commands work
+            - 'system_sudo': True if sudo system commands (usermod, chown) work
+    """
+    capabilities = {
+        "sudo_available": False,
+        "passwordless_sudo": False,
+        "apt_sudo": False,
+        "snap_sudo": False,
+        "system_sudo": False,
+    }
+
+    # Check if sudo command exists
+    if not shutil.which("sudo"):
+        return capabilities
+
+    capabilities["sudo_available"] = True
+
+    # Test basic passwordless sudo
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "true"], capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            capabilities["passwordless_sudo"] = True
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+
+    # Test apt sudo capabilities
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "apt", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            capabilities["apt_sudo"] = True
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+
+    # Test snap sudo capabilities
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "snap", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            capabilities["snap_sudo"] = True
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+
+    # Test system sudo capabilities (usermod, chown)
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "usermod", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            capabilities["system_sudo"] = True
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+
+    return capabilities
+
+
+def _is_sudo_command(command: List[str]) -> bool:
+    """Check if a command requires sudo privileges."""
+    return len(command) > 0 and command[0] == "sudo"
+
+
+def _handle_sudo_failure(
+    command: List[str], result: subprocess.CompletedProcess
+) -> None:
+    """
+    Handle sudo command failures with helpful error messages.
+
+    Args:
+        command: The failed command
+        result: The subprocess result
+    """
+    print(f"Error: Sudo command failed: {' '.join(command)}", file=sys.stderr)
+
+    if (
+        "password is required" in result.stderr
+        or "a password is required" in result.stderr
+    ):
+        print("\n" + "=" * 60, file=sys.stderr)
+        print("SUDO PASSWORD REQUIRED", file=sys.stderr)
+        print("=" * 60, file=sys.stderr)
+        print(
+            "The Flask installer needs to run commands with elevated privileges.",
+            file=sys.stderr,
+        )
+        print("You have several options to resolve this:", file=sys.stderr)
+        print("\n1. Run the Flask app with sudo:", file=sys.stderr)
+        print(
+            "   sudo FLASK_APP=installer.installer_app.app:create_app flask run",
+            file=sys.stderr,
+        )
+        print(
+            "\n2. Configure passwordless sudo for required commands:",
+            file=sys.stderr,
+        )
+        print(
+            "   Add these lines to /etc/sudoers (using 'sudo visudo'):",
+            file=sys.stderr,
+        )
+        print(
+            f"   {os.environ.get('USER', '%user')} ALL=(ALL) NOPASSWD: /usr/bin/apt, /usr/bin/apt-get",
+            file=sys.stderr,
+        )
+        print(
+            f"   {os.environ.get('USER', '%user')} ALL=(ALL) NOPASSWD: /usr/bin/snap",
+            file=sys.stderr,
+        )
+        print(
+            f"   {os.environ.get('USER', '%user')} ALL=(ALL) NOPASSWD: /usr/sbin/usermod",
+            file=sys.stderr,
+        )
+        print(
+            f"   {os.environ.get('USER', '%user')} ALL=(ALL) NOPASSWD: /bin/chown",
+            file=sys.stderr,
+        )
+        print(
+            "\n3. Run the installer CLI instead (supports interactive sudo):",
+            file=sys.stderr,
+        )
+        print(
+            "   python3 -m installer.installer_app.cli --help",
+            file=sys.stderr,
+        )
+        print("=" * 60, file=sys.stderr)
+    else:
+        print(f"STDERR: {result.stderr}", file=sys.stderr)
+
+
 def run_command(
     command: List[str],
     directory: Optional[str] = None,
@@ -83,6 +232,7 @@ def run_command(
     check: bool = True,
     capture_output: bool = False,
     verbose: bool = False,
+    allow_sudo_failure: bool = False,
 ) -> subprocess.CompletedProcess:
     """
     Executes a shell command as a subprocess and optionally captures its output.
@@ -114,6 +264,9 @@ def run_command(
         A flag to enable verbose logging of the command's execution. It also attempts
         to add verbosity flags to common command-line tools automatically. Default
         is False.
+    allow_sudo_failure: bool
+        If True, sudo command failures will not cause the program to exit, allowing
+        graceful handling of permission issues. Default is False.
 
     Returns:
     subprocess.CompletedProcess
@@ -123,12 +276,14 @@ def run_command(
     Raises:
     SystemExit
         Exits the current Python process with a status code of 1 if the command
-        execution fails and `check` is True.
+        execution fails and `check` is True, unless `allow_sudo_failure` is True
+        for sudo commands.
 
     Notes:
     This function modifies the command arguments to include additional verbosity
     for specific commands, such as docker, wget, apt, etc., when the verbose flag is
-    enabled.
+    enabled. It also provides enhanced error handling for sudo commands with
+    helpful guidance when permission issues occur.
     """
     if verbose:
         print(f"[VERBOSE] Executing: {' '.join(command)}")
@@ -160,13 +315,23 @@ def run_command(
         text=True,
     )
     if check and result.returncode != 0:
-        print(
-            f"Error: Command failed with exit code {result.returncode}",
-            file=sys.stderr,
-        )
-        if capture_output:
-            print(f"STDOUT: {result.stdout}", file=sys.stderr)
-            print(f"STDERR: {result.stderr}", file=sys.stderr)
+        # Handle sudo command failures with enhanced error messages
+        if _is_sudo_command(command):
+            _handle_sudo_failure(command, result)
+            if allow_sudo_failure:
+                print(
+                    "Continuing despite sudo failure due to allow_sudo_failure=True",
+                    file=sys.stderr,
+                )
+                return result
+        else:
+            print(
+                f"Error: Command failed with exit code {result.returncode}",
+                file=sys.stderr,
+            )
+            if capture_output:
+                print(f"STDOUT: {result.stdout}", file=sys.stderr)
+                print(f"STDERR: {result.stderr}", file=sys.stderr)
         sys.exit(1)
     return result
 

@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+import sys
+
 from flask import Flask, render_template, request
 
 from .utils.builders.amd64 import create_debian_installer_amd64
 from .utils.builders.rpi64 import create_debian_installer_rpi64
-from .utils.common import create_debian_package
+from .utils.common import check_sudo_capabilities, create_debian_package
 from .utils.kubernetes_tools import deploy, destroy, get_kubectl_command
 from .utils.plugin_manager import PluginManager
 
@@ -31,6 +33,63 @@ def create_app():
     app.config.from_mapping(
         SECRET_KEY="dev",
     )
+
+    # Check sudo capabilities at startup and warn users if needed
+    sudo_caps = check_sudo_capabilities()
+    if not sudo_caps["sudo_available"]:
+        print(
+            "WARNING: sudo command not found. Some installer operations may fail.",
+            file=sys.stderr,
+        )
+    elif not sudo_caps["passwordless_sudo"]:
+        print("\n" + "=" * 60, file=sys.stderr)
+        print("SUDO CONFIGURATION WARNING", file=sys.stderr)
+        print("=" * 60, file=sys.stderr)
+        print(
+            "The Flask installer requires sudo privileges for some operations.",
+            file=sys.stderr,
+        )
+        print("Current sudo capabilities:", file=sys.stderr)
+        print(
+            f"  - Basic sudo: {'✓' if sudo_caps['sudo_available'] else '✗'}",
+            file=sys.stderr,
+        )
+        print(
+            f"  - Passwordless sudo: {'✓' if sudo_caps['passwordless_sudo'] else '✗'}",
+            file=sys.stderr,
+        )
+        print(
+            f"  - APT operations: {'✓' if sudo_caps['apt_sudo'] else '✗'}",
+            file=sys.stderr,
+        )
+        print(
+            f"  - Snap operations: {'✓' if sudo_caps['snap_sudo'] else '✗'}",
+            file=sys.stderr,
+        )
+        print(
+            f"  - System operations: {'✓' if sudo_caps['system_sudo'] else '✗'}",
+            file=sys.stderr,
+        )
+        print("\nTo resolve sudo issues, you can:", file=sys.stderr)
+        print("1. Run Flask with sudo:", file=sys.stderr)
+        print(
+            "   sudo FLASK_APP=installer.installer_app.app:create_app flask run",
+            file=sys.stderr,
+        )
+        print(
+            "2. Configure passwordless sudo (see error messages for details)",
+            file=sys.stderr,
+        )
+        print(
+            "3. Use the CLI instead: python3 -m installer.installer_app.cli",
+            file=sys.stderr,
+        )
+        print("=" * 60, file=sys.stderr)
+    else:
+        print(
+            "✓ Sudo capabilities verified - Flask installer should work correctly.",
+            file=sys.stderr,
+        )
 
     @app.route("/")
     def index():
