@@ -316,10 +316,11 @@ The daemon includes network policies that:
 
 ### Planned Features
 
-1. **Data Validation**: Enhanced GTFS feed validation
-2. **Metrics**: Prometheus metrics for monitoring
-3. **Notifications**: Slack/email notifications for failures
-4. **Web UI**: Management interface for feed configuration
+1. **Real-time Updates**: Integration with GTFS-RT feeds
+2. **Data Validation**: Enhanced GTFS feed validation
+3. **Metrics**: Prometheus metrics for monitoring
+4. **Notifications**: Slack/email notifications for failures
+5. **Web UI**: Management interface for feed configuration
 
 ### Extension Points
 
