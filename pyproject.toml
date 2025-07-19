@@ -88,7 +88,7 @@ exclude = ["tests*"]
 python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
-exclude = ['\.git', '\.venv', 'build', 'dist', 'plugins']
+exclude = ['\.git', '\.venv', 'build', 'dist', 'docs', 'plugins']
 
 [tool.pytest.ini_options]
 addopts = """
