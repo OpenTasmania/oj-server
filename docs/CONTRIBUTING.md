@@ -47,7 +47,7 @@ We encourage code contributions! If you'd like to contribute code, please follow
 5. **Test your changes:** Ensure your changes work as expected and don't introduce new issues.
 6. **Commit your changes:** Write clear and concise commit messages.
    ```bash
-   git commit -m "feat: Add new GTFS Realtime processing"
+   git commit -m "feat: Add new GTFS processing"
    ```
    (Using conventional commits is preferred, but not strictly enforced for initial contributions.)
 7. **Push your branch to your fork:**
@@ -67,7 +67,8 @@ We encourage code contributions! If you'd like to contribute code, please follow
   code).
 * **Testing:** If possible, include unit tests for new functionality.
 
-For more detailed information about the development environment, testing, and code style, please refer to the [Developer Guidelines](DEVELOPERS.md) file.
+For more detailed information about the development environment, testing, and code style, please refer to
+the [Developer Guidelines](DEVELOPERS.md) file.
 
 ## Contact
 
