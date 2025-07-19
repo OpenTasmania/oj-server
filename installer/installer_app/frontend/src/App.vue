@@ -2,6 +2,7 @@
 import { RouterView } from 'vue-router'
 import AppHeader from './components/common/AppHeader.vue'
 import AppNavigation from './components/common/AppNavigation.vue'
+import NotificationContainer from './components/common/NotificationContainer.vue'
 </script>
 
 <template>
@@ -22,6 +23,9 @@ import AppNavigation from './components/common/AppNavigation.vue'
         </Suspense>
       </main>
     </div>
+    
+    <!-- Global Notification Container -->
+    <NotificationContainer />
   </div>
 </template>
 
