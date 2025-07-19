@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useApi } from '@/composables/useApi'
 
 export const useDeploymentStore = defineStore('deployment', () => {
+  const { deployment: deploymentApi } = useApi()
+  
   // State
   const deployments = ref([])
   const currentDeployment = ref(null)
@@ -9,6 +12,7 @@ export const useDeploymentStore = defineStore('deployment', () => {
   const deploymentProgress = ref(0)
   const deploymentLogs = ref([])
   const deploymentError = ref(null)
+  const pollingInterval = ref(null)
 
   // Getters
   const activeDeployments = computed(() => 
@@ -33,54 +37,19 @@ export const useDeploymentStore = defineStore('deployment', () => {
     deploymentLogs.value = []
 
     try {
-      // TODO: Replace with actual API call
       console.log('Starting deployment with config:', config)
       
-      // Simulate deployment process
-      const deploymentId = Date.now().toString()
-      const newDeployment = {
-        id: deploymentId,
-        name: `${config.env} Deployment`,
-        environment: config.env,
-        components: config.images,
-        status: 'deploying',
-        progress: 0,
-        startedAt: new Date().toISOString(),
-        config: { ...config }
-      }
-
-      deployments.value.push(newDeployment)
-      currentDeployment.value = newDeployment
-
-      // Simulate progress updates
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 200))
-        deploymentProgress.value = i
-        newDeployment.progress = i
-        
-        addLog(`Deployment progress: ${i}%`)
-        
-        if (i === 50) {
-          addLog('Installing components...')
-        } else if (i === 80) {
-          addLog('Configuring services...')
-        } else if (i === 100) {
-          addLog('Deployment completed successfully!')
-          newDeployment.status = 'completed'
-          newDeployment.completedAt = new Date().toISOString()
-        }
-      }
-
-      return newDeployment
+      // Call the actual API
+      const response = await deploymentApi.create(config)
+      const deploymentId = response.deployment_id
+      
+      // Start polling for status updates
+      startPolling(deploymentId)
+      
+      return { id: deploymentId }
     } catch (error) {
       console.error('Deployment failed:', error)
       deploymentError.value = error.message
-      
-      if (currentDeployment.value) {
-        currentDeployment.value.status = 'failed'
-        currentDeployment.value.error = error.message
-      }
-      
       addLog(`Deployment failed: ${error.message}`)
       throw error
     } finally {
@@ -88,32 +57,129 @@ export const useDeploymentStore = defineStore('deployment', () => {
     }
   }
 
+  const startPolling = (deploymentId) => {
+    // Clear any existing polling
+    stopPolling()
+    
+    // Poll every 2 seconds for status updates
+    pollingInterval.value = setInterval(async () => {
+      try {
+        const status = await deploymentApi.getStatus(deploymentId)
+        updateDeploymentStatus(deploymentId, status)
+        
+        // Stop polling if deployment is complete
+        if (['completed', 'failed', 'cancelled'].includes(status.status)) {
+          stopPolling()
+        }
+      } catch (error) {
+        console.error('Error polling deployment status:', error)
+      }
+    }, 2000)
+  }
+
+  const stopPolling = () => {
+    if (pollingInterval.value) {
+      clearInterval(pollingInterval.value)
+      pollingInterval.value = null
+    }
+  }
+
+  const updateDeploymentStatus = (deploymentId, status) => {
+    // Update deployment in list
+    const index = deployments.value.findIndex(d => d.id === deploymentId)
+    if (index > -1) {
+      deployments.value[index] = { ...deployments.value[index], ...status }
+    } else {
+      // Add new deployment if not found
+      deployments.value.push(status)
+    }
+    
+    // Update current deployment if it matches
+    if (currentDeployment.value?.id === deploymentId) {
+      currentDeployment.value = status
+      deploymentProgress.value = status.progress || 0
+      
+      // Update logs if available
+      if (status.logs && Array.isArray(status.logs)) {
+        deploymentLogs.value = status.logs
+      }
+      
+      // Update error state
+      if (status.error) {
+        deploymentError.value = status.error
+      }
+    }
+  }
+
+  const fetchDeployments = async () => {
+    try {
+      const response = await deploymentApi.list()
+      deployments.value = Object.values(response.deployments || {})
+    } catch (error) {
+      console.error('Error fetching deployments:', error)
+    }
+  }
+
   const getDeploymentStatus = async (deploymentId) => {
-    // TODO: Replace with actual API call
-    const deployment = deployments.value.find(d => d.id === deploymentId)
-    return deployment || null
+    try {
+      return await deploymentApi.getStatus(deploymentId)
+    } catch (error) {
+      console.error('Error getting deployment status:', error)
+      return null
+    }
   }
 
   const cancelDeployment = async (deploymentId) => {
-    // TODO: Replace with actual API call
-    const deployment = deployments.value.find(d => d.id === deploymentId)
-    if (deployment && deployment.status === 'deploying') {
-      deployment.status = 'cancelled'
-      deployment.cancelledAt = new Date().toISOString()
+    try {
+      await deploymentApi.cancel(deploymentId)
+      
+      // Update local state
+      const deployment = deployments.value.find(d => d.id === deploymentId)
+      if (deployment) {
+        deployment.status = 'cancelled'
+        deployment.completed_at = new Date().toISOString()
+      }
+      
+      if (currentDeployment.value?.id === deploymentId) {
+        currentDeployment.value.status = 'cancelled'
+        isDeploying.value = false
+        stopPolling()
+      }
+      
       addLog('Deployment cancelled by user')
-    }
-    
-    if (currentDeployment.value?.id === deploymentId) {
-      isDeploying.value = false
+    } catch (error) {
+      console.error('Error cancelling deployment:', error)
+      throw error
     }
   }
 
-  const addLog = (message) => {
+  const destroy = async (config) => {
+    try {
+      console.log('Starting destroy operation with config:', config)
+      const response = await deploymentApi.destroy ? 
+        await deploymentApi.destroy(config) : 
+        await fetch('/api/v1/destroy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        }).then(r => r.json())
+      
+      const deploymentId = response.deployment_id
+      startPolling(deploymentId)
+      
+      return { id: deploymentId }
+    } catch (error) {
+      console.error('Destroy operation failed:', error)
+      throw error
+    }
+  }
+
+  const addLog = (message, level = 'info') => {
     deploymentLogs.value.push({
       id: Date.now(),
       timestamp: new Date().toISOString(),
       message,
-      level: 'info'
+      level
     })
   }
 
@@ -129,11 +195,15 @@ export const useDeploymentStore = defineStore('deployment', () => {
     
     if (currentDeployment.value?.id === deploymentId) {
       currentDeployment.value = null
+      stopPolling()
     }
   }
 
   const setCurrentDeployment = (deployment) => {
     currentDeployment.value = deployment
+    if (deployment && ['deploying', 'pending'].includes(deployment.status)) {
+      startPolling(deployment.id)
+    }
   }
 
   const resetDeploymentState = () => {
@@ -142,28 +212,20 @@ export const useDeploymentStore = defineStore('deployment', () => {
     deploymentProgress.value = 0
     deploymentLogs.value = []
     deploymentError.value = null
+    stopPolling()
   }
 
-  // Initialize with mock data for development
-  const initializeMockData = () => {
-    deployments.value = [
-      {
-        id: '1',
-        name: 'Local Development',
-        environment: 'local',
-        components: ['openjourney-server', 'openjourney-web'],
-        status: 'running',
-        progress: 100,
-        startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        completedAt: new Date(Date.now() - 2 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString(), // 5 minutes later
-        config: {
-          env: 'local',
-          images: ['openjourney-server', 'openjourney-web'],
-          overwrite: false,
-          production: false
-        }
-      }
-    ]
+  const updateConfig = (config) => {
+    // Store the current config for reference
+    // This method is called by DeploymentWizard.vue to update configuration
+    console.log('Updating deployment config:', config)
+    // The config is typically used immediately for deployment, so we don't need to persist it
+    // But we could store it in a reactive ref if needed for other components
+  }
+
+  // Initialize by fetching real deployments
+  const initialize = async () => {
+    await fetchDeployments()
   }
 
   return {
@@ -183,6 +245,8 @@ export const useDeploymentStore = defineStore('deployment', () => {
     
     // Actions
     deploy,
+    destroy,
+    fetchDeployments,
     getDeploymentStatus,
     cancelDeployment,
     addLog,
@@ -190,6 +254,9 @@ export const useDeploymentStore = defineStore('deployment', () => {
     removeDeployment,
     setCurrentDeployment,
     resetDeploymentState,
-    initializeMockData
+    updateConfig,
+    startPolling,
+    stopPolling,
+    initialize
   }
 })
