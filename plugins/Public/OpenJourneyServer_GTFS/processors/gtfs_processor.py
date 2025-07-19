@@ -24,6 +24,12 @@ import sys
 
 sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 from common.processor_interface import ProcessorInterface, ProcessorError
+from common.logging_config import (
+    setup_service_logging,
+    get_logger,
+    log_database_operation,
+    log_performance,
+)
 
 
 class GTFSDatabaseWriter:
@@ -34,7 +40,9 @@ class GTFSDatabaseWriter:
     def __init__(self, db_config: Dict):
         """Initialize with database configuration."""
         self.db_config = db_config
-        self.logger = logging.getLogger("GTFSDatabaseWriter")
+        # Set up centralized logging for GTFS database writer
+        setup_service_logging("gtfs-database-writer")
+        self.logger = get_logger("GTFSDatabaseWriter")
 
     def get_connection(self):
         """Get database connection."""
@@ -48,6 +56,11 @@ class GTFSDatabaseWriter:
 
     def write_agencies(self, conn, agencies_data: List[Dict]):
         """Write agencies data to canonical.transport_agencies."""
+        self.logger.info(f"Writing {len(agencies_data)} agencies to database")
+        log_database_operation(
+            "INSERT", "transport_agencies", len(agencies_data)
+        )
+
         with conn.cursor() as cur:
             for agency in agencies_data:
                 cur.execute(

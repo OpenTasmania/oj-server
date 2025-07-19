@@ -6,10 +6,14 @@ This module defines the formal interface that all static data processors must im
 This enables a pluggable architecture where different data sourcescan be processed uniformly.
 """
 
-import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from .logging_config import (
+    get_logger,
+    setup_service_logging,
+)
 
 
 class ProcessorInterface(ABC):
@@ -32,7 +36,9 @@ class ProcessorInterface(ABC):
             db_config: Database connection configuration dictionary
         """
         self.db_config = db_config
-        self.logger = logging.getLogger(self.__class__.__name__)
+        # Set up centralized logging for this processor
+        setup_service_logging(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__)
 
     @property
     @abstractmethod
@@ -248,7 +254,9 @@ class ProcessorRegistry:
 
     def __init__(self):
         self._processors: Dict[str, ProcessorInterface] = {}
-        self.logger = logging.getLogger("ProcessorRegistry")
+        # Set up centralized logging for the registry
+        setup_service_logging("ProcessorRegistry")
+        self.logger = get_logger("ProcessorRegistry")
 
     def register(self, processor: ProcessorInterface) -> None:
         """
