@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSystemStore } from '@/stores/system'
 import { useDeploymentStore } from '@/stores/deployment'
 import { useBuildStore } from '@/stores/build'
+import { useWebSocket } from '@/composables/useWebSocket'
 import ComponentStatus from './ComponentStatus.vue'
 
 const systemStore = useSystemStore()
@@ -11,6 +12,15 @@ const buildStore = useBuildStore()
 
 const refreshInterval = ref(null)
 const lastUpdated = ref(new Date())
+
+// WebSocket connection for real-time system monitoring
+const wsUrl = `ws://${window.location.host}/ws/system`
+const { isConnected, connect, send, on, off } = useWebSocket(wsUrl, {
+  autoConnect: true,
+  reconnectInterval: 5000,
+  maxReconnectAttempts: 10,
+  heartbeatInterval: 30000
+})
 
 // System metrics
 const systemMetrics = ref({
@@ -164,24 +174,95 @@ const formatUptime = (uptime) => {
   return uptime
 }
 
+const setupSystemMonitoring = () => {
+  // Listen for system metrics updates
+  on('system_metrics', (data) => {
+    if (data.cpu) {
+      systemMetrics.value.cpu = { ...systemMetrics.value.cpu, ...data.cpu }
+    }
+    if (data.memory) {
+      systemMetrics.value.memory = { ...systemMetrics.value.memory, ...data.memory }
+    }
+    if (data.disk) {
+      systemMetrics.value.disk = { ...systemMetrics.value.disk, ...data.disk }
+    }
+    if (data.network) {
+      systemMetrics.value.network = { ...systemMetrics.value.network, ...data.network }
+    }
+    lastUpdated.value = new Date()
+  })
+
+  // Listen for component status updates
+  on('component_status', (data) => {
+    const componentIndex = systemComponents.value.findIndex(c => c.id === data.id)
+    if (componentIndex !== -1) {
+      systemComponents.value[componentIndex] = { ...systemComponents.value[componentIndex], ...data }
+    }
+    lastUpdated.value = new Date()
+  })
+
+  // Listen for deployment overview updates
+  on('deployment_overview', (data) => {
+    deploymentOverview.value = { ...deploymentOverview.value, ...data }
+    lastUpdated.value = new Date()
+  })
+
+  // Listen for build overview updates
+  on('build_overview', (data) => {
+    buildOverview.value = { ...buildOverview.value, ...data }
+    lastUpdated.value = new Date()
+  })
+
+  // Listen for new activities
+  on('system_activity', (data) => {
+    const newActivity = {
+      id: Date.now() + Math.random(),
+      type: data.type,
+      action: data.action,
+      target: data.target,
+      timestamp: data.timestamp || new Date().toISOString(),
+      status: data.status
+    }
+    
+    // Add to beginning of activities list and keep only recent ones
+    recentActivities.value.unshift(newActivity)
+    if (recentActivities.value.length > 10) {
+      recentActivities.value = recentActivities.value.slice(0, 10)
+    }
+    lastUpdated.value = new Date()
+  })
+
+  // Request initial data
+  if (isConnected.value) {
+    send({ type: 'request_system_status' })
+  }
+}
+
 const refreshData = async () => {
   try {
-    // Simulate data refresh
-    systemMetrics.value.cpu.usage = Math.floor(Math.random() * 100)
-    systemMetrics.value.memory.usage = Math.floor(Math.random() * 100)
-    systemMetrics.value.disk.usage = Math.floor(Math.random() * 100)
-    
-    lastUpdated.value = new Date()
+    // Request fresh data via WebSocket
+    if (isConnected.value) {
+      send({ type: 'request_system_status' })
+    } else {
+      // Fallback to simulated data if WebSocket is not connected
+      systemMetrics.value.cpu.usage = Math.floor(Math.random() * 100)
+      systemMetrics.value.memory.usage = Math.floor(Math.random() * 100)
+      systemMetrics.value.disk.usage = Math.floor(Math.random() * 100)
+      lastUpdated.value = new Date()
+    }
   } catch (error) {
     console.error('Failed to refresh dashboard data:', error)
   }
 }
 
 onMounted(() => {
+  // Set up WebSocket event listeners for real-time monitoring
+  setupSystemMonitoring()
+  
   // Initial data load
   refreshData()
   
-  // Set up auto-refresh every 30 seconds
+  // Set up auto-refresh every 30 seconds (fallback for when WebSocket is disconnected)
   refreshInterval.value = setInterval(refreshData, 30000)
 })
 
