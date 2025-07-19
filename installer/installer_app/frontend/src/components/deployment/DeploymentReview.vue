@@ -19,7 +19,7 @@ const deploymentLogs = ref([])
 
 // WebSocket connection for real-time updates
 const wsUrl = `ws://${window.location.host}/ws/deployment`
-const { isConnected, send, on, off } = useWebSocket(wsUrl, {
+const { isConnected, connect, send, on, off } = useWebSocket(wsUrl, {
   autoConnect: false,
   reconnectInterval: 3000,
   maxReconnectAttempts: 5
@@ -75,66 +75,117 @@ const deploymentSteps = ref([
   { id: 8, name: 'Finalizing deployment', status: 'pending' }
 ])
 
-const simulateDeployment = async () => {
+const startRealTimeDeployment = async () => {
   isDeploying.value = true
   deploymentProgress.value = 0
   deploymentLogs.value = []
   
   try {
-    for (let i = 0; i < deploymentSteps.value.length; i++) {
-      const step = deploymentSteps.value[i]
-      
-      // Update step status to running
-      step.status = 'running'
-      deploymentLogs.value.push({
-        id: Date.now() + i,
-        timestamp: new Date().toLocaleTimeString(),
-        level: 'info',
-        message: `Starting: ${step.name}`
-      })
-      
-      // Simulate step execution time
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
-      
-      // Update progress
-      deploymentProgress.value = Math.round(((i + 1) / deploymentSteps.value.length) * 100)
-      
-      // Mark step as completed
-      step.status = 'completed'
-      deploymentLogs.value.push({
-        id: Date.now() + i + 100,
-        timestamp: new Date().toLocaleTimeString(),
-        level: 'success',
-        message: `Completed: ${step.name}`
-      })
+    // Connect to WebSocket if not already connected
+    if (!isConnected.value) {
+      await connect()
     }
     
-    // Final success message
-    deploymentLogs.value.push({
-      id: Date.now() + 1000,
-      timestamp: new Date().toLocaleTimeString(),
-      level: 'success',
-      message: 'Deployment completed successfully!'
+    // Send deployment start message
+    const deploymentId = `deployment-${Date.now()}`
+    send({
+      type: 'start_deployment',
+      deploymentId,
+      config: props.config
     })
     
-    // Wait a moment then emit deploy event
-    setTimeout(() => {
-      emit('deploy')
-    }, 2000)
+    // Set up event listeners for deployment updates
+    setupDeploymentListeners(deploymentId)
     
   } catch (error) {
+    console.error('Failed to start deployment:', error)
     deploymentLogs.value.push({
-      id: Date.now() + 2000,
+      id: Date.now(),
       timestamp: new Date().toLocaleTimeString(),
       level: 'error',
-      message: `Deployment failed: ${error.message}`
+      message: `Failed to start deployment: ${error.message}`
     })
     isDeploying.value = false
   }
 }
 
+const setupDeploymentListeners = (deploymentId) => {
+  // Listen for deployment progress updates
+  on('deployment_progress', (data) => {
+    if (data.deploymentId === deploymentId) {
+      deploymentProgress.value = data.progress
+      
+      // Update step status
+      if (data.currentStep && data.currentStep <= deploymentSteps.value.length) {
+        const step = deploymentSteps.value[data.currentStep - 1]
+        if (step) {
+          step.status = data.stepStatus || 'running'
+        }
+      }
+    }
+  })
+  
+  // Listen for deployment logs
+  on('deployment_log', (data) => {
+    if (data.deploymentId === deploymentId) {
+      deploymentLogs.value.push({
+        id: Date.now() + Math.random(),
+        timestamp: new Date().toLocaleTimeString(),
+        level: data.level || 'info',
+        message: data.message
+      })
+    }
+  })
+  
+  // Listen for deployment completion
+  on('deployment_complete', (data) => {
+    if (data.deploymentId === deploymentId) {
+      isDeploying.value = false
+      deploymentProgress.value = 100
+      
+      deploymentLogs.value.push({
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        level: 'success',
+        message: 'Deployment completed successfully!'
+      })
+      
+      // Mark all steps as completed
+      deploymentSteps.value.forEach(step => {
+        if (step.status !== 'completed') {
+          step.status = 'completed'
+        }
+      })
+      
+      setTimeout(() => {
+        emit('deploy')
+      }, 2000)
+    }
+  })
+  
+  // Listen for deployment errors
+  on('deployment_error', (data) => {
+    if (data.deploymentId === deploymentId) {
+      isDeploying.value = false
+      
+      deploymentLogs.value.push({
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        level: 'error',
+        message: `Deployment failed: ${data.error}`
+      })
+      
+      // Mark current step as failed
+      const currentStep = deploymentSteps.value.find(step => step.status === 'running')
+      if (currentStep) {
+        currentStep.status = 'failed'
+      }
+    }
+  })
+}
+
 const handleDeploy = () => {
-  simulateDeployment()
+  startRealTimeDeployment()
 }
 
 const handleBack = () => {
