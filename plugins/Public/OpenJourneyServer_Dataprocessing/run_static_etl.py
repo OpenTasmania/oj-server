@@ -15,6 +15,7 @@ Usage:
 import argparse
 import logging
 import sys
+import time
 import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -30,6 +31,7 @@ from common.processor_interface import (
     ProcessorError,
     ProcessorRegistry,
 )
+from common.metrics import get_metrics
 
 # Configure logging
 logging.basicConfig(
@@ -59,6 +61,7 @@ class StaticETLOrchestrator:
         self.config_path = Path(config_path)
         self.config = self._load_config()
         self.processor_registry = ProcessorRegistry()
+        self.metrics = get_metrics()
         self._load_processors()
 
     def _load_config(self) -> Dict[str, Any]:
@@ -124,6 +127,9 @@ class StaticETLOrchestrator:
         Args:
             processor_file: Path to the processor Python file
         """
+        start_time = time.time()
+        processor_type = processor_file.stem
+
         try:
             # Create module spec
             module_name = f"processors.{processor_file.stem}"
@@ -155,9 +161,19 @@ class StaticETLOrchestrator:
                             f"Registered processor: {processor_instance.processor_name}"
                         )
 
+                        # Record successful processor loading time
+                        duration = time.time() - start_time
+                        self.metrics.record_etl_processor_load_time(
+                            processor_type, duration
+                        )
+
         except Exception as e:
             logger.error(
                 f"Failed to load processor from {processor_file}: {e}"
+            )
+            # Record processor loading error
+            self.metrics.record_etl_error(
+                "processor_load_error", processor_type
             )
 
     def get_static_feeds(self) -> List[Dict[str, Any]]:
@@ -198,11 +214,16 @@ class StaticETLOrchestrator:
             )
             return True
 
+        # Start timing for metrics
+        start_time = time.time()
+
         try:
             # Find appropriate processor for this feed type
             processor = self._get_processor_for_type(feed_type)
             if not processor:
                 logger.error(f"No processor found for feed type: {feed_type}")
+                self.metrics.record_etl_error("no_processor_found", feed_name)
+                self.metrics.record_etl_feed_processed("failed", feed_type)
                 return False
 
             # Create source path from URL or file path
@@ -221,14 +242,34 @@ class StaticETLOrchestrator:
             }
 
             processor.process(source_path, source_info)
+
+            # Record successful processing
+            duration = time.time() - start_time
+            self.metrics.record_etl_processing_time(
+                feed_name, feed_type, duration
+            )
+            self.metrics.record_etl_feed_processed("success", feed_type)
+
             logger.info(f"Successfully processed feed: {feed_name}")
             return True
 
         except ProcessorError as e:
             logger.error(f"Processor error for feed {feed_name}: {e}")
+            duration = time.time() - start_time
+            self.metrics.record_etl_processing_time(
+                feed_name, feed_type, duration
+            )
+            self.metrics.record_etl_error("processor_error", feed_name)
+            self.metrics.record_etl_feed_processed("failed", feed_type)
             return False
         except Exception as e:
             logger.error(f"Unexpected error processing feed {feed_name}: {e}")
+            duration = time.time() - start_time
+            self.metrics.record_etl_processing_time(
+                feed_name, feed_type, duration
+            )
+            self.metrics.record_etl_error("unexpected_error", feed_name)
+            self.metrics.record_etl_feed_processed("failed", feed_type)
             return False
 
     def _get_processor_for_type(

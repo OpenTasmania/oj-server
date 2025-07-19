@@ -27,6 +27,12 @@ from psycopg2.extras import RealDictCursor
 import pandas as pd
 import gtfs_kit as gk
 
+# Add the project root to the Python path for metrics import
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from common.metrics import get_metrics
+
 
 class PostgreSQLOpenJourneyWriter:
     """
@@ -386,6 +392,9 @@ class GTFSDaemon:
         # Setup logging
         self.setup_logging()
 
+        # Initialize metrics
+        self.metrics = get_metrics()
+
         # Initialize components
         self.converter = GTFSToOpenJourneyConverter()
         self.db_writer = PostgreSQLOpenJourneyWriter(self.db_config)
@@ -404,9 +413,11 @@ class GTFSDaemon:
         self.logger = logging.getLogger("GTFSDaemon")
 
     def download_gtfs_from_url(
-        self, url: str, temp_dir: str
+        self, url: str, temp_dir: str, feed_name: str = "unknown"
     ) -> Optional[Path]:
         """Download GTFS feed from URL."""
+        start_time = time.time()
+
         try:
             self.logger.info(f"Downloading GTFS feed from {url}")
             response = requests.get(url, timeout=300)
@@ -416,6 +427,10 @@ class GTFSDaemon:
             temp_path = Path(temp_dir) / "gtfs_feed.zip"
             with open(temp_path, "wb") as f:
                 f.write(response.content)
+
+            # Record successful download
+            duration = time.time() - start_time
+            self.metrics.record_gtfs_download_time(feed_name, duration)
 
             self.logger.info(f"Downloaded GTFS feed to {temp_path}")
             return temp_path
@@ -436,23 +451,50 @@ class GTFSDaemon:
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Download GTFS feed
-                gtfs_path = self.download_gtfs_from_url(feed_url, temp_dir)
+                gtfs_path = self.download_gtfs_from_url(
+                    feed_url, temp_dir, feed_name
+                )
                 if not gtfs_path:
+                    self.metrics.record_gtfs_feed_processed(
+                        "failed", feed_name
+                    )
                     return False
 
                 # Convert to OpenJourney format
+                conversion_start = time.time()
                 journey_data = self.converter.convert_gtfs_to_openjourney(
                     gtfs_path, feed_config
                 )
+                conversion_duration = time.time() - conversion_start
+                self.metrics.record_gtfs_conversion_time(
+                    feed_name, conversion_duration
+                )
 
                 # Write to PostgreSQL
-                self.db_writer.write_journey_data(journey_data)
+                try:
+                    self.db_writer.write_journey_data(journey_data)
+                    self.metrics.record_gtfs_database_operation(
+                        "write_journey_data", "success"
+                    )
+                except Exception as db_e:
+                    self.logger.error(
+                        f"Database error for feed {feed_name}: {str(db_e)}"
+                    )
+                    self.metrics.record_gtfs_database_operation(
+                        "write_journey_data", "failed"
+                    )
+                    self.metrics.record_gtfs_feed_processed(
+                        "failed", feed_name
+                    )
+                    return False
 
+                self.metrics.record_gtfs_feed_processed("success", feed_name)
                 self.logger.info(f"Successfully processed feed: {feed_name}")
                 return True
 
         except Exception as e:
             self.logger.error(f"Error processing feed {feed_name}: {str(e)}")
+            self.metrics.record_gtfs_feed_processed("failed", feed_name)
             return False
 
     def process_feed_with_retry(self, feed_config: Dict):
@@ -469,6 +511,11 @@ class GTFSDaemon:
                 )
 
             if attempt < self.max_retries - 1:
+                # Record retry attempt
+                self.metrics.record_gtfs_retry_attempt(
+                    feed_name, "processing_failed"
+                )
+
                 delay = self.retry_delay * (2**attempt)
                 self.logger.info(
                     f"Retrying feed {feed_name} in {delay} seconds..."
@@ -479,8 +526,14 @@ class GTFSDaemon:
         """Run the daemon once (process all feeds)."""
         self.logger.info("Starting GTFS daemon run...")
 
+        # Set active feeds gauge
+        self.metrics.set_gtfs_active_feeds(len(self.feeds))
+
         for feed_config in self.feeds:
             self.process_feed_with_retry(feed_config)
+
+        # Reset active feeds gauge after processing
+        self.metrics.set_gtfs_active_feeds(0)
 
         self.logger.info("GTFS daemon run completed")
 
