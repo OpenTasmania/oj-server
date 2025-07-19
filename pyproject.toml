@@ -44,6 +44,7 @@ dependencies = [
     "python-dotenv>=1.1.1,<2.0.0",
     "PyYAML>6.0.0,<7.0.0",
     "requests>2.32.0,<3.0.0",
+    "types-flask-cors>=6.0.0.20250520",
     "urwid>3.0.0,<4.0.0",
 ]
 
