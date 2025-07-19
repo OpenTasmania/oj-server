@@ -39,7 +39,7 @@ We encourage code contributions! If you'd like to contribute code, please follow
    cd oj-server
    ```
 3. **Create a new branch:** For each new feature or bug fix, create a separate branch. Use a descriptive name for your
-   branch (e.g., `feature/add-gtfs-realtime`, `bugfix/fix-osrm-docker`).
+   branch (e.g., `feature/add-transxchange`, `bugfix/fix-osrm-docker`).
    ```bash
    git checkout -b your-branch-name
    ```
@@ -47,7 +47,7 @@ We encourage code contributions! If you'd like to contribute code, please follow
 5. **Test your changes:** Ensure your changes work as expected and don't introduce new issues.
 6. **Commit your changes:** Write clear and concise commit messages.
    ```bash
-   git commit -m "feat: Add new GTFS Realtime processing"
+   git commit -m "feat: Add optimised GTFS processing"
    ```
    (Using conventional commits is preferred, but not strictly enforced for initial contributions.)
 7. **Push your branch to your fork:**
