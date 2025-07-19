@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useDeploymentStore } from '@/stores/deployment'
+import { useWebSocket } from '@/composables/useWebSocket'
 
 const props = defineProps({
   config: {
