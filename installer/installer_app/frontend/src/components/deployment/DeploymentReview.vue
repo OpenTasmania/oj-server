@@ -17,6 +17,14 @@ const isDeploying = ref(false)
 const deploymentProgress = ref(0)
 const deploymentLogs = ref([])
 
+// WebSocket connection for real-time updates
+const wsUrl = `ws://${window.location.host}/ws/deployment`
+const { isConnected, send, on, off } = useWebSocket(wsUrl, {
+  autoConnect: false,
+  reconnectInterval: 3000,
+  maxReconnectAttempts: 5
+})
+
 const environmentLabels = {
   local: 'Local Development',
   staging: 'Staging Environment',
