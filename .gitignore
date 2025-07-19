@@ -169,3 +169,6 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+
+/installer/installer_app/frontend/node_modules
