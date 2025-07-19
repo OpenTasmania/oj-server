@@ -42,8 +42,7 @@ const features = ref([
         OpenJourney Server Installer
       </h1>
       <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-        A modern, user-friendly interface for deploying, managing, and monitoring your OpenJourney Server installation.
-        Built with Vue.js 3.5 for a seamless experience.
+        Deploy, manage, and monitoring your OpenJourney Server installation.
       </p>
     </div>
 
